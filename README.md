@@ -21,7 +21,7 @@
 ![Flow Chart](https://github.com/garciamsu/MARL_emergent_microgrid/blob/main/assets/images/demand.png)
 
 > [!NOTE]
-<p align="justify">Es importante destacar que los datos recopilados fueron homologados al mismo año 2019, con un período de recolección de un año y un muestreo cada hora. Además, las estaciones del año analizadas coinciden entre Estados Unidos y España, ya que ambos países se encuentran en el hemisferio norte. Esto implica que experimentan las estaciones simultáneamente, aunque pueden existir ligeras variaciones en las fechas exactas de inicio y finalización. </p>
+> Es importante destacar que los datos recopilados fueron homologados al mismo año 2019, con un período de recolección de un año y un muestreo cada hora. Además, las estaciones del año analizadas coinciden entre Estados Unidos y España, ya que ambos países se encuentran en el hemisferio norte. Esto implica que experimentan las estaciones simultáneamente, aunque pueden existir ligeras variaciones en las fechas exactas de inicio y finalización.
 
 ## Referencias
 

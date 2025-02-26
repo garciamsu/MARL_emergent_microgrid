@@ -1,5 +1,7 @@
+import os
 import numpy as np
 import random
+import pandas as pd
 
 # Parámetros físicos y constantes
 ETA = 0.15  # Eficiencia de conversión solar
@@ -13,17 +15,15 @@ C_CONFORT = 0.5  # Umbral de confort para el costo del mercado
 
 class Environment:
     def __init__(self):
-        self.solar_bins = np.linspace(0, 1, 10)
-        self.wind_bins = np.linspace(0, 1, 10)
-        self.battery_bins = np.linspace(0, 1, 10)
-        self.demand_bins = np.linspace(0, 1, 10)
-        self.price_bins = np.linspace(0, 1, 10)
+        # Ruta del archivo
+        file_path = os.getcwd() + "/assets/datasets/" + "Case1_energy_data_with_pv_power.csv"
+        
+        # Cargar el archivo CSV
+        self.dataset = pd.read_csv(file_path)
 
-    def discretize_state(self, state):
-        return tuple(np.digitize(s, b) for s, b in zip(state, [
-            self.solar_bins, self.wind_bins, self.battery_bins, self.demand_bins, self.price_bins
-        ]))
-
+        # Mostrar las primeras filas del DataFrame
+        print(self.dataset.head())
+        
 class Agent:
     def __init__(self, name, actions, alpha=1.0, beta=1.0, gamma=1.0):
         self.name = name
@@ -152,13 +152,16 @@ class Simulation:
         self.num_episodes = num_episodes
         self.max_steps = max_steps
         self.environment = Environment()
+        
         self.agents = [
             SolarAgent(),
-            WindAgent(),
+            SolarAgent(),
+            SolarAgent(),
             BatteryAgent(),
             GridAgent(),
             LoadAgent()
         ]
+         
         self.alpha = 0.1
         self.gamma = 0.9
         self.epsilon = 0.1
@@ -166,7 +169,8 @@ class Simulation:
     def run(self):
         for agent in self.agents:
             agent.initialize_q_table(self.environment)
-
+        
+        '''
         for episode in range(self.num_episodes):
             current_state = self.environment.discretize_state(
                 [random.uniform(0, 1) for _ in range(5)]
@@ -219,7 +223,8 @@ class Simulation:
                     )
                     agent.update_q_table(current_state, action, reward, next_state, self.alpha, self.gamma)
                     current_state = next_state
+        '''
 
 if __name__ == "__main__":
     simulation = Simulation(num_episodes=1000, max_steps=100)
-    simulation.run()
+    #simulation.run()

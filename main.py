@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import random
 import pandas as pd
@@ -26,22 +27,25 @@ class MultiAgentEnv:
     """
 
     def __init__(self, csv_filename="Case1_energy_data_with_pv_power.csv", 
-                 num_solar_bins=5, num_wind_bins=5, num_battery_bins=5, 
-                 num_demand_bins=5, num_price_bins=5):
+                 num_renew_bins=3, num_grid_bins=3, num_battery_bins=4):
         """
         Parámetros:
           - num_*_bins: define cuántos intervalos se utilizan para discretizar cada variable.
         """
         # Cargamos el dataset
         self.dataset = self._load_data(csv_filename)
+
+        max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
         
         # Definimos los "bins" para discretizar cada variable de interés:
         # Ajusta los rangos según tu dataset real
-        self.solar_bins = np.linspace(0, 1, num_solar_bins)      # Ejemplo
-        self.wind_bins = np.linspace(0, 1, num_wind_bins)
+        self.renew_bins = np.linspace(-max_value, max_value, num_renew_bins)      # Ejemplo
         self.battery_bins = np.linspace(0, 1, num_battery_bins)
-        self.demand_bins = np.linspace(0, 1, num_demand_bins)
-        self.price_bins = np.linspace(0, 1, num_price_bins)
+        self.grid_bins = np.linspace(0, 1, num_grid_bins)
+
+        print(self.renew_bins)
+        print(self.battery_bins)
+        print(self.grid_bins)
         
         # Índice actual dentro del dataset (simularemos step a step)
         self.current_index = 0
@@ -52,16 +56,8 @@ class MultiAgentEnv:
     def _load_data(self, filename):
         # Ruta al archivo
         file_path = os.path.join(os.getcwd(), "assets", "datasets", filename)
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(file_path, sep=';', engine='python')
         print("Primeras filas del dataset:\n", df.head())
-        
-        # Suponiendo que df contiene columnas como ["irradiance", "wind_speed", "demand", "price", ...]
-        # Ajusta según tus columnas reales
-        # Nos aseguramos de que existan, o simulamos en caso de no haber
-        for col in ["irradiance", "wind_speed", "demand", "price"]:
-            if col not in df.columns:
-                # En tu caso real, puedes manejarlo de otra forma
-                df[col] = np.random.uniform(0, 1, size=len(df))
         
         return df
 
@@ -96,17 +92,16 @@ class MultiAgentEnv:
         # Ejemplo: la batería puede ser un estado interno que no viene del dataset,
         # lo inicializamos a un valor aleatorio o 0.5
         # (También podrías llevar el SOC en otra parte del código.)
-        soc = 0.5  
+        soc = 0.5
+        grid = 0  
 
-        # Discretizamos
-        solar_idx = np.digitize([row["irradiance"]], self.solar_bins)[0] - 1
-        wind_idx = np.digitize([row["wind_speed"]], self.wind_bins)[0] - 1
+        # Discretizamos (QUIZAS AQUI SEA PRUDENTE NO DIFERENCIAR POR SOLAR NI EOLICA SINO CONSIDERAR COMO UNA SOLA PH "SOLAR + WIND + OTRAS RENOVABLES")
+        renew_idx = np.digitize([row["pv_power_1"] + row["pv_power_2"] + row["pv_power_3"] + row["wind_power"] - row["demand"]], self.renew_bins)[0] - 1
         battery_idx = np.digitize([soc], self.battery_bins)[0] - 1
-        demand_idx = np.digitize([row["demand"]], self.demand_bins)[0] - 1
-        price_idx = np.digitize([row["price"]], self.price_bins)[0] - 1
-        
+        grid_idx = np.digitize([grid], self.grid_bins)[0] - 1
+
         # Retornamos la tupla de estado discretizado
-        return (solar_idx, wind_idx, battery_idx, demand_idx, price_idx)
+        return (renew_idx, battery_idx, grid_idx)
 
 # -----------------------------------------------------
 # 2) Definimos la clase base de Agente con Q-Table
@@ -125,21 +120,20 @@ class BaseAgent:
     def initialize_q_table(self, env: MultiAgentEnv):
         """
         Crea la Q-table para todos los posibles estados discretizados.
-        (solar_bins, wind_bins, battery_bins, demand_bins, price_bins)
+        (solar_bins, wind_bins, battery_bins, demand_bins)
         """
         states = []
-        for a in range(len(env.solar_bins)):
-            for b in range(len(env.wind_bins)):
-                for c in range(len(env.battery_bins)):
-                    for d in range(len(env.demand_bins)):
-                        for e in range(len(env.price_bins)):
-                            states.append( (a, b, c, d, e) )
+        for a in range(len(env.renew_bins)):
+            for b in range(len(env.battery_bins)):
+                for c in range(len(env.grid_bins)):
+                    states.append( (a, b, c) )
         
         # Para cada estado, creamos un diccionario de acción->Q
         self.q_table = {
-            state: {action: 0.0 for action in self.actions} 
+            state: {action: 0 for action in self.actions} 
             for state in states
         }
+        print(self.q_table)
 
     def choose_action(self, state, epsilon=0.1):
         """
@@ -283,11 +277,9 @@ class Simulation:
         
         # Creamos el entorno que carga el CSV y discretiza
         self.env = MultiAgentEnv(csv_filename="Case1_energy_data_with_pv_power.csv",
-                                 num_solar_bins=5, 
-                                 num_wind_bins=5, 
-                                 num_battery_bins=5,
-                                 num_demand_bins=5, 
-                                 num_price_bins=5)
+                                 num_renew_bins=3, 
+                                 num_grid_bins=3, 
+                                 num_battery_bins=4)
         
         # Definimos un conjunto de agentes (ejemplo: 3 solares, 1 battery, 1 grid, 1 load)
         self.agents = [
@@ -304,17 +296,21 @@ class Simulation:
         
         # Inicializamos Q-tables
         for ag in self.agents:
+            print("*"*20)
             ag.initialize_q_table(self.env)
-
+        
     def run(self):
         for ep in range(self.num_episodes):
             # Reseteamos entorno al inicio de cada episodio
             state = self.env.reset()
             
+            
             for step in range(self.max_steps):
                 # Obtenemos variables reales del entorno (por ejemplo, para recompensas)
                 # row real:
                 row = self.env.dataset.iloc[self.env.current_index]
+                
+                sys.exit(0)
                 irradiance = row["irradiance"]
                 wind_speed = row["wind_speed"]
                 demand = row["demand"]

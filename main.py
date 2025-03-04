@@ -32,6 +32,11 @@ class MultiAgentEnv:
         Parámetros:
           - num_*_bins: define cuántos intervalos se utilizan para discretizar cada variable.
         """
+
+        self.renew_power = 0
+        self.demand = 0
+        self.price = 0
+        
         # Cargamos el dataset
         self.dataset = self._load_data(csv_filename)
 
@@ -82,6 +87,14 @@ class MultiAgentEnv:
         self.state = self._get_discretized_state(self.current_index)
         return self.state
 
+    def _get_global(self, index):
+        row = self.dataset.iloc[index]
+
+        # Variables globales
+        self.renew_power = row["pv_power_1"] + row["pv_power_2"] + row["pv_power_3"] + row["wind_power"]
+        self.demand = row["demand"]
+        self.price = row["price"]
+
     def _get_discretized_state(self, index):
         """
         Toma valores reales (irradancia, viento, demanda, precio, etc.) y los discretiza en bins,
@@ -93,10 +106,10 @@ class MultiAgentEnv:
         # lo inicializamos a un valor aleatorio o 0.5
         # (También podrías llevar el SOC en otra parte del código.)
         soc = 0.5
-        grid = 0  
+        grid = 0          
 
         # Discretizamos (QUIZAS AQUI SEA PRUDENTE NO DIFERENCIAR POR SOLAR NI EOLICA SINO CONSIDERAR COMO UNA SOLA PH "SOLAR + WIND + OTRAS RENOVABLES")
-        renew_idx = np.digitize([row["pv_power_1"] + row["pv_power_2"] + row["pv_power_3"] + row["wind_power"] - row["demand"]], self.renew_bins)[0] - 1
+        renew_idx = np.digitize([self.renew_power - self.demand], self.renew_bins)[0] - 1
         battery_idx = np.digitize([soc], self.battery_bins)[0] - 1
         grid_idx = np.digitize([grid], self.grid_bins)[0] - 1
 
@@ -171,7 +184,7 @@ class SolarAgent(BaseAgent):
 
     def calculate_power(self, irradiance):
         # Ejemplo muy simplificado
-        return ETA * SOLAR_AREA * irradiance * (1 - 0.005*(T_AMBIENT - 25))
+        return ETA * SOLAR_AREA * irradiance * (1 - 0.005*(T_AMBIENT + 25))
 
     def calculate_reward(self, P_H, P_L, SOC, active_agents):
         """
@@ -283,12 +296,13 @@ class Simulation:
         
         # Definimos un conjunto de agentes (ejemplo: 3 solares, 1 battery, 1 grid, 1 load)
         self.agents = [
-            SolarAgent(),
-            SolarAgent(),
-            SolarAgent(),
+            SolarAgent("pv_power_1"),
+            SolarAgent("pv_power_2"),
+            SolarAgent("pv_power_3"),
+            WindAgent("wind_power"),
             BatteryAgent(),
-            GridAgent(),
-            LoadAgent()
+            GridAgent("price"),
+            LoadAgent("demand")
         ]
         
         # Parámetros de entrenamiento
@@ -308,13 +322,8 @@ class Simulation:
             for step in range(self.max_steps):
                 # Obtenemos variables reales del entorno (por ejemplo, para recompensas)
                 # row real:
-                row = self.env.dataset.iloc[self.env.current_index]
-                
-                sys.exit(0)
-                irradiance = row["irradiance"]
-                wind_speed = row["wind_speed"]
-                demand = row["demand"]
-                price = row["price"]
+                #row = self.env.dataset.iloc[self.env.current_index]
+                self._get_global(self.env.current_index)
                 
                 # Valor "total de potencia" (muy simplificado)
                 # Suponemos que cada agente "produce" si su acción es "produce"
@@ -348,6 +357,8 @@ class Simulation:
                     else:
                         # GridAgent, LoadAgent no generan en este ejemplo
                         _ = ag.choose_action(state, self.epsilon)
+
+                sys.exit(0)
                 
                 # Ahora calculamos la recompensa individual por agente
                 # y actualizamos la Q-table

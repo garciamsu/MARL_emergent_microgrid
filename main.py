@@ -87,14 +87,6 @@ class MultiAgentEnv:
         self.state = self._get_discretized_state(self.current_index)
         return self.state
 
-    def _get_global(self, index):
-        row = self.dataset.iloc[index]
-
-        # Variables globales
-        self.renew_power = row["pv_power_1"] + row["pv_power_2"] + row["pv_power_3"] + row["wind_power"]
-        self.demand = row["demand"]
-        self.price = row["price"]
-
     def _get_discretized_state(self, index):
         """
         Toma valores reales (irradancia, viento, demanda, precio, etc.) y los discretiza en bins,
@@ -123,11 +115,12 @@ class BaseAgent:
     """
     Clase base para agentes con Q-table.
     """
-    def __init__(self, name, actions, alpha=0.1, gamma=0.9):
+    def __init__(self, name, actions, alpha=0.1, gamma=0.9, isPower=True):
         self.name = name
         self.actions = actions
         self.alpha = alpha
         self.gamma = gamma
+        self.isPower = isPower
         self.q_table = {}
     
     def initialize_q_table(self, env: MultiAgentEnv):
@@ -180,11 +173,17 @@ class BaseAgent:
 # -----------------------------------------------------
 class SolarAgent(BaseAgent):
     def __init__(self):
-        super().__init__("solar", ["produce", "idle"], alpha=0.1, gamma=0.9)
+        super().__init__("solar", ["produce", "idle"], alpha=0.1, gamma=0.9, isPower=True)
 
-    def calculate_power(self, irradiance):
+    def calculate_power(self, row):
+
+        if self.isPower:
+            return row["solar_power"]
+        else:
+            return ETA * SOLAR_AREA * row["irradiance"] * (1 - 0.005*(T_AMBIENT + 25))
+
         # Ejemplo muy simplificado
-        return ETA * SOLAR_AREA * irradiance * (1 - 0.005*(T_AMBIENT + 25))
+        
 
     def calculate_reward(self, P_H, P_L, SOC, active_agents):
         """
@@ -208,11 +207,14 @@ class SolarAgent(BaseAgent):
 
 class WindAgent(BaseAgent):
     def __init__(self):
-        super().__init__("wind", ["produce", "idle"], alpha=0.1, gamma=0.9)
+        super().__init__("wind", ["produce", "idle"], alpha=0.1, gamma=0.9, isPower=True)
 
-    def calculate_power(self, wind_speed):
-        # Ejemplo con fórmula eólica
-        return 0.5 * RHO * BLADE_AREA * C_P * (wind_speed**3)
+    def calculate_power(self, row):
+
+        if self.isPower:
+            return row["wind_power"]
+        else:
+            return 0.5 * RHO * BLADE_AREA * C_P * (row["wind speed"]**3)
 
     def calculate_reward(self, P_H, P_L, SOC, active_agents):
         # Ejemplo simplificado
@@ -294,15 +296,13 @@ class Simulation:
                                  num_grid_bins=3, 
                                  num_battery_bins=4)
         
-        # Definimos un conjunto de agentes (ejemplo: 3 solares, 1 battery, 1 grid, 1 load)
+        # Definimos un conjunto de agentes (ejemplo: 1 pv, 1 wind, 1 battery, 1 grid, 1 load)
         self.agents = [
-            SolarAgent("pv_power_1"),
-            SolarAgent("pv_power_2"),
-            SolarAgent("pv_power_3"),
-            WindAgent("wind_power"),
+            SolarAgent(),
+            WindAgent(),
             BatteryAgent(),
-            GridAgent("price"),
-            LoadAgent("demand")
+            GridAgent(),
+            LoadAgent()
         ]
         
         # Parámetros de entrenamiento
@@ -316,14 +316,13 @@ class Simulation:
     def run(self):
         for ep in range(self.num_episodes):
             # Reseteamos entorno al inicio de cada episodio
-            state = self.env.reset()
-            
+            state = self.env.reset()            
             
             for step in range(self.max_steps):
+
                 # Obtenemos variables reales del entorno (por ejemplo, para recompensas)
                 # row real:
-                #row = self.env.dataset.iloc[self.env.current_index]
-                self._get_global(self.env.current_index)
+                row = self.env.dataset.iloc[self.env.current_index]
                 
                 # Valor "total de potencia" (muy simplificado)
                 # Suponemos que cada agente "produce" si su acción es "produce"
@@ -334,17 +333,19 @@ class Simulation:
                         # Escoger acción
                         action = ag.choose_action(state, self.epsilon)
                         if action == "produce":
-                            p = ag.calculate_power(irradiance)
+                            p = ag.calculate_power(row)
                         else:
                             p = 0.0
+                        print("solar - " + str(p))
                         P_total += p
                     elif isinstance(ag, WindAgent):
                         action = ag.choose_action(state, self.epsilon)
                         if action == "produce":
-                            p = ag.calculate_power(wind_speed)
+                            p = ag.calculate_power(row)
                         else:
                             p = 0.0
                         P_total += p
+                        print("wind - " + str(p))
                     elif isinstance(ag, BatteryAgent):
                         action = ag.choose_action(state, self.epsilon)
                         # No suma potencia directamente si "idle",
@@ -358,12 +359,12 @@ class Simulation:
                         # GridAgent, LoadAgent no generan en este ejemplo
                         _ = ag.choose_action(state, self.epsilon)
 
-                sys.exit(0)
+                
                 
                 # Ahora calculamos la recompensa individual por agente
                 # y actualizamos la Q-table
                 next_state = self.env.step()  # Avanzamos el entorno un índice
-                for ag in self.agents:
+                '''for ag in self.agents:
                     # Recuperamos la acción que tomó este agente en este step
                     # Para un enfoque riguroso, cada agente debería almacenar su "acción" actual,
                     # aquí simplificamos volviendo a elegir la misma acción con choose_action(...) 
@@ -410,18 +411,20 @@ class Simulation:
                                                      SOC=0.5, C_mercado=price)
                     else:
                         reward = 0.0
-                    
+                    '''
                     # Actualizamos Q-table
-                    ag.update_q_table(state, action, reward, next_state)
+                    #ag.update_q_table(state, action, reward, next_state)
                 
                 # Actualizamos el estado actual
-                state = next_state
-
+                #state = next_state
+                
+            
             print(f"Fin episodio {ep+1}/{self.num_episodes}")
+            sys.exit(0)
 
 # -----------------------------------------------------
 # 5) Punto de entrada principal
 # -----------------------------------------------------
 if __name__ == "__main__":
-    sim = Simulation(num_episodes=5, max_steps=3)
+    sim = Simulation(num_episodes=5, max_steps=24)
     sim.run()

@@ -27,31 +27,30 @@ class MultiAgentEnv:
     """
 
     def __init__(self, csv_filename="Case1_energy_data_with_pv_power.csv", 
-                 num_renew_bins=3, num_grid_bins=3, num_battery_bins=4):
+                 num_solar_bins=6, num_wind_bins=6, num_demand_bins=6, num_battery_bins=3):
         """
         Parámetros:
           - num_*_bins: define cuántos intervalos se utilizan para discretizar cada variable.
         """
 
-        self.renew_power = 0
-        self.demand = 0
-        self.price = 0
+        self.solar_power = 0
+        self.wind_power = 0
+        self.demand = 0        
+        self.battery_bins = 0
         
         # Cargamos el dataset
         self.dataset = self._load_data(csv_filename)
 
         max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
         
-        # Definimos los "bins" para discretizar cada variable de interés:
+        # Discretizacion por cuantizacion uniforme
+        # Definimos los "bins" para discretizar cada variable de interé
         # Ajusta los rangos según tu dataset real
-        self.renew_bins = np.linspace(-max_value, max_value, num_renew_bins)      # Ejemplo
+        self.solar_power_bins = np.linspace(0, max_value, num_solar_bins)     
+        self.wind_power_bins = np.linspace(0, max_value, num_wind_bins)      
+        self.demand_bins = np.linspace(0, max_value, num_demand_bins)
         self.battery_bins = np.linspace(0, 1, num_battery_bins)
-        self.grid_bins = np.linspace(0, 1, num_grid_bins)
 
-        print(self.renew_bins)
-        print(self.battery_bins)
-        print(self.grid_bins)
-        
         # Índice actual dentro del dataset (simularemos step a step)
         self.current_index = 0
         
@@ -62,7 +61,7 @@ class MultiAgentEnv:
         # Ruta al archivo
         file_path = os.path.join(os.getcwd(), "assets", "datasets", filename)
         df = pd.read_csv(file_path, sep=';', engine='python')
-        print("Primeras filas del dataset:\n", df.head())
+        #print("Primeras filas del dataset:\n", df.head())
         
         return df
 
@@ -97,16 +96,17 @@ class MultiAgentEnv:
         # Ejemplo: la batería puede ser un estado interno que no viene del dataset,
         # lo inicializamos a un valor aleatorio o 0.5
         # (También podrías llevar el SOC en otra parte del código.)
-        soc = 0.5
-        grid = 0          
+        soc = 0.5       
 
-        # Discretizamos (QUIZAS AQUI SEA PRUDENTE NO DIFERENCIAR POR SOLAR NI EOLICA SINO CONSIDERAR COMO UNA SOLA PH "SOLAR + WIND + OTRAS RENOVABLES")
-        renew_idx = np.digitize([self.renew_power - self.demand], self.renew_bins)[0] - 1
+        # Discretizamos
+        solar_power_idx = np.digitize([row["solar_power"]], self.solar_power_bins)[0] - 1
+        wind_power_idx = np.digitize([row["wind_power"]], self.wind_power_bins)[0] - 1
+        demand_power_idx = np.digitize([row["demand"]], self.demand_bins)[0] - 1
         battery_idx = np.digitize([soc], self.battery_bins)[0] - 1
-        grid_idx = np.digitize([grid], self.grid_bins)[0] - 1
-
+        print(f"Solar {row['solar_power']} wind {row['wind_power']} demand {row['demand']} battery {soc}")
+        
         # Retornamos la tupla de estado discretizado
-        return (renew_idx, battery_idx, grid_idx)
+        return (solar_power_idx, wind_power_idx, demand_power_idx, battery_idx)
 
 # -----------------------------------------------------
 # 2) Definimos la clase base de Agente con Q-Table
@@ -129,17 +129,17 @@ class BaseAgent:
         (solar_bins, wind_bins, battery_bins, demand_bins)
         """
         states = []
-        for a in range(len(env.renew_bins)):
-            for b in range(len(env.battery_bins)):
-                for c in range(len(env.grid_bins)):
-                    states.append( (a, b, c) )
+        for a in range(len(env.solar_power_bins)):
+            for b in range(len(env.wind_power_bins)):
+                for c in range(len(env.demand_bins)):
+                    for d in range(len(env.battery_bins)):
+                        states.append( (a, b, c, d) )
         
         # Para cada estado, creamos un diccionario de acción->Q
         self.q_table = {
             state: {action: 0 for action in self.actions} 
             for state in states
         }
-        print(self.q_table)
 
     def choose_action(self, state, epsilon=0.1):
         """
@@ -292,14 +292,11 @@ class Simulation:
         
         # Creamos el entorno que carga el CSV y discretiza
         self.env = MultiAgentEnv(csv_filename="Case1_energy_data_with_pv_power.csv",
-                                 num_renew_bins=3, 
-                                 num_grid_bins=3, 
-                                 num_battery_bins=4)
+                                 num_solar_bins=7, num_wind_bins=7, num_demand_bins=7, num_battery_bins=4)
         
-        # Definimos un conjunto de agentes (ejemplo: 1 pv, 1 wind, 1 battery, 1 grid, 1 load)
+        # Definimos un conjunto de agentes (ejemplo: 1 pv, 1 battery, 1 grid, 1 load)
         self.agents = [
             SolarAgent(),
-            WindAgent(),
             BatteryAgent(),
             GridAgent(),
             LoadAgent()
@@ -309,14 +306,13 @@ class Simulation:
         self.epsilon = 0.1  # Exploración \epsilon
         
         # Inicializamos Q-tables
-        for ag in self.agents:
-            print("*"*20)
-            ag.initialize_q_table(self.env)
+        for agent in self.agents:
+            agent.initialize_q_table(self.env)
         
     def run(self):
         for ep in range(self.num_episodes):
             # Reseteamos entorno al inicio de cada episodio
-            state = self.env.reset()            
+            state = self.env.reset()    
             
             for step in range(self.max_steps):
 
@@ -328,26 +324,26 @@ class Simulation:
                 # Suponemos que cada agente "produce" si su acción es "produce"
                 # y 0 en otro caso. Podrías refinarlo según la acción de cada uno.
                 P_total = 0.0
-                for ag in self.agents:
-                    if isinstance(ag, SolarAgent):
+                for agent in self.agents:
+                    if isinstance(agent, SolarAgent):
                         # Escoger acción
-                        action = ag.choose_action(state, self.epsilon)
+                        action = agent.choose_action(state, self.epsilon)
                         if action == "produce":
-                            p = ag.calculate_power(row)
+                            p = agent.calculate_power(row)
                         else:
                             p = 0.0
                         print("solar - " + str(p))
                         P_total += p
-                    elif isinstance(ag, WindAgent):
-                        action = ag.choose_action(state, self.epsilon)
+                    elif isinstance(agent, WindAgent):
+                        action = agent.choose_action(state, self.epsilon)
                         if action == "produce":
-                            p = ag.calculate_power(row)
+                            p = agent.calculate_power(row)
                         else:
                             p = 0.0
                         P_total += p
                         print("wind - " + str(p))
-                    elif isinstance(ag, BatteryAgent):
-                        action = ag.choose_action(state, self.epsilon)
+                    elif isinstance(agent, BatteryAgent):
+                        action = agent.choose_action(state, self.epsilon)
                         # No suma potencia directamente si "idle",
                         # pero si "discharge" podríamos sumarla. Simplificado:
                         if action == "discharge":
@@ -357,8 +353,7 @@ class Simulation:
                         P_total += p
                     else:
                         # GridAgent, LoadAgent no generan en este ejemplo
-                        _ = ag.choose_action(state, self.epsilon)
-
+                        _ = agent.choose_action(state, self.epsilon)
                 
                 
                 # Ahora calculamos la recompensa individual por agente
@@ -420,7 +415,6 @@ class Simulation:
                 
             
             print(f"Fin episodio {ep+1}/{self.num_episodes}")
-            sys.exit(0)
 
 # -----------------------------------------------------
 # 5) Punto de entrada principal

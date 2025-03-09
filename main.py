@@ -27,16 +27,15 @@ class MultiAgentEnv:
     """
 
     def __init__(self, csv_filename="Case1_energy_data_with_pv_power.csv", 
-                 num_solar_bins=6, num_wind_bins=6, num_demand_bins=6, num_battery_bins=3):
+                 num_solar_bins=7, state_solar_bins=3, num_wind_bins=7, state_wind_bins=3, num_demand_bins=7, num_battery_bins=4):
         """
         Parámetros:
           - num_*_bins: define cuántos intervalos se utilizan para discretizar cada variable.
         """
 
-        self.solar_power = 0
-        self.wind_power = 0
-        self.demand = 0        
-        self.battery_bins = 0
+        self.renewable_power = 0
+        self.total_power = 0
+        self.demand_power = 0        
         
         # Cargamos el dataset
         self.dataset = self._load_data(csv_filename)
@@ -47,7 +46,9 @@ class MultiAgentEnv:
         # Definimos los "bins" para discretizar cada variable de interé
         # Ajusta los rangos según tu dataset real
         self.solar_power_bins = np.linspace(0, max_value, num_solar_bins)     
-        self.wind_power_bins = np.linspace(0, max_value, num_wind_bins)      
+        self.state_solar_bins = np.linspace(0, 1, state_solar_bins)
+        self.wind_power_bins = np.linspace(0, max_value, num_wind_bins)
+        self.state_wind_bins = np.linspace(0, 1, state_wind_bins)
         self.demand_bins = np.linspace(0, max_value, num_demand_bins)
         self.battery_bins = np.linspace(0, 1, num_battery_bins)
 
@@ -130,10 +131,12 @@ class BaseAgent:
         """
         states = []
         for a in range(len(env.solar_power_bins)):
-            for b in range(len(env.wind_power_bins)):
-                for c in range(len(env.demand_bins)):
-                    for d in range(len(env.battery_bins)):
-                        states.append( (a, b, c, d) )
+            for b in range(len(env.state_solar_bins)):
+                for c in range(len(env.wind_power_bins)):
+                    for d in range(len(env.state_wind_bins)):
+                        for e in range(len(env.demand_bins)):
+                            for f in range(len(env.battery_bins)):
+                                states.append((a, b, c, d, e, f))
         
         # Para cada estado, creamos un diccionario de acción->Q
         self.q_table = {
@@ -292,7 +295,7 @@ class Simulation:
         
         # Creamos el entorno que carga el CSV y discretiza
         self.env = MultiAgentEnv(csv_filename="Case1_energy_data_with_pv_power.csv",
-                                 num_solar_bins=7, num_wind_bins=7, num_demand_bins=7, num_battery_bins=4)
+                                 num_solar_bins=7, state_solar_bins=3, num_wind_bins=7, state_wind_bins=3, num_demand_bins=7, num_battery_bins=4)
         
         # Definimos un conjunto de agentes (ejemplo: 1 pv, 1 battery, 1 grid, 1 load)
         self.agents = [

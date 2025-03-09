@@ -35,7 +35,6 @@ class MultiAgentEnv:
 
         self.renewable_power = 0
         self.total_power = 0
-        self.demand_power = 0        
         
         # Cargamos el dataset
         self.dataset = self._load_data(csv_filename)
@@ -43,7 +42,7 @@ class MultiAgentEnv:
         max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
         
         # Discretizacion por cuantizacion uniforme
-        # Definimos los "bins" para discretizar cada variable de interé
+        # Definimos los "bins" para discretizar cada variable de interés
         # Ajusta los rangos según tu dataset real
         self.solar_power_bins = np.linspace(0, max_value, num_solar_bins)     
         self.state_solar_bins = np.linspace(0, 1, state_solar_bins)
@@ -124,26 +123,7 @@ class BaseAgent:
         self.isPower = isPower
         self.q_table = {}
     
-    def initialize_q_table(self, env: MultiAgentEnv):
-        """
-        Crea la Q-table para todos los posibles estados discretizados.
-        (solar_bins, wind_bins, battery_bins, demand_bins)
-        """
-        states = []
-        for a in range(len(env.solar_power_bins)):
-            for b in range(len(env.state_solar_bins)):
-                for c in range(len(env.wind_power_bins)):
-                    for d in range(len(env.state_wind_bins)):
-                        for e in range(len(env.demand_bins)):
-                            for f in range(len(env.battery_bins)):
-                                states.append((a, b, c, d, e, f))
-        
-        # Para cada estado, creamos un diccionario de acción->Q
-        self.q_table = {
-            state: {action: 0 for action in self.actions} 
-            for state in states
-        }
-
+    
     def choose_action(self, state, epsilon=0.1):
         """
         Selecciona acción con política epsilon-greedy.
@@ -177,6 +157,26 @@ class BaseAgent:
 class SolarAgent(BaseAgent):
     def __init__(self):
         super().__init__("solar", ["produce", "idle"], alpha=0.1, gamma=0.9, isPower=True)
+
+    def initialize_q_table(self, env: MultiAgentEnv):
+        """
+        Crea la Q-table para todos los posibles estados discretizados.
+        (solar_bins, wind_bins, battery_bins, demand_bins)
+        """
+        states = []
+        for a in range(len(env.solar_power_bins)):
+            for b in range(len(env.state_solar_bins)):
+                for c in range(len(env.wind_power_bins)):
+                    for d in range(len(env.state_wind_bins)):
+                        for e in range(len(env.demand_bins)):
+                            for f in range(len(env.battery_bins)):
+                                states.append((a, b, c, d, e, f))
+        
+        # Para cada estado, creamos un diccionario de acción->Q
+        self.q_table = {
+            state: {action: 0 for action in self.actions} 
+            for state in states
+        }
 
     def calculate_power(self, row):
 
@@ -212,6 +212,26 @@ class WindAgent(BaseAgent):
     def __init__(self):
         super().__init__("wind", ["produce", "idle"], alpha=0.1, gamma=0.9, isPower=True)
 
+    def initialize_q_table(self, env: MultiAgentEnv):
+        """
+        Crea la Q-table para todos los posibles estados discretizados.
+        (solar_bins, wind_bins, battery_bins, demand_bins)
+        """
+        states = []
+        for a in range(len(env.solar_power_bins)):
+            for b in range(len(env.state_solar_bins)):
+                for c in range(len(env.wind_power_bins)):
+                    for d in range(len(env.state_wind_bins)):
+                        for e in range(len(env.demand_bins)):
+                            for f in range(len(env.battery_bins)):
+                                states.append((a, b, c, d, e, f))
+        
+        # Para cada estado, creamos un diccionario de acción->Q
+        self.q_table = {
+            state: {action: 0 for action in self.actions} 
+            for state in states
+        }    
+
     def calculate_power(self, row):
 
         if self.isPower:
@@ -233,6 +253,26 @@ class BatteryAgent(BaseAgent):
     def __init__(self):
         super().__init__("battery", ["charge", "discharge", "idle"], alpha=0.1, gamma=0.9)
         self.soc = 0.5
+
+    def initialize_q_table(self, env: MultiAgentEnv):
+        """
+        Crea la Q-table para todos los posibles estados discretizados.
+        (solar_bins, wind_bins, battery_bins, demand_bins)
+        """
+        states = []
+        for a in range(len(env.solar_power_bins)):
+            for b in range(len(env.state_solar_bins)):
+                for c in range(len(env.wind_power_bins)):
+                    for d in range(len(env.state_wind_bins)):
+                        for e in range(len(env.demand_bins)):
+                            for f in range(len(env.battery_bins)):
+                                states.append((a, b, c, d, e, f))
+        
+        # Para cada estado, creamos un diccionario de acción->Q
+        self.q_table = {
+            state: {action: 0 for action in self.actions} 
+            for state in states
+        }
 
     def update_soc(self, action, charge_rate=0.1):
         if action == "charge":
@@ -260,6 +300,26 @@ class GridAgent(BaseAgent):
     def __init__(self):
         super().__init__("grid", ["sell", "idle"], alpha=0.1, gamma=0.9)
 
+    def initialize_q_table(self, env: MultiAgentEnv):
+        """
+        Crea la Q-table para todos los posibles estados discretizados.
+        (solar_bins, wind_bins, battery_bins, demand_bins)
+        """
+        states = []
+        for a in range(len(env.solar_power_bins)):
+            for b in range(len(env.state_solar_bins)):
+                for c in range(len(env.wind_power_bins)):
+                    for d in range(len(env.state_wind_bins)):
+                        for e in range(len(env.demand_bins)):
+                            for f in range(len(env.battery_bins)):
+                                states.append((a, b, c, d, e, f))
+        
+        # Para cada estado, creamos un diccionario de acción->Q
+        self.q_table = {
+            state: {action: 0 for action in self.actions} 
+            for state in states
+        }
+
     def calculate_reward(self, action, P_T, P_L, SOC, C_mercado, S_UT):
         if action == "sell":
             if SOC < 0.5 and P_T < P_L and S_UT == 0:
@@ -273,6 +333,26 @@ class GridAgent(BaseAgent):
 class LoadAgent(BaseAgent):
     def __init__(self):
         super().__init__("load", ["consume", "idle"], alpha=0.1, gamma=0.9)
+
+    def initialize_q_table(self, env: MultiAgentEnv):
+        """
+        Crea la Q-table para todos los posibles estados discretizados.
+        (solar_bins, wind_bins, battery_bins, demand_bins)
+        """
+        states = []
+        for a in range(len(env.solar_power_bins)):
+            for b in range(len(env.state_solar_bins)):
+                for c in range(len(env.wind_power_bins)):
+                    for d in range(len(env.state_wind_bins)):
+                        for e in range(len(env.demand_bins)):
+                            for f in range(len(env.battery_bins)):
+                                states.append((a, b, c, d, e, f))
+        
+        # Para cada estado, creamos un diccionario de acción->Q
+        self.q_table = {
+            state: {action: 0 for action in self.actions} 
+            for state in states
+        }
 
     def calculate_reward(self, action, P_T, P_L, SOC, C_mercado):
         if action == "consume":
@@ -300,8 +380,8 @@ class Simulation:
         # Definimos un conjunto de agentes (ejemplo: 1 pv, 1 battery, 1 grid, 1 load)
         self.agents = [
             SolarAgent(),
-            BatteryAgent(),
-            GridAgent(),
+            #BatteryAgent(),
+            #GridAgent(),
             LoadAgent()
         ]
         

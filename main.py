@@ -26,8 +26,7 @@ class MultiAgentEnv:
     - Puede gestionarse en un bucle de episodios.
     """
 
-    def __init__(self, csv_filename="Case1_energy_data_with_pv_power.csv", 
-                 num_solar_bins=7, state_solar_bins=3, num_wind_bins=7, state_wind_bins=3, num_demand_bins=7, num_battery_bins=4):
+    def __init__(self, csv_filename="Case1_energy_data_with_pv_power.csv", num_demand_bins=7):
         """
         Parámetros:
           - num_*_bins: define cuántos intervalos se utilizan para discretizar cada variable.
@@ -39,17 +38,12 @@ class MultiAgentEnv:
         # Cargamos el dataset
         self.dataset = self._load_data(csv_filename)
 
-        max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
+        self.max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
         
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
         # Ajusta los rangos según tu dataset real
-        self.solar_power_bins = np.linspace(0, max_value, num_solar_bins)     
-        self.state_solar_bins = np.linspace(0, 1, state_solar_bins)
-        self.wind_power_bins = np.linspace(0, max_value, num_wind_bins)
-        self.state_wind_bins = np.linspace(0, 1, state_wind_bins)
-        self.demand_bins = np.linspace(0, max_value, num_demand_bins)
-        self.battery_bins = np.linspace(0, 1, num_battery_bins)
+        self.demand_bins = np.linspace(0, self.max_value, num_demand_bins)
 
         # Índice actual dentro del dataset (simularemos step a step)
         self.current_index = 0
@@ -99,14 +93,13 @@ class MultiAgentEnv:
         soc = 0.5       
 
         # Discretizamos
-        solar_power_idx = np.digitize([row["solar_power"]], self.solar_power_bins)[0] - 1
-        wind_power_idx = np.digitize([row["wind_power"]], self.wind_power_bins)[0] - 1
         demand_power_idx = np.digitize([row["demand"]], self.demand_bins)[0] - 1
+        solar_power_idx = np.digitize([row["solar_power"]], self.solar_power_bins)[0] - 1
+        wind_power_idx = np.digitize([row["wind_power"]], self.wind_power_bins)[0] - 1        
         battery_idx = np.digitize([soc], self.battery_bins)[0] - 1
-        print(f"Solar {row['solar_power']} wind {row['wind_power']} demand {row['demand']} battery {soc}")
         
         # Retornamos la tupla de estado discretizado
-        return (solar_power_idx, wind_power_idx, demand_power_idx, battery_idx)
+        return (demand_power_idx)
 
 # -----------------------------------------------------
 # 2) Definimos la clase base de Agente con Q-Table
@@ -155,13 +148,30 @@ class BaseAgent:
 #    Heredan de BaseAgent y añaden sus recompensas
 # -----------------------------------------------------
 class SolarAgent(BaseAgent):
-    def __init__(self):
+    def __init__(self, env: MultiAgentEnv, num_solar_bins=7):
         super().__init__("solar", ["produce", "idle"], alpha=0.1, gamma=0.9, isPower=True)
+
+        # Discretizacion por cuantizacion uniforme
+        # Definimos los "bins" para discretizar cada variable de interés
+        # Ajusta los rangos según tu dataset real
+        self.solar_power_bins = np.linspace(0, env.max_value, num_solar_bins)
+
+    def _get_discretized_state(self, env: MultiAgentEnv, index):
+        """
+        Toma valores reales y los discretiza en bins,
+        devolviendo (idx_solar).
+        """
+        row = env.dataset.iloc[index]
+        
+        # Discretizamos
+        solar_power_idx = np.digitize([row["solar_power"]], env.solar_power_bins)[0] - 1
+        
+        # Retornamos la tupla de estado discretizado
+        return (solar_power_idx)
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
         Crea la Q-table para todos los posibles estados discretizados.
-        (solar_bins, wind_bins, battery_bins, demand_bins)
         """
         states = []
         for a in range(len(env.solar_power_bins)):
@@ -212,6 +222,27 @@ class WindAgent(BaseAgent):
     def __init__(self):
         super().__init__("wind", ["produce", "idle"], alpha=0.1, gamma=0.9, isPower=True)
 
+    def _get_discretized_state(self, index):
+        """
+        Toma valores reales (irradancia, viento, demanda, precio, etc.) y los discretiza en bins,
+        devolviendo una tupla como (idx_solar, idx_wind, idx_battery, idx_demand, idx_price).
+        """
+        row = self.dataset.iloc[index]
+        
+        # Ejemplo: la batería puede ser un estado interno que no viene del dataset,
+        # lo inicializamos a un valor aleatorio o 0.5
+        # (También podrías llevar el SOC en otra parte del código.)
+        soc = 0.5       
+
+        # Discretizamos
+        demand_power_idx = np.digitize([row["demand"]], self.demand_bins)[0] - 1
+        solar_power_idx = np.digitize([row["solar_power"]], self.solar_power_bins)[0] - 1
+        wind_power_idx = np.digitize([row["wind_power"]], self.wind_power_bins)[0] - 1        
+        battery_idx = np.digitize([soc], self.battery_bins)[0] - 1
+        
+        # Retornamos la tupla de estado discretizado
+        return (demand_power_idx)
+
     def initialize_q_table(self, env: MultiAgentEnv):
         """
         Crea la Q-table para todos los posibles estados discretizados.
@@ -253,6 +284,27 @@ class BatteryAgent(BaseAgent):
     def __init__(self):
         super().__init__("battery", ["charge", "discharge", "idle"], alpha=0.1, gamma=0.9)
         self.soc = 0.5
+
+    def _get_discretized_state(self, index):
+        """
+        Toma valores reales (irradancia, viento, demanda, precio, etc.) y los discretiza en bins,
+        devolviendo una tupla como (idx_solar, idx_wind, idx_battery, idx_demand, idx_price).
+        """
+        row = self.dataset.iloc[index]
+        
+        # Ejemplo: la batería puede ser un estado interno que no viene del dataset,
+        # lo inicializamos a un valor aleatorio o 0.5
+        # (También podrías llevar el SOC en otra parte del código.)
+        soc = 0.5       
+
+        # Discretizamos
+        demand_power_idx = np.digitize([row["demand"]], self.demand_bins)[0] - 1
+        solar_power_idx = np.digitize([row["solar_power"]], self.solar_power_bins)[0] - 1
+        wind_power_idx = np.digitize([row["wind_power"]], self.wind_power_bins)[0] - 1        
+        battery_idx = np.digitize([soc], self.battery_bins)[0] - 1
+        
+        # Retornamos la tupla de estado discretizado
+        return (demand_power_idx)
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
@@ -374,15 +426,14 @@ class Simulation:
         self.max_steps = max_steps
         
         # Creamos el entorno que carga el CSV y discretiza
-        self.env = MultiAgentEnv(csv_filename="Case1_energy_data_with_pv_power.csv",
-                                 num_solar_bins=7, state_solar_bins=3, num_wind_bins=7, state_wind_bins=3, num_demand_bins=7, num_battery_bins=4)
+        self.env = MultiAgentEnv(csv_filename="Case1_energy_data_with_pv_power.csv", num_demand_bins=7)
         
         # Definimos un conjunto de agentes (ejemplo: 1 pv, 1 battery, 1 grid, 1 load)
         self.agents = [
-            SolarAgent(),
-            #BatteryAgent(),
-            #GridAgent(),
-            LoadAgent()
+            SolarAgent(self.env),
+            BatteryAgent(self.env),
+            GridAgent(self.env),
+            LoadAgent(self.env)
         ]
         
         # Parámetros de entrenamiento

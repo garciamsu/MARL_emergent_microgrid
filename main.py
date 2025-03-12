@@ -61,16 +61,6 @@ class MultiAgentEnv:
         
         return df
 
-    def reset(self):
-        """
-        Resetea el episodio:
-        - Opcional: mezclar o reiniciar a un índice aleatorio.
-        - Retorna el estado discretizado.
-        """
-        self.current_index = 0  # o random.randint(0, len(self.dataset)-1)
-        self.state = self._get_discretized_state(self.current_index)
-        return self.state
-
     def step(self):
         """
         Avanza al siguiente índice del dataset (o uno aleatorio) y retorna el nuevo estado.
@@ -89,10 +79,6 @@ class MultiAgentEnv:
         """
         row = self.dataset.iloc[index]
         
-        # Ejemplo: la batería puede ser un estado interno que no viene del dataset,
-        # lo inicializamos a un valor aleatorio o 0.5
-        # (También podrías llevar el SOC en otra parte del código.)
-        soc = 0.5       
         self.demand_power = row["demand"]
 
         # Discretizamos
@@ -115,8 +101,8 @@ class BaseAgent:
         self.alpha = alpha
         self.gamma = gamma
         self.isPower = isPower
-        self.q_table = {}    
-    
+        self.q_table = {}   
+
     def choose_action(self, state, epsilon=0.1):
         """
         Selecciona acción con política epsilon-greedy.
@@ -165,7 +151,7 @@ class SolarAgent(BaseAgent):
         row = env.dataset.iloc[index]
         
         # Discretizamos
-        solar_power_idx = np.digitize([row["solar_power"]], env.solar_power_bins)[0] - 1
+        solar_power_idx = np.digitize([row["solar_power"]], self.solar_power_bins)[0] - 1
         
         # Retornamos la tupla de estado discretizado
         return (solar_power_idx)
@@ -331,10 +317,8 @@ class BatteryAgent(BaseAgent):
         return 0
 
 class GridAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv):
+    def __init__(self):
         super().__init__("grid", ["sell", "idle"], alpha=0.1, gamma=0.9)
-
-        
 
     def initialize_q_table(self, env: MultiAgentEnv, ess: BatteryAgent):
         """
@@ -412,8 +396,8 @@ class Simulation:
         # Definimos un conjunto de agentes (ejemplo: 1 pv, 1 battery, 1 grid, 1 load)
         self.agents = [
             SolarAgent(self.env),
-            BatteryAgent(self.env),
-            GridAgent(self.env)
+            #BatteryAgent(self.env),
+            #GridAgent(self.env)
         ]
         
         # Parámetros de entrenamiento
@@ -421,13 +405,18 @@ class Simulation:
         
         # Inicializamos Q-tables
         for agent in self.agents:
-            agent.initialize_q_table(self.env)
+            if isinstance(agent, GridAgent):
+                agent.initialize_q_table(self.env, BatteryAgent(self.env))
+            else:
+                agent.initialize_q_table(self.env)
         
     def run(self):
         for ep in range(self.num_episodes):
-            # Reseteamos entorno al inicio de cada episodio
-            state = self.env.reset()    
-            
+            # Reseteamos entorno y los agentes al inicio de cada episodio
+            self.env._get_discretized_state(0)
+            for agent in self.agents:
+                agent._get_discretized_state(self.env, 0)
+
             for step in range(self.max_steps):
 
                 # Obtenemos variables reales del entorno (por ejemplo, para recompensas)
@@ -467,9 +456,9 @@ class Simulation:
                         P_total += p
                     else:
                         # GridAgent, LoadAgent no generan en este ejemplo
-                        _ = agent.choose_action(state, self.epsilon)
+                        _ = agent.choose_action(state, self.epsilon)                
                 
-                
+                sys.exit(0)
                 # Ahora calculamos la recompensa individual por agente
                 # y actualizamos la Q-table
                 next_state = self.env.step()  # Avanzamos el entorno un índice

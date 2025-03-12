@@ -142,6 +142,7 @@ class SolarAgent(BaseAgent):
         # Ajusta los rangos según tu dataset real
         self.solar_power_bins = np.linspace(0, env.max_value, num_solar_bins)
         self.solar_state_bins = [0, 1]
+        self.solar_state = 0
 
     def _get_discretized_state(self, env: MultiAgentEnv, index):
         """
@@ -152,9 +153,13 @@ class SolarAgent(BaseAgent):
         
         # Discretizamos
         solar_power_idx = np.digitize([row["solar_power"]], self.solar_power_bins)[0] - 1
+        solar_state_idx = np.digitize([self.solar_state], self.solar_state_bins)[0] - 1
+        
+        state_env = env._get_discretized_state(index)
         
         # Retornamos la tupla de estado discretizado
-        return (solar_power_idx)
+        print("*** solar_power_idx, solar_state_idx, demand_power_idx, renewable_power_idx ***")
+        return (solar_power_idx, solar_state_idx, state_env[0], state_env[1])
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
@@ -415,7 +420,9 @@ class Simulation:
             # Reseteamos entorno y los agentes al inicio de cada episodio
             self.env._get_discretized_state(0)
             for agent in self.agents:
-                agent._get_discretized_state(self.env, 0)
+                if isinstance(agent, SolarAgent):
+                    state_solar = agent._get_discretized_state(self.env, 0)
+                    print(state_solar)
 
             for step in range(self.max_steps):
 
@@ -430,12 +437,11 @@ class Simulation:
                 for agent in self.agents:
                     if isinstance(agent, SolarAgent):
                         # Escoger acción
-                        action = agent.choose_action(state, self.epsilon)
+                        action = agent.choose_action(state_solar, self.epsilon)
                         if action == "produce":
                             p = agent.calculate_power(row)
                         else:
                             p = 0.0
-                        print("solar - " + str(p))
                         P_total += p
                     elif isinstance(agent, WindAgent):
                         action = agent.choose_action(state, self.epsilon)

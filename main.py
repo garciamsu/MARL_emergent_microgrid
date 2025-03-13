@@ -35,6 +35,7 @@ class MultiAgentEnv:
         self.renewable_power = 0
         self.total_power = 0
         self.demand_power = 0        
+        self.dif_power = 0
         
         # Cargamos el dataset
         self.dataset = self._load_data(csv_filename)
@@ -284,16 +285,22 @@ class WindAgent(BaseAgent):
         return 0.0
 
 class BatteryAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, num_battery_bins=4):
+    def __init__(self, env: MultiAgentEnv, capacity_ah= 10000, num_battery_bins=4):
         super().__init__("battery", ["charge", "discharge", "idle"], alpha=0.1, gamma=0.9)
-        self.soc = 0.5
+        """
+        Inicializa la batería con una capacidad fija en Ah y un SOC inicial del 50%.
+        :param capacity_ah: Capacidad de la batería en Amperios-hora (Ah).
+        """
+        self.capacity_ah = capacity_ah  # Capacidad fija en Ah
+        self.soc = 50.0  # Estado de carga inicial en %
+        self.battery_power = 0.0  # Potencia en W
+        self.battery_state = "idle"  # Estado inicial de operación
 
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
         # Ajusta los rangos según tu dataset real
-        self.battery_bins = np.linspace(0, 1, num_battery_bins)
+        self.battery_bins = np.linspace(0, 100, num_battery_bins)
         self.battery_state_bins = [0, 1, 2]
-        self.battery_state = 0
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
@@ -509,6 +516,9 @@ class Simulation:
                     else:
                         # GridAgent, LoadAgent no generan en este ejemplo
                         _ = agent.choose_action(state, self.epsilon)                
+                
+                self.env.total_power = self.env.renewable_power
+                self.dif_power = self.env.total_power - self.env.demand_power
                 
                 sys.exit(0)
                 # Ahora calculamos la recompensa individual por agente

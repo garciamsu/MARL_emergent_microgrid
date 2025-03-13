@@ -474,6 +474,7 @@ class Simulation:
                 # Suponemos que cada agente "produce" si su acción es "produce"
                 # y 0 en otro caso. Podrías refinarlo según la acción de cada uno.
                 self.env.renewable_power = 0.0
+                self.env.total_power = 0
                 for agent in self.agents:
                     if isinstance(agent, SolarAgent):
                         # Escoger acción

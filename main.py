@@ -102,6 +102,7 @@ class BaseAgent:
         self.gamma = gamma
         self.isPower = isPower
         self.q_table = {}   
+        self.current_power = 0.0
 
     def choose_action(self, state, epsilon=0.1):
         """
@@ -142,7 +143,7 @@ class SolarAgent(BaseAgent):
         # Ajusta los rangos según tu dataset real
         self.solar_power_bins = np.linspace(0, env.max_value, num_solar_bins)
         self.solar_state_bins = [0, 1]
-        self.solar_state = 0
+        self.solar_state = 0        
 
     def _get_discretized_state(self, env: MultiAgentEnv, index):
         """
@@ -150,16 +151,22 @@ class SolarAgent(BaseAgent):
         devolviendo (idx_solar).
         """
         row = env.dataset.iloc[index]
+        self.current_power = row["solar_power"]
         
         # Discretizamos
-        solar_power_idx = np.digitize([row["solar_power"]], self.solar_power_bins)[0] - 1
+        solar_power_idx = np.digitize([self.current_power], self.solar_power_bins)[0] - 1
         solar_state_idx = np.digitize([self.solar_state], self.solar_state_bins)[0] - 1
         
+        print("*"*100)
+        print(self.current_power)
+        print(self.solar_power_bins)
+        print(solar_power_idx)
+
         state_env = env._get_discretized_state(index)
         
         # Retornamos la tupla de estado discretizado
-        print("*** solar_power_idx, solar_state_idx, demand_power_idx, renewable_power_idx ***")
-        return (solar_power_idx, solar_state_idx, state_env[0], state_env[1])
+        print("*** solar_power_idx, solar_state_idx, renewable_power_idx, demand_power_idx ***")
+        return (solar_power_idx, solar_state_idx, state_env[1], state_env[0])
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
@@ -216,6 +223,8 @@ class WindAgent(BaseAgent):
         # Ajusta los rangos según tu dataset real
         self.wind_power_bins = np.linspace(0, env.max_value, num_wind_bins)
         self.wind_state_bins = [0, 1]
+        self.wind_state = 0
+        
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
@@ -234,25 +243,28 @@ class WindAgent(BaseAgent):
             for state in states
         }
 
-    def initialize_q_table(self, env: MultiAgentEnv):
+    def _get_discretized_state(self, env: MultiAgentEnv, index):
         """
-        Crea la Q-table para todos los posibles estados discretizados.
-        (solar_bins, wind_bins, battery_bins, demand_bins)
+        Toma valores reales y los discretiza en bins,
+        devolviendo (idx_solar).
         """
-        states = []
-        for a in range(len(env.solar_power_bins)):
-            for b in range(len(env.state_solar_bins)):
-                for c in range(len(env.wind_power_bins)):
-                    for d in range(len(env.state_wind_bins)):
-                        for e in range(len(env.demand_bins)):
-                            for f in range(len(env.battery_bins)):
-                                states.append((a, b, c, d, e, f))
+        row = env.dataset.iloc[index]
+        self.current_power = row["wind_power"]
         
-        # Para cada estado, creamos un diccionario de acción->Q
-        self.q_table = {
-            state: {action: 0 for action in self.actions} 
-            for state in states
-        }    
+        # Discretizamos
+        wind_power_idx = np.digitize([self.current_power], self.wind_power_bins)[0] - 1
+        wind_state_idx = np.digitize([self.wind_state], self.wind_state_bins)[0] - 1
+        
+        print("*"*100)
+        print(self.current_power)
+        print(self.wind_power_bins)
+        print(wind_power_idx)
+
+        state_env = env._get_discretized_state(index)
+        
+        # Retornamos la tupla de estado discretizado
+        print("*** wind_power_idx, wind_state_idx, renewable_power_idx, demand_power_idx ***")
+        return (wind_power_idx, wind_state_idx, state_env[1], state_env[0])
 
     def calculate_power(self, row):
 
@@ -281,6 +293,7 @@ class BatteryAgent(BaseAgent):
         # Ajusta los rangos según tu dataset real
         self.battery_bins = np.linspace(0, 1, num_battery_bins)
         self.battery_state_bins = [0, 1, 2]
+        self.battery_state = 0
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
@@ -298,6 +311,26 @@ class BatteryAgent(BaseAgent):
             state: {action: 0 for action in self.actions} 
             for state in states
         }
+
+    def _get_discretized_state(self, env: MultiAgentEnv, index):
+        """
+        Toma valores reales y los discretiza en bins,
+        devolviendo (idx_solar).
+        """
+       
+        # Discretizamos
+        battery_power_idx = np.digitize([self.soc], self.battery_bins)[0] - 1
+        
+        print("*"*100)
+        print(self.soc)
+        print(self.battery_bins)
+        print(battery_power_idx)
+
+        state_env = env._get_discretized_state(index)
+        
+        # Retornamos la tupla de estado discretizado
+        print("*** battery_power_idx, self.battery_state_bins, renewable_power_idx, demand_power_idx ***")
+        return (battery_power_idx, self.battery_state, state_env[1], state_env[0])
 
     def update_soc(self, action, charge_rate=0.1):
         if action == "charge":
@@ -401,7 +434,8 @@ class Simulation:
         # Definimos un conjunto de agentes (ejemplo: 1 pv, 1 battery, 1 grid, 1 load)
         self.agents = [
             SolarAgent(self.env),
-            #BatteryAgent(self.env),
+            WindAgent(self.env),
+            BatteryAgent(self.env),
             #GridAgent(self.env)
         ]
         
@@ -423,6 +457,12 @@ class Simulation:
                 if isinstance(agent, SolarAgent):
                     state_solar = agent._get_discretized_state(self.env, 0)
                     print(state_solar)
+                elif isinstance(agent, WindAgent):
+                    state_wind = agent._get_discretized_state(self.env, 0)
+                    print(state_wind)
+                elif isinstance(agent, BatteryAgent):
+                    state_battery = agent._get_discretized_state(self.env, 0)
+                    print(state_battery)
 
             for step in range(self.max_steps):
 
@@ -433,33 +473,38 @@ class Simulation:
                 # Valor "total de potencia" (muy simplificado)
                 # Suponemos que cada agente "produce" si su acción es "produce"
                 # y 0 en otro caso. Podrías refinarlo según la acción de cada uno.
-                P_total = 0.0
+                self.env.renewable_power = 0.0
                 for agent in self.agents:
                     if isinstance(agent, SolarAgent):
                         # Escoger acción
                         action = agent.choose_action(state_solar, self.epsilon)
+                        print(action)
                         if action == "produce":
-                            p = agent.calculate_power(row)
+                            agent.solar_state = 1
+                            self.env.renewable_power += agent.solar_state*agent.current_power
                         else:
-                            p = 0.0
-                        P_total += p
+                            self.env.renewable_power += 0.0
+                        
                     elif isinstance(agent, WindAgent):
-                        action = agent.choose_action(state, self.epsilon)
+                        action = agent.choose_action(state_wind, self.epsilon)
+                        print(action)
                         if action == "produce":
-                            p = agent.calculate_power(row)
+                            agent.solar_state = 1
+                            self.env.renewable_power += agent.solar_state*agent.current_power
                         else:
-                            p = 0.0
-                        P_total += p
-                        print("wind - " + str(p))
+                            self.env.renewable_power += 0.0
                     elif isinstance(agent, BatteryAgent):
-                        action = agent.choose_action(state, self.epsilon)
+                        action = agent.choose_action(state_battery, self.epsilon)
+                        print(action)
                         # No suma potencia directamente si "idle",
                         # pero si "discharge" podríamos sumarla. Simplificado:
-                        if action == "discharge":
+                        if action == "charge":
+                            p = 0.2  # Potencia que consume la batería
+                        elif action == "discharge":
                             p = 0.2  # Potencia que aporta la batería
                         else:
                             p = 0.0
-                        P_total += p
+
                     else:
                         # GridAgent, LoadAgent no generan en este ejemplo
                         _ = agent.choose_action(state, self.epsilon)                

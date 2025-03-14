@@ -62,16 +62,6 @@ class MultiAgentEnv:
         
         return df
 
-    def step(self):
-        """
-        Avanza al siguiente índice del dataset (o uno aleatorio) y retorna el nuevo estado.
-        """
-        self.current_index += 1
-        if self.current_index >= len(self.dataset):
-            self.current_index = 0  # En un entorno real, podría definirse done=True en vez de wrap-around
-        
-        self.state = self._get_discretized_state(self.current_index)
-        return self.state
 
     def _get_discretized_state(self, index):
         """
@@ -158,15 +148,10 @@ class SolarAgent(BaseAgent):
         solar_power_idx = np.digitize([self.current_power], self.solar_power_bins)[0] - 1
         solar_state_idx = np.digitize([self.solar_state], self.solar_state_bins)[0] - 1
         
-        print("*"*100)
-        print(self.current_power)
-        print(self.solar_power_bins)
-        print(solar_power_idx)
-
         state_env = env._get_discretized_state(index)
         
         # Retornamos la tupla de estado discretizado
-        print("*** solar_power_idx, solar_state_idx, renewable_power_idx, demand_power_idx ***")
+
         return (solar_power_idx, solar_state_idx, state_env[1], state_env[0])
 
     def initialize_q_table(self, env: MultiAgentEnv):
@@ -256,15 +241,10 @@ class WindAgent(BaseAgent):
         wind_power_idx = np.digitize([self.current_power], self.wind_power_bins)[0] - 1
         wind_state_idx = np.digitize([self.wind_state], self.wind_state_bins)[0] - 1
         
-        print("*"*100)
-        print(self.current_power)
-        print(self.wind_power_bins)
-        print(wind_power_idx)
-
         state_env = env._get_discretized_state(index)
         
         # Retornamos la tupla de estado discretizado
-        print("*** wind_power_idx, wind_state_idx, renewable_power_idx, demand_power_idx ***")
+
         return (wind_power_idx, wind_state_idx, state_env[1], state_env[0])
 
     def calculate_power(self, row):
@@ -367,15 +347,10 @@ class BatteryAgent(BaseAgent):
         # Discretizamos
         battery_power_idx = np.digitize([self.soc], self.battery_soc_bins)[0] - 1
         
-        print("*"*100)
-        print(self.soc)
-        print(self.battery_soc_bins)
-        print(battery_power_idx)
-
         state_env = env._get_discretized_state(index)
         
         # Retornamos la tupla de estado discretizado
-        print("*** battery_power_idx, self.battery_state, renewable_power_idx, demand_power_idx ***")
+
         return (battery_power_idx, self.battery_state, state_env[1], state_env[0])
 
     def calculate_reward_charge(self, P_T, P_L):
@@ -434,15 +409,10 @@ class GridAgent(BaseAgent):
         # Discretizamos
         battery_power_idx = np.digitize([self.ess.soc], self.ess.battery_soc_bins)[0] - 1
         
-        print("*"*100)
-        print(self.ess.soc)
-        print(self.ess.battery_soc_bins)
-        print(battery_power_idx)
-
         state_env = env._get_discretized_state(index)
         
         # Retornamos la tupla de estado discretizado
-        print("*** grid_state, battery_power_idx, self.battery_state, renewable_power_idx, demand_power_idx ***")
+
         return (self.grid_state, battery_power_idx, self.ess.battery_state, state_env[1], state_env[0])        
 
     def calculate_reward(self, action, P_T, P_L, SOC, C_mercado, S_UT):
@@ -515,25 +485,26 @@ class Simulation:
         # Inicializamos Q-tables
         for agent in self.agents:
             agent.initialize_q_table(self.env)
-                
+
+    def step(self, index):
+
+        self.env._get_discretized_state(index)
+        for agent in self.agents:
+            if isinstance(agent, SolarAgent):
+                state_solar = agent._get_discretized_state(self.env, index)
+            elif isinstance(agent, WindAgent):
+                state_wind = agent._get_discretized_state(self.env, index)
+            elif isinstance(agent, BatteryAgent):
+                state_battery = agent._get_discretized_state(self.env, index)
+            elif isinstance(agent, GridAgent):
+                state_grid = agent._get_discretized_state(self.env, index)
+        
+        return (state_solar, state_wind, state_battery, state_grid)
         
     def run(self):
         for ep in range(self.num_episodes):
             # Reseteamos entorno y los agentes al inicio de cada episodio
-            self.env._get_discretized_state(0)
-            for agent in self.agents:
-                if isinstance(agent, SolarAgent):
-                    state_solar = agent._get_discretized_state(self.env, 0)
-                    print(state_solar)
-                elif isinstance(agent, WindAgent):
-                    state_wind = agent._get_discretized_state(self.env, 0)
-                    print(state_wind)
-                elif isinstance(agent, BatteryAgent):
-                    state_battery = agent._get_discretized_state(self.env, 0)
-                    print(state_battery)
-                elif isinstance(agent, GridAgent):
-                    state_grid = agent._get_discretized_state(self.env, 0)
-                    print(state_grid)
+            state = self.step(0)
 
             for step in range(self.max_steps):
 
@@ -555,7 +526,7 @@ class Simulation:
                 for agent in self.agents:
                     if isinstance(agent, SolarAgent):
                         # Escoger acción
-                        action = agent.choose_action(state_solar, self.epsilon)
+                        action = agent.choose_action(state[0], self.epsilon)
 
                         if action == "produce":
                             agent.solar_state = 1
@@ -566,7 +537,7 @@ class Simulation:
                         print("Solar -> " + action + " = " + str(self.env.renewable_power))
                         
                     elif isinstance(agent, WindAgent):
-                        action = agent.choose_action(state_wind, self.epsilon)
+                        action = agent.choose_action(state[1], self.epsilon)
                         if action == "produce":
                             agent.solar_state = 1
                             self.env.renewable_power += agent.solar_state*agent.current_power
@@ -575,7 +546,7 @@ class Simulation:
 
                         print("Wind -> " + action + " = " + str(self.env.renewable_power))
                     elif isinstance(agent, BatteryAgent):
-                        action = agent.choose_action(state_battery, self.epsilon)
+                        action = agent.choose_action(state[2], self.epsilon)
 
                         if action == "charge":
                             agent.battery_state = "charging" 
@@ -592,7 +563,7 @@ class Simulation:
                         bat_power = agent.battery_power
                         print("Battery -> " + action + " = " + str(bat_power))
                     elif isinstance(agent, GridAgent):
-                        action = agent.choose_action(state_grid, self.epsilon)
+                        action = agent.choose_action(state[3], self.epsilon)
                         if action == "sell":
                             agent.grid_state = "selling" 
                             #agent.grid_power = abs(self.env.demand_power - self.env.renewable_power)
@@ -605,7 +576,7 @@ class Simulation:
                         print("Grid -> " + action + " = " + str(agent.grid_power))
                     else:
                         # GridAgent, LoadAgent no generan en este ejemplo
-                        _ = agent.choose_action(state, self.epsilon)               
+                        _ = agent.choose_action(state[4], self.epsilon)               
                
                 self.env.total_power = self.env.renewable_power - bat_power + grid_power
                 self.dif_power = self.env.total_power - self.env.demand_power
@@ -614,11 +585,16 @@ class Simulation:
                 print("Delta_P -> " + str(self.dif_power))
                 print("*"*100)
                 
-                sys.exit(0)
+                self.env.current_index += 1
+                if self.env.current_index >= len(self.env.dataset):
+                    self.env.current_index = 0  # En un entorno real, podría definirse done=True en vez de wrap-around
+                
                 # Ahora calculamos la recompensa individual por agente
                 # y actualizamos la Q-table
-                next_state = self.env.step()  # Avanzamos el entorno un índice
-                '''for ag in self.agents:
+                next_state = self.step(self.env.current_index)  # Avanzamos el entorno un índice
+                print(next_state)
+                
+                for agent in self.agents:
                     # Recuperamos la acción que tomó este agente en este step
                     # Para un enfoque riguroso, cada agente debería almacenar su "acción" actual,
                     # aquí simplificamos volviendo a elegir la misma acción con choose_action(...) 
@@ -627,45 +603,46 @@ class Simulation:
                     
                     # -- EJEMPLO: asumiremos la misma acción que generamos antes (guardándola):
                     # Para hacerlo rápido, repetimos la llamada (no es lo ideal).
-                    action = ag.choose_action(state, self.epsilon)
+                    action = agent.choose_action(state, self.epsilon)
                     
                     # Calculamos la recompensa según el tipo de agente
-                    if isinstance(ag, SolarAgent):
+                    if isinstance(agent, SolarAgent):
                         # Asumimos que P_H es la parte de P_total que generó solar
                         # Para simplificar, lo aproximamos como P_total (no es lo ideal)
-                        reward = ag.calculate_reward(
-                            P_H=P_total, 
-                            P_L=demand, 
+                        reward = agent.calculate_reward(
+                            P_H=self.agent.solar_power, 
+                            P_L=self.env.demand_power, 
                             SOC=0.5, 
                             active_agents=self.agents
                         )
-                    elif isinstance(ag, WindAgent):
-                        reward = ag.calculate_reward(
-                            P_H=P_total, 
-                            P_L=demand, 
+                    elif isinstance(agent, WindAgent):
+                        reward = agent.calculate_reward(
+                            P_H=self.env.renewable_power, 
+                            P_L=self.env.demand_power, 
                             SOC=0.5, 
                             active_agents=self.agents
                         )
-                    elif isinstance(ag, BatteryAgent):
+                    elif isinstance(agent, BatteryAgent):
                         # Ejemplo simplificado: 
                         if action == "charge":
-                            reward = ag.calculate_reward_charge(P_T=P_total, P_L=demand)
+                            reward = agent.calculate_reward_charge(P_T=self.env.total_power, P_L=self.env.demand_power)
                         elif action == "discharge":
-                            reward = ag.calculate_reward_discharge(P_T=P_total, P_L=demand)
+                            reward = agent.calculate_reward_discharge(P_T=self.env.total_power, P_L=self.env.demand_power)
                         else:
                             reward = 0.0
-                        ag.update_soc(action)
-                    elif isinstance(ag, GridAgent):
+                        agent.update_soc(action)
+                    elif isinstance(agent, GridAgent):
                         # S_UT aleatorio 0/1, C_mercado=price
                         S_UT = random.choice([0,1])
-                        reward = ag.calculate_reward(action, P_T=P_total, P_L=demand, 
+                        reward = agent.calculate_reward(action, P_T=self.env.total_power, P_L=self.env.demand_power, 
                                                      SOC=0.5, C_mercado=price, S_UT=S_UT)
-                    elif isinstance(ag, LoadAgent):
-                        reward = ag.calculate_reward(action, P_T=P_total, P_L=demand,
+                    elif isinstance(agent, LoadAgent):
+                        reward = agent.calculate_reward(action, P_T=self.env.total_power, P_L=self.env.demand_power,
                                                      SOC=0.5, C_mercado=price)
                     else:
                         reward = 0.0
-                    '''
+                    
+                    sys.exit(0)
                     # Actualizamos Q-table
                     #ag.update_q_table(state, action, reward, next_state)
                 

@@ -546,47 +546,73 @@ class Simulation:
                 # y 0 en otro caso. Podrías refinarlo según la acción de cada uno.
                 self.env.renewable_power = 0.0
                 self.env.total_power = 0
+                bat_power = 0.0
+                grid_power = 0.0
+                
+                print("*"*100)
+                print("Demand -> " + str(self.env.demand_power))
+
                 for agent in self.agents:
                     if isinstance(agent, SolarAgent):
                         # Escoger acción
                         action = agent.choose_action(state_solar, self.epsilon)
-                        print(action)
+
                         if action == "produce":
                             agent.solar_state = 1
                             self.env.renewable_power += agent.solar_state*agent.current_power
                         else:
                             self.env.renewable_power += 0.0
                         
+                        print("Solar -> " + action + " = " + str(self.env.renewable_power))
+                        
                     elif isinstance(agent, WindAgent):
                         action = agent.choose_action(state_wind, self.epsilon)
-                        print(action)
                         if action == "produce":
                             agent.solar_state = 1
                             self.env.renewable_power += agent.solar_state*agent.current_power
                         else:
                             self.env.renewable_power += 0.0
+
+                        print("Wind -> " + action + " = " + str(self.env.renewable_power))
                     elif isinstance(agent, BatteryAgent):
                         action = agent.choose_action(state_battery, self.epsilon)
-                        print(action)
 
                         if action == "charge":
                             agent.battery_state = "charging" 
+                            #agent.battery_power = abs(self.env.demand_power - self.env.renewable_power)
+                            agent.battery_power = 99999
                         elif action == "discharge":
                             agent.battery_state = "discharging" 
+                            #agent.battery_power = - abs(self.env.demand_power - self.env.renewable_power)
+                            agent.battery_power = - 99999
                         else:
                             agent.battery_state = "idle" 
+                            agent.battery_power = 0.0
+
+                        bat_power = agent.battery_power
+                        print("Battery -> " + action + " = " + str(bat_power))
                     elif isinstance(agent, GridAgent):
                         action = agent.choose_action(state_grid, self.epsilon)
-                        print(action)
-                            
-
-
+                        if action == "sell":
+                            agent.grid_state = "selling" 
+                            #agent.grid_power = abs(self.env.demand_power - self.env.renewable_power)
+                            agent.grid_power = 999999
+                        else: 
+                            agent.grid_state = "idle" 
+                            agent.grid_power = 0
+                        
+                        grid_power = agent.grid_power
+                        print("Grid -> " + action + " = " + str(agent.grid_power))
                     else:
                         # GridAgent, LoadAgent no generan en este ejemplo
-                        _ = agent.choose_action(state, self.epsilon)                
-                
-                self.env.total_power = self.env.renewable_power
+                        _ = agent.choose_action(state, self.epsilon)               
+               
+                self.env.total_power = self.env.renewable_power - bat_power + grid_power
                 self.dif_power = self.env.total_power - self.env.demand_power
+
+                print("Total Power -> " + str(self.env.total_power))
+                print("Delta_P -> " + str(self.dif_power))
+                print("*"*100)
                 
                 sys.exit(0)
                 # Ahora calculamos la recompensa individual por agente

@@ -285,7 +285,7 @@ class WindAgent(BaseAgent):
         return 0.0
 
 class BatteryAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, capacity_ah= 10000, num_battery_bins=4):
+    def __init__(self, env: MultiAgentEnv, capacity_ah= 10000, num_battery_soc_bins=4):
         super().__init__("battery", ["charge", "discharge", "idle"], alpha=0.1, gamma=0.9)
         """
         Inicializa la batería con una capacidad fija en Ah y un SOC inicial del 50%.
@@ -298,17 +298,56 @@ class BatteryAgent(BaseAgent):
 
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
-        # Ajusta los rangos según tu dataset real
-        self.battery_bins = np.linspace(0, 100, num_battery_bins)
-        self.battery_state_bins = [0, 1, 2]
+        self.battery_soc_bins = np.linspace(0, 100, num_battery_soc_bins)
+
+    def update_soc(self, power_w: float):
+        """
+        Actualiza el SOC basado en la potencia suministrada o extraída en una unidad de tiempo de 1 hora.
+        
+        :param power_w: Potencia en Watts (positiva si está cargando, negativa si está descargando).
+        """
+        # Convertimos potencia en energía transferida en Wh
+        energy_wh = power_w  # Asumimos 1 hora de tiempo fijo
+        
+        # Convertimos la energía en Wh a Ah usando la capacidad de la batería
+        delta_soc = (energy_wh / (self.capacity_ah * 1)) * 100  # Expresado en porcentaje
+        
+        # Actualizamos el SOC asegurándonos de que se mantenga en los límites de 0% a 100%
+        self.soc = max(0.0, min(100.0, self.soc + delta_soc))
+        
+        # Actualizamos la potencia y el estado de la batería
+        self.battery_power = power_w
+        
+        if power_w > 0:
+            self.battery_state = "charging"
+        elif power_w < 0:
+            self.battery_state = "discharging"
+        else:
+            self.battery_state = "idle"
+
+    def get_state(self) -> str:
+        """
+        Retorna el estado actual de la batería.
+        
+        :return: "charging", "discharging" o "idle".
+        """
+        return self.battery_state
+    
+    def get_soc(self) -> float:
+        """
+        Retorna el estado de carga actual en porcentaje.
+        
+        :return: SOC en porcentaje (0% - 100%).
+        """
+        return self.soc
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
         Crea la Q-table para todos los posibles estados discretizados.
         """
         states = []
-        for a in range(len(self.battery_bins)):
-            for b in range(len(self.battery_state_bins)):
+        for a in range(len(self.battery_soc_bins)):
+            for b in range(3):
                 for c in range(len(env.renewable_bins)):
                     for d in range(len(env.demand_bins)):
                         states.append((a, b, c, d))
@@ -326,24 +365,18 @@ class BatteryAgent(BaseAgent):
         """
        
         # Discretizamos
-        battery_power_idx = np.digitize([self.soc], self.battery_bins)[0] - 1
+        battery_power_idx = np.digitize([self.soc], self.battery_soc_bins)[0] - 1
         
         print("*"*100)
         print(self.soc)
-        print(self.battery_bins)
+        print(self.battery_soc_bins)
         print(battery_power_idx)
 
         state_env = env._get_discretized_state(index)
         
         # Retornamos la tupla de estado discretizado
-        print("*** battery_power_idx, self.battery_state_bins, renewable_power_idx, demand_power_idx ***")
+        print("*** battery_power_idx, self.battery_state, renewable_power_idx, demand_power_idx ***")
         return (battery_power_idx, self.battery_state, state_env[1], state_env[0])
-
-    def update_soc(self, action, charge_rate=0.1):
-        if action == "charge":
-            self.soc = min(self.soc + charge_rate, 1.0)
-        elif action == "discharge":
-            self.soc = max(self.soc - charge_rate, 0.0)
 
     def calculate_reward_charge(self, P_T, P_L):
         if self.soc < 1 and P_T > P_L:
@@ -362,25 +395,55 @@ class BatteryAgent(BaseAgent):
         return 0
 
 class GridAgent(BaseAgent):
-    def __init__(self):
+    def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
         super().__init__("grid", ["sell", "idle"], alpha=0.1, gamma=0.9)
 
-    def initialize_q_table(self, env: MultiAgentEnv, ess: BatteryAgent):
+        self.grid_power = 0.0  # Potencia en W
+        self.grid_state = "idle"  # Estado inicial de operación
+
+        # Discretizacion por cuantizacion uniforme
+        # Definimos los "bins" para discretizar cada variable de interés
+        #self.battery_soc_bins = np.linspace(0, 100, num_battery_soc_bins)
+
+        self.ess =  ess
+
+    def initialize_q_table(self, env: MultiAgentEnv):
         """
         Crea la Q-table para todos los posibles estados discretizados.
         """
         states = []
-        for a in range(len(ess.battery_bins)):
-            for b in range(len(ess.battery_state_bins)):
-                for c in range(len(env.renewable_bins)):
-                    for d in range(len(env.demand_bins)):
-                        states.append((a, b, c, d))
+        for a in range(2):
+            for b in range(len(self.ess.battery_soc_bins)):
+                for c in range(3):
+                    for d in range(len(env.renewable_bins)):
+                        for e in range(len(env.demand_bins)):
+                            states.append((a, b, c, d, e))
         
         # Para cada estado, creamos un diccionario de acción->Q
         self.q_table = {
             state: {action: 0 for action in self.actions} 
             for state in states
         }
+
+    def _get_discretized_state(self, env: MultiAgentEnv, index):
+        """
+        Toma valores reales y los discretiza en bins,
+        devolviendo (idx_solar).
+        """
+       
+        # Discretizamos
+        battery_power_idx = np.digitize([self.ess.soc], self.ess.battery_soc_bins)[0] - 1
+        
+        print("*"*100)
+        print(self.ess.soc)
+        print(self.ess.battery_soc_bins)
+        print(battery_power_idx)
+
+        state_env = env._get_discretized_state(index)
+        
+        # Retornamos la tupla de estado discretizado
+        print("*** grid_state, battery_power_idx, self.battery_state, renewable_power_idx, demand_power_idx ***")
+        return (self.grid_state, battery_power_idx, self.ess.battery_state, state_env[1], state_env[0])        
 
     def calculate_reward(self, action, P_T, P_L, SOC, C_mercado, S_UT):
         if action == "sell":
@@ -399,7 +462,7 @@ class LoadAgent(BaseAgent):
     def initialize_q_table(self, env: MultiAgentEnv):
         """
         Crea la Q-table para todos los posibles estados discretizados.
-        (solar_bins, wind_bins, battery_bins, demand_bins)
+        (solar_bins, wind_bins, battery_soc_bins, demand_bins)
         """
         states = []
         for a in range(len(env.solar_power_bins)):
@@ -407,7 +470,7 @@ class LoadAgent(BaseAgent):
                 for c in range(len(env.wind_power_bins)):
                     for d in range(len(env.state_wind_bins)):
                         for e in range(len(env.demand_bins)):
-                            for f in range(len(env.battery_bins)):
+                            for f in range(len(env.battery_soc_bins)):
                                 states.append((a, b, c, d, e, f))
         
         # Para cada estado, creamos un diccionario de acción->Q
@@ -443,7 +506,7 @@ class Simulation:
             SolarAgent(self.env),
             WindAgent(self.env),
             BatteryAgent(self.env),
-            #GridAgent(self.env)
+            GridAgent(self.env, BatteryAgent(self.env))
         ]
         
         # Parámetros de entrenamiento
@@ -451,10 +514,8 @@ class Simulation:
         
         # Inicializamos Q-tables
         for agent in self.agents:
-            if isinstance(agent, GridAgent):
-                agent.initialize_q_table(self.env, BatteryAgent(self.env))
-            else:
-                agent.initialize_q_table(self.env)
+            agent.initialize_q_table(self.env)
+                
         
     def run(self):
         for ep in range(self.num_episodes):
@@ -470,6 +531,9 @@ class Simulation:
                 elif isinstance(agent, BatteryAgent):
                     state_battery = agent._get_discretized_state(self.env, 0)
                     print(state_battery)
+                elif isinstance(agent, GridAgent):
+                    state_grid = agent._get_discretized_state(self.env, 0)
+                    print(state_grid)
 
             for step in range(self.max_steps):
 
@@ -504,14 +568,18 @@ class Simulation:
                     elif isinstance(agent, BatteryAgent):
                         action = agent.choose_action(state_battery, self.epsilon)
                         print(action)
-                        # No suma potencia directamente si "idle",
-                        # pero si "discharge" podríamos sumarla. Simplificado:
+
                         if action == "charge":
-                            p = 0.2  # Potencia que consume la batería
+                            agent.battery_state = "charging" 
                         elif action == "discharge":
-                            p = 0.2  # Potencia que aporta la batería
+                            agent.battery_state = "discharging" 
                         else:
-                            p = 0.0
+                            agent.battery_state = "idle" 
+                    elif isinstance(agent, GridAgent):
+                        action = agent.choose_action(state_grid, self.epsilon)
+                        print(action)
+                            
+
 
                     else:
                         # GridAgent, LoadAgent no generan en este ejemplo

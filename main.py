@@ -86,11 +86,14 @@ class BaseAgent:
     """
     Clase base para agentes con Q-table.
     """
-    def __init__(self, name, actions, alpha=0.1, gamma=0.9, isPower=True):
+    def __init__(self, name, actions, alpha=0.1, gamma=0.9, kappa=0.1, sigma=0.0, mu=0.1, isPower=True):
         self.name = name
         self.actions = actions
         self.alpha = alpha
         self.gamma = gamma
+        self.kappa = kappa
+        self.sigma = sigma
+        self.mu = mu
         self.isPower = isPower
         self.q_table = {}   
         self.current_power = 0.0
@@ -180,24 +183,23 @@ class SolarAgent(BaseAgent):
 
         # Ejemplo muy simplificado
 
-    def calculate_reward(self, P_H, P_L, SOC, active_agents):
+    def calculate_reward(self, P_H, P_L, SOC):
         """
         P_H: potencia generada por el panel local
         P_L: demanda local (o parte de la demanda)
         SOC: estado de la batería
-        active_agents: lista con otros agentes que puedan generar potencia, etc.
         """
-        total_renewables = 0
-        for ag in active_agents:
-            if isinstance(ag, (SolarAgent, WindAgent)):
-                total_renewables += ag.calculate_power(random.uniform(0,1))
+
+        print("P_H = " + str(P_H))
+        print("P_L = " + str(P_L))
+        print("SOC = " + str(SOC))
         
         if P_H <= P_L:
-            return 1.0 * (P_L / (P_H + total_renewables + 1e-6))
-        elif P_H > P_L and SOC == 1:
-            return 1.0 * (P_L - (P_H + total_renewables))
-        elif P_H > P_L and SOC < 1:
-            return -1.0 * ((P_H + total_renewables - P_L))
+            return self.kappa * (P_L - P_H)
+        elif P_H > P_L and SOC == 100:
+            return self.sigma * (P_L - P_H)
+        elif P_H > P_L and SOC < 100:
+            return self.mu * (P_H - P_L)
         return 0.0
 
 class WindAgent(BaseAgent):
@@ -487,24 +489,20 @@ class Simulation:
             agent.initialize_q_table(self.env)
 
     def step(self, index):
-
         self.env._get_discretized_state(index)
-        for agent in self.agents:
-            if isinstance(agent, SolarAgent):
-                state_solar = agent._get_discretized_state(self.env, index)
-            elif isinstance(agent, WindAgent):
-                state_wind = agent._get_discretized_state(self.env, index)
-            elif isinstance(agent, BatteryAgent):
-                state_battery = agent._get_discretized_state(self.env, index)
-            elif isinstance(agent, GridAgent):
-                state_grid = agent._get_discretized_state(self.env, index)
+        agent_states = {}
         
-        return (state_solar, state_wind, state_battery, state_grid)
+        for agent in self.agents:
+            agent_type = type(agent).__name__  # Obtiene el nombre de la clase del agente
+            agent_states[agent_type] = agent._get_discretized_state(self.env, index)
+        
+        return agent_states
         
     def run(self):
         for ep in range(self.num_episodes):
             # Reseteamos entorno y los agentes al inicio de cada episodio
             state = self.step(0)
+            print(state)
 
             for step in range(self.max_steps):
 
@@ -520,13 +518,10 @@ class Simulation:
                 bat_power = 0.0
                 grid_power = 0.0
                 
-                print("*"*100)
-                print("Demand -> " + str(self.env.demand_power))
-
                 for agent in self.agents:
                     if isinstance(agent, SolarAgent):
                         # Escoger acción
-                        action = agent.choose_action(state[0], self.epsilon)
+                        action = agent.choose_action(state['SolarAgent'], self.epsilon)
 
                         if action == "produce":
                             agent.solar_state = 1
@@ -537,7 +532,7 @@ class Simulation:
                         print("Solar -> " + action + " = " + str(self.env.renewable_power))
                         
                     elif isinstance(agent, WindAgent):
-                        action = agent.choose_action(state[1], self.epsilon)
+                        action = agent.choose_action(state['WindAgent'], self.epsilon)
                         if action == "produce":
                             agent.solar_state = 1
                             self.env.renewable_power += agent.solar_state*agent.current_power
@@ -546,7 +541,7 @@ class Simulation:
 
                         print("Wind -> " + action + " = " + str(self.env.renewable_power))
                     elif isinstance(agent, BatteryAgent):
-                        action = agent.choose_action(state[2], self.epsilon)
+                        action = agent.choose_action(state['BatteryAgent'], self.epsilon)
 
                         if action == "charge":
                             agent.battery_state = "charging" 
@@ -563,7 +558,7 @@ class Simulation:
                         bat_power = agent.battery_power
                         print("Battery -> " + action + " = " + str(bat_power))
                     elif isinstance(agent, GridAgent):
-                        action = agent.choose_action(state[3], self.epsilon)
+                        action = agent.choose_action(state['GridAgent'], self.epsilon)
                         if action == "sell":
                             agent.grid_state = "selling" 
                             #agent.grid_power = abs(self.env.demand_power - self.env.renewable_power)
@@ -575,8 +570,8 @@ class Simulation:
                         grid_power = agent.grid_power
                         print("Grid -> " + action + " = " + str(agent.grid_power))
                     else:
-                        # GridAgent, LoadAgent no generan en este ejemplo
-                        _ = agent.choose_action(state[4], self.epsilon)               
+                        # LoadAgent no generan en este ejemplo
+                        _ = agent.choose_action(state["LoadAgent"], self.epsilon)               
                
                 self.env.total_power = self.env.renewable_power - bat_power + grid_power
                 self.dif_power = self.env.total_power - self.env.demand_power
@@ -594,6 +589,13 @@ class Simulation:
                 next_state = self.step(self.env.current_index)  # Avanzamos el entorno un índice
                 print(next_state)
                 
+                # Extrae el agente bateria
+                battery_agent = None
+                for agent in self.agents:
+                    if isinstance(agent, BatteryAgent):
+                        battery_agent = agent
+                        break  # Detiene el bucle al encontrar el primer BatteryAgent
+
                 for agent in self.agents:
                     # Recuperamos la acción que tomó este agente en este step
                     # Para un enfoque riguroso, cada agente debería almacenar su "acción" actual,
@@ -603,18 +605,19 @@ class Simulation:
                     
                     # -- EJEMPLO: asumiremos la misma acción que generamos antes (guardándola):
                     # Para hacerlo rápido, repetimos la llamada (no es lo ideal).
-                    action = agent.choose_action(state, self.epsilon)
+                    
+                    agent_type = type(agent).__name__  # Obtiene el nombre de la clase del agente
+                    action = agent.choose_action(state[agent_type], self.epsilon)
                     
                     # Calculamos la recompensa según el tipo de agente
                     if isinstance(agent, SolarAgent):
-                        # Asumimos que P_H es la parte de P_total que generó solar
-                        # Para simplificar, lo aproximamos como P_total (no es lo ideal)
                         reward = agent.calculate_reward(
-                            P_H=self.agent.solar_power, 
+                            P_H=self.env.renewable_power, 
                             P_L=self.env.demand_power, 
-                            SOC=0.5, 
-                            active_agents=self.agents
+                            SOC=battery_agent.get_soc()
                         )
+                        print(reward)
+                        sys.exit(0)
                     elif isinstance(agent, WindAgent):
                         reward = agent.calculate_reward(
                             P_H=self.env.renewable_power, 

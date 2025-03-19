@@ -35,6 +35,7 @@ class MultiAgentEnv:
         self.renewable_power = 0
         self.total_power = 0
         self.demand_power = 0        
+        self.price = 0
         self.dif_power = 0
         
         # Cargamos el dataset
@@ -71,6 +72,7 @@ class MultiAgentEnv:
         row = self.dataset.iloc[index]
         
         self.demand_power = row["demand"]
+        self.price = row["price"]
 
         # Discretizamos
         demand_power_idx = np.digitize([row["demand"]], self.demand_bins)[0] - 1
@@ -428,15 +430,16 @@ class GridAgent(BaseAgent):
 
         return (self.grid_state, battery_power_idx, self.ess.battery_state, state_env[1], state_env[0])        
 
-    def calculate_reward(self, action, P_T, P_L, SOC, C_mercado, S_UT):
-        if action == "sell":
-            if SOC < 0.5 and P_T < P_L and S_UT == 0:
-                return 1.0 / (P_T * C_mercado + 1e-6)
-            elif SOC >= 0.5 and P_T >= P_L and S_UT == 0:
-                return -1.0 * P_T * C_mercado
-            elif (SOC >= 0.5 or P_T >= P_L) and S_UT == 1:
-                return -1.0 * P_T * C_mercado
-        return 0.0
+    def calculate_reward(self, P_H, P_L, SOC, C_mercado):
+        
+        if SOC < 50 and P_H < P_L and self.grid_state == "selling":
+            return self.kappa / C_mercado
+        elif SOC >= 50 and P_H < P_L and self.grid_state == "selling":
+            return -self.mu * C_mercado
+        elif P_H >= P_L and self.grid_state == "selling":
+            return -self.sigma * C_mercado
+        else:
+            return 0.0
 
 class LoadAgent(BaseAgent):
     def __init__(self):
@@ -649,25 +652,33 @@ class Simulation:
                             print("reward battery discharge " + str(reward))
                         else:
                             reward = 0.0
-                        
-                        sys.exit(0)
-                        agent.update_soc(action)
+
+                        #agent.update_soc(action)
                     elif isinstance(agent, GridAgent):
-                        # S_UT aleatorio 0/1, C_mercado=price
-                        S_UT = random.choice([0,1])
-                        reward = agent.calculate_reward(action, P_T=self.env.total_power, P_L=self.env.demand_power, 
-                                                     SOC=0.5, C_mercado=price, S_UT=S_UT)
+                        reward = agent.calculate_reward(
+                            P_H=self.env.renewable_power,
+                            P_L=self.env.demand_power, 
+                            SOC=battery_agent.get_soc(),
+                            C_mercado=self.env.price)
+                        print("reward grid " + str(reward))
+                        
                     elif isinstance(agent, LoadAgent):
-                        reward = agent.calculate_reward(action, P_T=self.env.total_power, P_L=self.env.demand_power,
-                                                     SOC=0.5, C_mercado=price)
+                        reward = agent.calculate_reward(
+                            action,
+                            P_H=self.env.renewable_power,
+                            P_L=self.env.demand_power,
+                            SOC=battery_agent.get_soc(),
+                            C_mercado=self.env.price)
                     else:
                         reward = 0.0
                     
                     # Actualizamos Q-table
-                    #ag.update_q_table(state, action, reward, next_state)
+                    
+                    agent.update_q_table(state[agent_type], action, reward, next_state)
                 
                 # Actualizamos el estado actual
-                #state = next_state
+                state = next_state
+                sys.exit(0)
                 
             
             print(f"Fin episodio {ep+1}/{self.num_episodes}")

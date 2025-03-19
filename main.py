@@ -86,7 +86,7 @@ class BaseAgent:
     """
     Clase base para agentes con Q-table.
     """
-    def __init__(self, name, actions, alpha=0.1, gamma=0.9, kappa=0.1, sigma=0.0, mu=0.1, isPower=True):
+    def __init__(self, name, actions, alpha=0.1, gamma=0.9, kappa=0.001, sigma=0.001, mu=0.001, nu=0.001, beta=0.01, isPower=True):
         self.name = name
         self.actions = actions
         self.alpha = alpha
@@ -94,6 +94,8 @@ class BaseAgent:
         self.kappa = kappa
         self.sigma = sigma
         self.mu = mu
+        self.nu = nu
+        self.beta = beta
         self.isPower = isPower
         self.q_table = {}   
         self.current_power = 0.0
@@ -256,14 +258,23 @@ class WindAgent(BaseAgent):
         else:
             return 0.5 * RHO * BLADE_AREA * C_P * (row["wind speed"]**3)
 
-    def calculate_reward(self, P_H, P_L, SOC, active_agents):
-        # Ejemplo simplificado
+    def calculate_reward(self, P_H, P_L, SOC):
+        """
+        P_H: potencia generada por el panel local
+        P_L: demanda local (o parte de la demanda)
+        SOC: estado de la batería
+        """
+
+        print("P_H = " + str(P_H))
+        print("P_L = " + str(P_L))
+        print("SOC = " + str(SOC))
+        
         if P_H <= P_L:
-            return 1.0 * (P_L / (P_H + 1e-6))
-        elif P_H > P_L and SOC == 1:
-            return 1.0 * (P_L - (P_H / len(active_agents)))
-        elif P_H > P_L and SOC < 1:
-            return -1.0 * ((P_H - P_L) / len(active_agents))
+            return self.kappa * (P_L - P_H)
+        elif P_H > P_L and SOC == 100:
+            return self.sigma * (P_L - P_H)
+        elif P_H > P_L and SOC < 100:
+            return self.mu * (P_H - P_L)
         return 0.0
 
 class BatteryAgent(BaseAgent):
@@ -355,20 +366,20 @@ class BatteryAgent(BaseAgent):
 
         return (battery_power_idx, self.battery_state, state_env[1], state_env[0])
 
-    def calculate_reward_charge(self, P_T, P_L):
-        if self.soc < 1 and P_T > P_L:
-            return 1.0 * (1 - self.soc) * (P_T - P_L)
-        elif self.soc <= 1 and P_T <= P_L:
-            return -1.0 * self.soc * (P_L - P_T)
+    def calculate_reward_discharge(self, P_T, P_L):
+        if self.get_soc() >= 50 and P_T < P_L and self.battery_state == "discharging":
+            return self.kappa* self.get_soc() * (P_L - P_T)
+        elif self.get_soc() < 50 and P_T > P_L and self.battery_state == "discharging":
+            return -self.sigma * (100 - self.get_soc()) * (P_T - P_L)
+        elif self.get_soc() < 50 and P_T < P_L and self.battery_state == "discharging":
+            return -self.mu * (100 - self.get_soc()) * (P_L - P_T)
         return 0
 
-    def calculate_reward_discharge(self, P_T, P_L):
-        if self.soc >= 0.5 and P_T < P_L:
-            return 1.0 * self.soc * (P_L - P_T)
-        elif self.soc < 0.5 and P_T > P_L:
-            return -1.0 * (1 - self.soc) * (P_T - P_L)
-        elif self.soc < 0.5 and P_T < P_L:
-            return -1.0 * (1 - self.soc) * (P_L - P_T)
+    def calculate_reward_charge(self, P_T, P_L):
+        if self.get_soc() < 100 and P_T > P_L and self.battery_state == "charging":
+            return self.nu * (100 - self.get_soc()) * (P_T - P_L)
+        elif self.get_soc() <= 100 and P_T <= P_L and self.battery_state == "charging":
+            return -self.beta * self.get_soc() * (P_L - P_T)
         return 0
 
 class GridAgent(BaseAgent):
@@ -616,23 +627,30 @@ class Simulation:
                             P_L=self.env.demand_power, 
                             SOC=battery_agent.get_soc()
                         )
-                        print(reward)
-                        sys.exit(0)
+                        print("reward solar " + str(reward))
                     elif isinstance(agent, WindAgent):
                         reward = agent.calculate_reward(
                             P_H=self.env.renewable_power, 
                             P_L=self.env.demand_power, 
-                            SOC=0.5, 
-                            active_agents=self.agents
+                            SOC=battery_agent.get_soc()
                         )
+                        print("reward wind " + str(reward))
                     elif isinstance(agent, BatteryAgent):
                         # Ejemplo simplificado: 
                         if action == "charge":
-                            reward = agent.calculate_reward_charge(P_T=self.env.total_power, P_L=self.env.demand_power)
+                            reward = agent.calculate_reward_charge(
+                                P_T=self.env.total_power, 
+                                P_L=self.env.demand_power)
+                            print("reward battery charge " + str(reward))
                         elif action == "discharge":
-                            reward = agent.calculate_reward_discharge(P_T=self.env.total_power, P_L=self.env.demand_power)
+                            reward = agent.calculate_reward_discharge(
+                                P_T=self.env.total_power, 
+                                P_L=self.env.demand_power)
+                            print("reward battery discharge " + str(reward))
                         else:
                             reward = 0.0
+                        
+                        sys.exit(0)
                         agent.update_soc(action)
                     elif isinstance(agent, GridAgent):
                         # S_UT aleatorio 0/1, C_mercado=price
@@ -645,7 +663,6 @@ class Simulation:
                     else:
                         reward = 0.0
                     
-                    sys.exit(0)
                     # Actualizamos Q-table
                     #ag.update_q_table(state, action, reward, next_state)
                 

@@ -114,6 +114,15 @@ class BaseAgent:
             return max(q_values, key=q_values.get)
 
     def update_q_table(self, state, action, reward, next_state):
+
+        print("------------- state")
+        print(state)
+        print("------------- action")
+        print(action)
+        print("------------- reward")
+        print(reward) 
+        print("------------- next_state")
+        print(next_state)        
         """
         Actualiza la Q-table según Q-Learning:
           Q(s, a) <- Q(s, a) + alpha * [r + gamma * max_a' Q(s', a') - Q(s, a)]
@@ -134,7 +143,9 @@ class BaseAgent:
 # -----------------------------------------------------
 class SolarAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, num_solar_bins=7):
-        super().__init__("solar", ["produce", "idle"], alpha=0.1, gamma=0.9, isPower=True)
+        super().__init__("solar", [0, 1], alpha=0.1, gamma=0.9, isPower=True)
+
+        # ["idle", "produce"] -> [0, 1]
 
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
@@ -208,8 +219,10 @@ class SolarAgent(BaseAgent):
 
 class WindAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, num_wind_bins=7):
-        super().__init__("wind", ["produce", "idle"], alpha=0.1, gamma=0.9, isPower=True)
+        super().__init__("wind", [0, 1], alpha=0.1, gamma=0.9, isPower=True)
         
+        # ["idle", "produce"] -> [0, 1]
+
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
         # Ajusta los rangos según tu dataset real
@@ -281,7 +294,10 @@ class WindAgent(BaseAgent):
 
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 10000, num_battery_soc_bins=4):
-        super().__init__("battery", ["charge", "discharge", "idle"], alpha=0.1, gamma=0.9)
+        super().__init__("battery", [-1, 0, 1], alpha=0.1, gamma=0.9)
+        
+        # ["charge", "idle", "discharge"] -> [-1, 0, 1]
+        
         """
         Inicializa la batería con una capacidad fija en Ah y un SOC inicial del 50%.
         :param capacity_ah: Capacidad de la batería en Amperios-hora (Ah).
@@ -289,7 +305,7 @@ class BatteryAgent(BaseAgent):
         self.capacity_ah = capacity_ah  # Capacidad fija en Ah
         self.soc = 50.0  # Estado de carga inicial en %
         self.battery_power = 0.0  # Potencia en W
-        self.battery_state = "idle"  # Estado inicial de operación
+        self.battery_state = 0  # Estado inicial de operación
 
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
@@ -314,11 +330,11 @@ class BatteryAgent(BaseAgent):
         self.battery_power = power_w
         
         if power_w > 0:
-            self.battery_state = "charging"
+            self.battery_state = -1
         elif power_w < 0:
-            self.battery_state = "discharging"
+            self.battery_state = 1
         else:
-            self.battery_state = "idle"
+            self.battery_state = 0
 
     def get_state(self) -> str:
         """
@@ -386,10 +402,11 @@ class BatteryAgent(BaseAgent):
 
 class GridAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
-        super().__init__("grid", ["sell", "idle"], alpha=0.1, gamma=0.9)
+        super().__init__("grid", [0, 1], alpha=0.1, gamma=0.9)
 
+        # ["idle", "sell"] -> [0, 1]
         self.grid_power = 0.0  # Potencia en W
-        self.grid_state = "idle"  # Estado inicial de operación
+        self.grid_state = 0  # Estado inicial de operación
 
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
@@ -443,7 +460,9 @@ class GridAgent(BaseAgent):
 
 class LoadAgent(BaseAgent):
     def __init__(self):
-        super().__init__("load", ["consume", "idle"], alpha=0.1, gamma=0.9)
+        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9)
+
+        # ["idle", "consume"] -> [0, 1]
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
@@ -471,7 +490,7 @@ class LoadAgent(BaseAgent):
                 return 1.0 * (1.0 / (P_T + C_mercado + 1e-6))
             elif C_mercado > C_CONFORT:
                 return -1.0 * P_T * C_mercado
-        elif action == "idle":
+        elif action == 0:
             if P_T > P_L or SOC >= 0.5:
                 return -1.0 * P_T * C_mercado
         return 0.0
@@ -543,7 +562,7 @@ class Simulation:
                         else:
                             self.env.renewable_power += 0.0
                         
-                        print("Solar -> " + action + " = " + str(self.env.renewable_power))
+                        print("Solar -> " + str(action) + " = " + str(self.env.renewable_power))
                         
                     elif isinstance(agent, WindAgent):
                         action = agent.choose_action(state['WindAgent'], self.epsilon)
@@ -553,7 +572,7 @@ class Simulation:
                         else:
                             self.env.renewable_power += 0.0
 
-                        print("Wind -> " + action + " = " + str(self.env.renewable_power))
+                        print("Wind -> " + str(action) + " = " + str(self.env.renewable_power))
                     elif isinstance(agent, BatteryAgent):
                         action = agent.choose_action(state['BatteryAgent'], self.epsilon)
 
@@ -566,11 +585,11 @@ class Simulation:
                             #agent.battery_power = - abs(self.env.demand_power - self.env.renewable_power)
                             agent.battery_power = - 99999
                         else:
-                            agent.battery_state = "idle" 
+                            agent.battery_state = 0 
                             agent.battery_power = 0.0
 
                         bat_power = agent.battery_power
-                        print("Battery -> " + action + " = " + str(bat_power))
+                        print("Battery -> " + str(action) + " = " + str(bat_power))
                     elif isinstance(agent, GridAgent):
                         action = agent.choose_action(state['GridAgent'], self.epsilon)
                         if action == "sell":
@@ -578,11 +597,11 @@ class Simulation:
                             #agent.grid_power = abs(self.env.demand_power - self.env.renewable_power)
                             agent.grid_power = 999999
                         else: 
-                            agent.grid_state = "idle" 
+                            agent.grid_state = 0 
                             agent.grid_power = 0
                         
                         grid_power = agent.grid_power
-                        print("Grid -> " + action + " = " + str(agent.grid_power))
+                        print("Grid -> " + str(action) + " = " + str(agent.grid_power))
                     else:
                         # LoadAgent no generan en este ejemplo
                         _ = agent.choose_action(state["LoadAgent"], self.epsilon)               
@@ -672,14 +691,12 @@ class Simulation:
                     else:
                         reward = 0.0
                     
-                    # Actualizamos Q-table
-                    
-                    agent.update_q_table(state[agent_type], action, reward, next_state)
+                    # Actualizamos Q-table                    
+                    agent.update_q_table(state[agent_type], action, reward, next_state[agent_type])
                 
                 # Actualizamos el estado actual
                 state = next_state
-                sys.exit(0)
-                
+                #sys.exit(0)
             
             print(f"Fin episodio {ep+1}/{self.num_episodes}")
 

@@ -681,16 +681,15 @@ class Simulation:
 
                 #print("Total Power -> " + str(self.env.total_power))
                 #print("Delta_P -> " + str(self.dif_power))
-                #print("*"*100)
-                
-                
+                #print("*"*100)                
+
+                # Ahora calculamos la recompensa individual por agente
+                # y actualizamos la Q-table                
                 self.env.current_index += 1
                 print(self.env.current_index)
                 if self.env.current_index >= len(self.env.dataset):
-                    self.env.current_index = 0  # En un entorno real, podría definirse done=True en vez de wrap-around
-                
-                # Ahora calculamos la recompensa individual por agente
-                # y actualizamos la Q-table
+                    self.env.current_index = 0  
+
                 next_state = self.step(self.env.current_index)  # Avanzamos el entorno un índice
                 # print(next_state)
                 

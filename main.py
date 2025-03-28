@@ -4,6 +4,7 @@ import numpy as np
 import random
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.widgets import CheckButtons
 
 # Parámetros físicos y constantes
 ETA = 0.15        # Eficiencia de conversión solar
@@ -41,6 +42,11 @@ class MultiAgentEnv:
         
         # Cargamos el dataset
         self.dataset = self._load_data(csv_filename)
+        
+        # Graficas interactiva
+        self.plot_data_interactive(csv_filename,
+                                  columns_to_plot=["demand", "price", "solar_power", "wind_power"],
+                                  title="Gráfico imteractivo de variables de entorno")
 
         self.max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
         
@@ -63,6 +69,79 @@ class MultiAgentEnv:
         #print("Primeras filas del dataset:\n", df.head())
         
         return df
+
+    def plot_data_interactive(self, filename: str, columns_to_plot=None, title: str = "Gráfico Interactivo"):
+        """
+        Carga los datos desde un archivo CSV y los grafica en una ventana interactiva
+        que permite mostrar/ocultar cada traza usando checkboxes.
+
+        Parámetros
+        ----------
+        filename : str
+            Nombre del archivo CSV a cargar (se buscará en la ruta definida en _load_data).
+        columns_to_plot : list, opcional
+            Lista de columnas a graficar. Si es None, se graficarán todas las columnas del DataFrame.
+        title : str, opcional
+            Título a mostrar en el gráfico principal.
+        """
+        df = self._load_data(filename)
+
+        if df.empty:
+            print("No hay datos para graficar (DataFrame vacío).")
+            return
+
+        # Determina qué columnas se van a graficar
+        if not columns_to_plot:
+            columns_to_plot = df.columns.tolist()
+
+        # Verificamos que las columnas existan realmente en el DataFrame
+        valid_columns = [col for col in columns_to_plot if col in df.columns]
+        invalid_columns = set(columns_to_plot) - set(valid_columns)
+
+        if invalid_columns:
+            print("Advertencia: Las siguientes columnas no existen en el DataFrame:")
+            for col in invalid_columns:
+                print(f"  - {col}")
+
+        if not valid_columns:
+            print("No se encontraron columnas válidas para graficar.")
+            return
+
+        # Preparar la figura principal y el área para los checkboxes
+        fig = plt.figure(figsize=(8, 6))
+        # Área para el gráfico principal (izquierda y parte central de la ventana)
+        ax = fig.add_axes([0.25, 0.1, 0.7, 0.8])
+
+        # Graficar cada columna y guardar la referencia a la línea
+        lines = []
+        for col in valid_columns:
+            line, = ax.plot(df[col], label=col)  # la coma tras 'line,' es necesaria para desempaquetar la tupla
+            lines.append(line)
+
+        ax.set_title(title)
+        ax.set_xlabel("Índice")
+        ax.set_ylabel("Valores")
+        ax.legend()
+
+        # Área para el panel de checkboxes (en la parte izquierda de la ventana)
+        rax = fig.add_axes([0.05, 0.4, 0.15, 0.15])  # [left, bottom, width, height] en fracción de la figura
+        labels = valid_columns
+        visibility = [True] * len(labels)
+
+        # Crear los checkboxes a partir de las etiquetas de las columnas
+        check = CheckButtons(rax, labels, visibility)
+
+        # Función para mostrar/ocultar la línea correspondiente cuando se activa el checkbox
+        def toggle_line(label):
+            index = labels.index(label)
+            lines[index].set_visible(not lines[index].get_visible())
+            plt.draw()  # Se actualiza el gráfico
+
+        # Asignar la función de callback al evento "on_clicked"
+        check.on_clicked(toggle_line)
+
+        # Mostrar la ventana con el gráfico interactivo
+        plt.show()
 
     def _get_discretized_state(self, index):
         """

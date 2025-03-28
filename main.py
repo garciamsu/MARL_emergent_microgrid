@@ -40,11 +40,13 @@ class MultiAgentEnv:
         self.price = 0
         self.dif_power = 0
         
-        # Cargamos el dataset
-        self.dataset = self._load_data(csv_filename)
+        # Cargamos el DataFrame con offsets
+        offsets_dict = {"demand": -7000, "price": 0, "solar_power": 0, "wind_power": 0}
+        self.dataset = self._load_data(csv_filename, offsets_dict)
         
         # Graficas interactiva
         self.plot_data_interactive(csv_filename,
+                                  offsets_dict,
                                   columns_to_plot=["demand", "price", "solar_power", "wind_power"],
                                   title="Gráfico imteractivo de variables de entorno")
 
@@ -62,15 +64,45 @@ class MultiAgentEnv:
         # Estado inicial (discretizado)
         self.state = None
 
-    def _load_data(self, filename):
+    def _load_data(self, filename: str, offsets: dict = None) -> pd.DataFrame:
+        """
+        Carga un archivo CSV usando pandas, aplica offsets (desplazamientos) a las columnas
+        especificadas y coloca en cero (0) los valores negativos de la columna 'demand'.
+
+        Parámetros:
+        -----------
+        filename : str
+            Nombre del archivo CSV a cargar, buscado en la ruta indicada.
+        offsets : dict, opcional
+            Diccionario con pares {nombre_columna: valor_offset}.
+            Por ejemplo: {"Load": 5, "PV_Power": -10}.
+            Si es None o está vacío, no se aplican desplazamientos.
+
+        Retorno:
+        --------
+        df : pd.DataFrame
+            DataFrame con el contenido del archivo y las transformaciones indicadas.
+        """
         # Ruta al archivo
         file_path = os.path.join(os.getcwd(), "assets", "datasets", filename)
         df = pd.read_csv(file_path, sep=';', engine='python')
-        #print("Primeras filas del dataset:\n", df.head())
-        
+
+        # 1. Aplica offsets a las columnas indicadas
+        if offsets is not None:
+            for col, offset_value in offsets.items():
+                if col in df.columns:
+                    df[col] += offset_value
+                else:
+                    print(f"Advertencia: La columna '{col}' no existe en el DataFrame. No se aplicó offset.")
+
+        # 2. Sustituir valores negativos en 'demand' con 0
+        #    Ajusta el nombre de la columna 'demand' según tu archivo CSV.
+        if 'demand' in df.columns:
+            df['demand'] = df['demand'].clip(lower=0)
+
         return df
 
-    def plot_data_interactive(self, filename: str, columns_to_plot=None, title: str = "Gráfico Interactivo"):
+    def plot_data_interactive(self, filename: str, offsets_dict, columns_to_plot=None, title: str = "Gráfico Interactivo"):
         """
         Carga los datos desde un archivo CSV y los grafica en una ventana interactiva
         que permite mostrar/ocultar cada traza usando checkboxes.
@@ -84,7 +116,7 @@ class MultiAgentEnv:
         title : str, opcional
             Título a mostrar en el gráfico principal.
         """
-        df = self._load_data(filename)
+        df = self._load_data(filename, offsets_dict)
 
         if df.empty:
             print("No hay datos para graficar (DataFrame vacío).")

@@ -41,7 +41,7 @@ class MultiAgentEnv:
         self.dif_power = 0
         
         # Cargamos el DataFrame con offsets
-        offsets_dict = {"demand": -7000, "price": 0, "solar_power": 0, "wind_power": 0}
+        offsets_dict = {"demand": -9000, "price": 0, "solar_power": 0, "wind_power": 0}
         self.dataset = self._load_data(csv_filename, offsets_dict)
         
         # Graficas interactiva
@@ -792,7 +792,8 @@ class Simulation:
                 self.dif_power = self.env.total_power - self.env.demand_power
 
                 #print("Total Power -> " + str(self.env.total_power))
-                print("Delta_P -> " + str(self.dif_power))
+                #print("Delta_P -> " + str(self.dif_power))
+                print("bat_power -> " + str(bat_power))
                 #print("*"*100)                
 
                 # Ahora calculamos la recompensa individual por agente
@@ -842,12 +843,12 @@ class Simulation:
                         #print("reward wind " + str(reward))
                     elif isinstance(agent, BatteryAgent):
                         # Ejemplo simplificado: 
-                        if action == "charge":
+                        if agent.action == 1:
                             reward = agent.calculate_reward_charge(
                                 P_T=self.env.total_power, 
                                 P_L=self.env.demand_power)
                             #print("reward battery charge " + str(reward))
-                        elif action == "discharge":
+                        elif agent.action == 2:
                             reward = agent.calculate_reward_discharge(
                                 P_T=self.env.total_power, 
                                 P_L=self.env.demand_power)
@@ -855,7 +856,7 @@ class Simulation:
                         else:
                             reward = 0.0
 
-                        #agent.update_soc(action)
+                        agent.update_soc(agent.action)
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
                             P_H=self.env.renewable_power,
@@ -879,7 +880,6 @@ class Simulation:
                 
                 # Actualizamos el estado actual
                 state = next_state
-                #sys.exit(0)
             
             # Visualizamos las Q-tables
             for agent in self.agents:

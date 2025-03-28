@@ -16,7 +16,7 @@ C_P = 0.4         # Coeficiente de potencia
 C_CONFORT = 0.5   # Umbral de confort para el costo del mercado
 
 # -----------------------------------------------------
-# 1) Definimos el entorno
+# Definimos el entorno
 # -----------------------------------------------------
 class MultiAgentEnv:
     """
@@ -64,7 +64,6 @@ class MultiAgentEnv:
         
         return df
 
-
     def _get_discretized_state(self, index):
         """
         Toma valores reales (irradancia, viento, demanda, precio, etc.) y los discretiza en bins,
@@ -83,7 +82,7 @@ class MultiAgentEnv:
         return (demand_power_idx, renewable_power_idx)
 
 # -----------------------------------------------------
-# 2) Definimos la clase base de Agente con Q-Table
+# Definimos la clase base de Agente con Q-Table
 # -----------------------------------------------------
 class BaseAgent:
     """
@@ -92,6 +91,7 @@ class BaseAgent:
     def __init__(self, name, actions, alpha=0.1, gamma=0.9, kappa=0.001, sigma=0.001, mu=0.001, nu=0.001, beta=0.01, isPower=True):
         self.name = name
         self.actions = actions
+        self.action = 0
         self.alpha = alpha
         self.gamma = gamma
         self.kappa = kappa
@@ -108,11 +108,13 @@ class BaseAgent:
         Selecciona acción con política epsilon-greedy.
         """
         if random.random() < epsilon:
-            return random.choice(self.actions)
+            self.action = random.choice(self.actions)
         else:
             # Escoge la acción con Q máximo
             q_values = self.q_table.get(state, {a: 0.0 for a in self.actions})
-            return max(q_values, key=q_values.get)
+            self.action = max(q_values, key=q_values.get)
+        
+        return self.action
 
     def update_q_table(self, state, action, reward, next_state):
 
@@ -128,6 +130,7 @@ class BaseAgent:
         Actualiza la Q-table según Q-Learning:
           Q(s, a) <- Q(s, a) + alpha * [r + gamma * max_a' Q(s', a') - Q(s, a)]
         """
+        #print(state)
         q_values = self.q_table[state]
         current_q = q_values[action]
         
@@ -139,7 +142,7 @@ class BaseAgent:
         self.q_table[state][action] = new_q
 
 # -----------------------------------------------------
-# 3) Agentes Especializados (Solar, Wind, Battery, Grid, Load)
+# Agentes Especializados (Solar, Wind, Battery, Grid, Load)
 #    Heredan de BaseAgent y añaden sus recompensas
 # -----------------------------------------------------
 class SolarAgent(BaseAgent):
@@ -371,9 +374,9 @@ class WindAgent(BaseAgent):
 
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 10000, num_battery_soc_bins=4):
-        super().__init__("battery", [-1, 0, 1], alpha=0.1, gamma=0.9)
+        super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9)
         
-        # ["charge", "idle", "discharge"] -> [-1, 0, 1]
+        # ["idle", "charge", "discharge"] -> [0, 1, 2]
         
         """
         Inicializa la batería con una capacidad fija en Ah y un SOC inicial del 50%.
@@ -626,32 +629,31 @@ class Simulation:
                 for agent in self.agents:
                     if isinstance(agent, SolarAgent):
                         # Escoger acción
-                        action = agent.choose_action(state['SolarAgent'], self.epsilon)
+                        agent.choose_action(state['SolarAgent'], self.epsilon)
 
-                        if action == "produce":
+                        if agent.action == 1: #"produce"
                             agent.solar_state = 1
                             self.env.renewable_power += agent.solar_state*agent.current_power
                         else:
                             agent.solar_state = 0
                             self.env.renewable_power += 0.0
                     elif isinstance(agent, WindAgent):
-                        action = agent.choose_action(state['WindAgent'], self.epsilon)
-                        if action == "produce":
+                        agent.choose_action(state['WindAgent'], self.epsilon)
+                        if agent.action == 1: #"produce"
                             agent.solar_state = 1
                             self.env.renewable_power += agent.solar_state*agent.current_power
                         else:
+                            agent.solar_state = 0
                             self.env.renewable_power += 0.0
-
-                        # print("Wind -> " + str(action) + " = " + str(self.env.renewable_power))
                     elif isinstance(agent, BatteryAgent):
-                        action = agent.choose_action(state['BatteryAgent'], self.epsilon)
+                        agent.choose_action(state['BatteryAgent'], self.epsilon)
 
-                        if action == "charge":
-                            agent.battery_state = "charging" 
+                        if agent.action == -1:
+                            agent.battery_state = 1 # "charging" 
                             #agent.battery_power = abs(self.env.demand_power - self.env.renewable_power)
                             agent.battery_power = 99999
-                        elif action == "discharge":
-                            agent.battery_state = "discharging" 
+                        elif agent.action == 1:
+                            agent.battery_state = 2  # "discharging" 
                             #agent.battery_power = - abs(self.env.demand_power - self.env.renewable_power)
                             agent.battery_power = - 99999
                         else:
@@ -659,11 +661,11 @@ class Simulation:
                             agent.battery_power = 0.0
 
                         bat_power = agent.battery_power
-                        # print("Battery -> " + str(action) + " = " + str(bat_power))
+                        
                     elif isinstance(agent, GridAgent):
-                        action = agent.choose_action(state['GridAgent'], self.epsilon)
-                        if action == "sell":
-                            agent.grid_state = "selling" 
+                        agent.choose_action(state['GridAgent'], self.epsilon)
+                        if agent.action == 1: # "sell"
+                            agent.grid_state = 1 # "selling" 
                             #agent.grid_power = abs(self.env.demand_power - self.env.renewable_power)
                             agent.grid_power = 999999
                         else: 
@@ -671,7 +673,6 @@ class Simulation:
                             agent.grid_power = 0
                         
                         grid_power = agent.grid_power
-                        # print("Grid -> " + str(action) + " = " + str(agent.grid_power))
                     else:
                         # LoadAgent no generan en este ejemplo
                         _ = agent.choose_action(state["LoadAgent"], self.epsilon)               
@@ -680,13 +681,13 @@ class Simulation:
                 self.dif_power = self.env.total_power - self.env.demand_power
 
                 #print("Total Power -> " + str(self.env.total_power))
-                #print("Delta_P -> " + str(self.dif_power))
+                print("Delta_P -> " + str(self.dif_power))
                 #print("*"*100)                
 
                 # Ahora calculamos la recompensa individual por agente
                 # y actualizamos la Q-table                
                 self.env.current_index += 1
-                print(self.env.current_index)
+                #print(self.env.current_index)
                 if self.env.current_index >= len(self.env.dataset):
                     self.env.current_index = 0  
 

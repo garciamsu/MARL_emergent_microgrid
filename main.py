@@ -222,9 +222,8 @@ class BaseAgent:
         """
         Selecciona acción con política epsilon-greedy.
         """
-        ran = random.random()
-        print(ran)
-        if ran < epsilon:
+
+        if random.random() < epsilon:
             self.action = random.choice(self.actions)
         else:
             # Escoge la acción con Q máximo
@@ -405,9 +404,9 @@ class SolarAgent(BaseAgent):
         
         if P_H <= P_L:
             return self.kappa * (P_L - P_H)
-        elif P_H > P_L and SOC == 100:
+        elif P_H > P_L and SOC == 1:
             return self.sigma * (P_L - P_H)
-        elif P_H > P_L and SOC < 100:
+        elif P_H > P_L and SOC < 1:
             return self.mu * (P_H - P_L)
         return 0.0
 
@@ -477,9 +476,9 @@ class WindAgent(BaseAgent):
         
         if P_H <= P_L:
             return self.kappa * (P_L - P_H)
-        elif P_H > P_L and SOC == 100:
+        elif P_H > P_L and SOC == 1:
             return self.sigma * (P_L - P_H)
-        elif P_H > P_L and SOC < 100:
+        elif P_H > P_L and SOC < 1:
             return self.mu * (P_H - P_L)
         return 0.0
 
@@ -494,13 +493,13 @@ class BatteryAgent(BaseAgent):
         :param capacity_ah: Capacidad de la batería en Amperios-hora (Ah).
         """
         self.capacity_ah = capacity_ah  # Capacidad fija en Ah
-        self.soc = 50.0  # Estado de carga inicial en %
+        self.soc = 0.5  # Estado de carga inicial en %
         self.battery_power = 0.0  # Potencia en W
         self.battery_state = 0  # Estado inicial de operación
 
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
-        self.battery_soc_bins = np.linspace(0, 100, num_battery_soc_bins)
+        self.battery_soc_bins = np.linspace(0, 1, num_battery_soc_bins)
 
     def update_soc(self, power_w: float):
         """
@@ -512,10 +511,10 @@ class BatteryAgent(BaseAgent):
         energy_wh = power_w  # Asumimos 1 hora de tiempo fijo
         
         # Convertimos la energía en Wh a Ah usando la capacidad de la batería
-        delta_soc = (energy_wh / (self.capacity_ah * 1)) * 100  # Expresado en porcentaje
+        delta_soc = (energy_wh / (self.capacity_ah * 1))   # Expresado en porcentaje
         
         # Actualizamos el SOC asegurándonos de que se mantenga en los límites de 0% a 100%
-        self.soc = max(0.0, min(100.0, self.soc + delta_soc))
+        self.soc = max(0.0, min(1.0, self.soc + delta_soc))
         
         # Actualizamos la potencia y el estado de la batería
         self.battery_power = power_w
@@ -539,7 +538,7 @@ class BatteryAgent(BaseAgent):
         """
         Retorna el estado de carga actual en porcentaje.
         
-        :return: SOC en porcentaje (0% - 100%).
+        :return: SOC en porcentaje (0 - 1).
         """
         return self.soc
 
@@ -573,18 +572,18 @@ class BatteryAgent(BaseAgent):
         return (battery_power_idx, self.battery_state, env.renewable_power_idx, env.demand_power_idx)
 
     def calculate_reward_discharge(self, P_T, P_L):
-        if self.get_soc() >= 50 and P_T < P_L and self.battery_state == "discharging":
+        if self.get_soc() >= 0.5 and P_T < P_L and self.battery_state == "discharging":
             return self.kappa* self.get_soc() * (P_L - P_T)
-        elif self.get_soc() < 50 and P_T > P_L and self.battery_state == "discharging":
-            return -self.sigma * (100 - self.get_soc()) * (P_T - P_L)
-        elif self.get_soc() < 50 and P_T < P_L and self.battery_state == "discharging":
-            return -self.mu * (100 - self.get_soc()) * (P_L - P_T)
+        elif self.get_soc() < 0.5 and P_T > P_L and self.battery_state == "discharging":
+            return -self.sigma * (1 - self.get_soc()) * (P_T - P_L)
+        elif self.get_soc() < 0.5 and P_T < P_L and self.battery_state == "discharging":
+            return -self.mu * (1 - self.get_soc()) * (P_L - P_T)
         return 0
 
     def calculate_reward_charge(self, P_T, P_L):
-        if self.get_soc() < 100 and P_T > P_L and self.battery_state == "charging":
-            return self.nu * (100 - self.get_soc()) * (P_T - P_L)
-        elif self.get_soc() <= 100 and P_T <= P_L and self.battery_state == "charging":
+        if self.get_soc() < 1 and P_T > P_L and self.battery_state == "charging":
+            return self.nu * (1 - self.get_soc()) * (P_T - P_L)
+        elif self.get_soc() <= 1 and P_T <= P_L and self.battery_state == "charging":
             return -self.beta * self.get_soc() * (P_L - P_T)
         return 0
 
@@ -634,9 +633,9 @@ class GridAgent(BaseAgent):
 
     def calculate_reward(self, P_H, P_L, SOC, C_mercado):
         
-        if SOC < 50 and P_H < P_L and self.grid_state == "selling":
+        if SOC < 0.5 and P_H < P_L and self.grid_state == "selling":
             return self.kappa / C_mercado
-        elif SOC >= 50 and P_H < P_L and self.grid_state == "selling":
+        elif SOC >= 0.5 and P_H < P_L and self.grid_state == "selling":
             return -self.mu * C_mercado
         elif P_H >= P_L and self.grid_state == "selling":
             return -self.sigma * C_mercado
@@ -809,18 +808,15 @@ class Simulation:
                 self.instant["renewable_discrete"] = self.env.renewable_power_idx
                 self.instant["total"] = self.env.total_power
                 self.instant["dif"] = self.dif_power
-                print(self.instant)
-                sys.exit(0)        
 
                 # Ahora calculamos la recompensa individual por agente
                 # y actualizamos la Q-table                
                 self.env.current_index += 1
-                #print(self.env.current_index)
+
                 if self.env.current_index >= len(self.env.dataset):
                     self.env.current_index = 0  
 
                 next_state = self.step(self.env.current_index)  # Avanzamos el entorno un índice
-                # print(next_state)
                 
                 # Extrae el agente bateria
                 battery_agent = None
@@ -840,7 +836,7 @@ class Simulation:
                     # Para hacerlo rápido, repetimos la llamada (no es lo ideal).
                     
                     agent_type = type(agent).__name__  # Obtiene el nombre de la clase del agente
-                    action = agent.choose_action(state[agent_type], self.epsilon)
+                    #action = agent.choose_action(state[agent_type], self.epsilon)
                     
                     # Calculamos la recompensa según el tipo de agente
                     if isinstance(agent, SolarAgent):
@@ -849,41 +845,40 @@ class Simulation:
                             P_L=self.env.demand_power, 
                             SOC=battery_agent.get_soc()
                         )
-                        #print("reward solar " + str(reward))
+                        self.instant["reward_solar"] = reward
                     elif isinstance(agent, WindAgent):
                         reward = agent.calculate_reward(
                             P_H=self.env.renewable_power, 
                             P_L=self.env.demand_power, 
                             SOC=battery_agent.get_soc()
                         )
-                        #print("reward wind " + str(reward))
+                        self.instant["reward_wind"] = reward
                     elif isinstance(agent, BatteryAgent):
-                        # Ejemplo simplificado: 
+
                         if agent.action == 1:
                             reward = agent.calculate_reward_charge(
                                 P_T=self.env.total_power, 
                                 P_L=self.env.demand_power)
-                            #print("reward battery charge " + str(reward))
                         elif agent.action == 2:
                             reward = agent.calculate_reward_discharge(
                                 P_T=self.env.total_power, 
                                 P_L=self.env.demand_power)
-                            #print("reward battery discharge " + str(reward))
                         else:
                             reward = 0.0
 
                         agent.update_soc(agent.action)
+                        self.instant["reward_bat"] = reward
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
                             P_H=self.env.renewable_power,
                             P_L=self.env.demand_power, 
                             SOC=battery_agent.get_soc(),
                             C_mercado=self.env.price)
-                        #print("reward grid " + str(reward))
+                        self.instant["reward_grid"] = reward
                         
                     elif isinstance(agent, LoadAgent):
                         reward = agent.calculate_reward(
-                            action,
+                            agent.action,
                             P_H=self.env.renewable_power,
                             P_L=self.env.demand_power,
                             SOC=battery_agent.get_soc(),
@@ -892,8 +887,11 @@ class Simulation:
                         reward = 0.0
                     
                     # Actualizamos Q-table                    
-                    agent.update_q_table(state[agent_type], action, reward, next_state[agent_type])
-                
+                    agent.update_q_table(state[agent_type], agent.action, reward, next_state[agent_type])
+
+
+                print(self.instant)
+                sys.exit(0)
                 # Actualizamos el estado actual
                 state = next_state
             

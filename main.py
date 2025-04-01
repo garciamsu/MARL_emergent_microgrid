@@ -203,7 +203,7 @@ class BaseAgent:
     """
     Clase base para agentes con Q-table.
     """
-    def __init__(self, name, actions, alpha=0.1, gamma=0.9, kappa=0.001, sigma=0.001, mu=0.001, nu=0.001, beta=0.01, isPower=True):
+    def __init__(self, name, actions, alpha=0.1, gamma=0.9, kappa=0.1, sigma=0.1, mu=0.1, nu=0.1, beta=0.1, isPower=True):
         self.name = name
         self.actions = actions
         self.action = 0
@@ -391,23 +391,19 @@ class SolarAgent(BaseAgent):
 
         # Ejemplo muy simplificado
 
-    def calculate_reward(self, P_H, P_L, SOC):
+    def calculate_reward(self, P_H, P_L, S_PV):
         """
         P_H: potencia generada por el panel local
         P_L: demanda local (o parte de la demanda)
         SOC: estado de la batería
         """
-
-        #print("P_H = " + str(P_H))
-        #print("P_L = " + str(P_L))
-        #print("SOC = " + str(SOC))
         
-        if P_H <= P_L:
-            return self.kappa * (P_L - P_H)
-        elif P_H > P_L and SOC == 1:
-            return self.sigma * (P_L - P_H)
-        elif P_H > P_L and SOC < 1:
-            return self.mu * (P_H - P_L)
+        if P_H <= P_L and S_PV == 1:
+            return - self.kappa * (P_L - P_H)
+        elif P_H > P_L and S_PV == 1:
+            return self.sigma * (P_H - P_L)
+        elif P_H > P_L and S_PV == 0:
+            return - self.sigma * (P_H - P_L)
         return 0.0
 
 class WindAgent(BaseAgent):
@@ -422,7 +418,6 @@ class WindAgent(BaseAgent):
         self.wind_power_bins = np.linspace(0, env.max_value, num_wind_bins)
         self.wind_state_bins = [0, 1]
         self.wind_state = 0
-        
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
@@ -463,23 +458,19 @@ class WindAgent(BaseAgent):
         else:
             return 0.5 * RHO * BLADE_AREA * C_P * (row["wind speed"]**3)
 
-    def calculate_reward(self, P_H, P_L, SOC):
+    def calculate_reward(self, P_H, P_L, S_WD):
         """
         P_H: potencia generada por el panel local
         P_L: demanda local (o parte de la demanda)
         SOC: estado de la batería
         """
-
-        #print("P_H = " + str(P_H))
-        #print("P_L = " + str(P_L))
-        #print("SOC = " + str(SOC))
         
-        if P_H <= P_L:
-            return self.kappa * (P_L - P_H)
-        elif P_H > P_L and SOC == 1:
-            return self.sigma * (P_L - P_H)
-        elif P_H > P_L and SOC < 1:
-            return self.mu * (P_H - P_L)
+        if P_H <= P_L and S_PV == 1:
+            return - self.kappa * (P_L - P_H)
+        elif P_H > P_L and S_PV == 1:
+            return self.sigma * (P_H - P_L)
+        elif P_H > P_L and S_PV == 0:
+            return - self.sigma * (P_H - P_L)
         return 0.0
 
 class BatteryAgent(BaseAgent):
@@ -841,16 +832,16 @@ class Simulation:
                     # Calculamos la recompensa según el tipo de agente
                     if isinstance(agent, SolarAgent):
                         reward = agent.calculate_reward(
-                            P_H=self.env.renewable_power, 
-                            P_L=self.env.demand_power, 
-                            SOC=battery_agent.get_soc()
+                            P_H=self.env.renewable_power_idx,
+                            P_L=self.env.demand_power_idx,
+                            S_PV=agent.action
                         )
                         self.instant["reward_solar"] = reward
                     elif isinstance(agent, WindAgent):
                         reward = agent.calculate_reward(
-                            P_H=self.env.renewable_power, 
-                            P_L=self.env.demand_power, 
-                            SOC=battery_agent.get_soc()
+                            P_H=self.env.renewable_power_idx, 
+                            P_L=self.env.demand_power_idx,
+                            S_WD=agent.action
                         )
                         self.instant["reward_wind"] = reward
                     elif isinstance(agent, BatteryAgent):

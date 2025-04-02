@@ -613,12 +613,14 @@ class GridAgent(BaseAgent):
 
     def calculate_reward(self, P_H, P_L, SOC, C_mercado):
         
-        if SOC < 0.5 and P_H < P_L and self.grid_state == "selling":
+        if SOC == 0 and P_H < P_L and self.grid_state == 1:
             return self.kappa / C_mercado
-        elif SOC >= 0.5 and P_H < P_L and self.grid_state == "selling":
+        elif SOC > 0 and P_H < P_L and self.grid_state == 1:
             return -self.mu * C_mercado
-        elif P_H >= P_L and self.grid_state == "selling":
+        elif (SOC > 0 or P_H > P_L) and self.grid_state == 1:
             return -self.sigma * C_mercado
+        elif SOC == 0 and P_H <= P_L and self.grid_state == 0:
+            return -self.nu * C_mercado
         else:
             return 0.0
 
@@ -843,15 +845,17 @@ class Simulation:
                                 P_L=self.env.demand_power_idx)
 
                         agent.update_soc(agent.battery_power)
+                        #battery_agent = agent
                         self.instant["soc"] = agent.get_soc()
                         self.instant["reward_bat"] = reward
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
-                            P_H=self.env.renewable_power,
-                            P_L=self.env.demand_power, 
-                            SOC=battery_agent.get_soc(),
+                            P_H=self.env.renewable_power_idx,
+                            P_L=self.env.demand_power_idx, 
+                            SOC=battery_agent.battery_power_idx,
                             C_mercado=self.env.price)
                         self.instant["reward_grid"] = reward
+                        #self.instant["price"] = self.env.price
                         
                     elif isinstance(agent, LoadAgent):
                         reward = agent.calculate_reward(

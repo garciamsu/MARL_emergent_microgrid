@@ -6,6 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons
 import copy
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
 
 # Parámetros físicos y constantes
 ETA = 0.15        # Eficiencia de conversión solar
@@ -185,6 +187,7 @@ class MultiAgentEnv:
         
         self.demand_power = row["demand"]
         self.price = row["price"]
+        self.time = row["Datetime"]
 
         # Discretizamos
         self.demand_power_idx = np.digitize([row["demand"]], self.demand_bins)[0] - 1
@@ -654,11 +657,12 @@ class LoadAgent(BaseAgent):
 # Simulación de entrenamiento
 # -----------------------------------------------------
 class Simulation:
-    def __init__(self, num_episodes=10, max_steps=5):
+    def __init__(self, num_episodes=10, max_steps=5, epsilon=1, learning=True):
         self.num_episodes = num_episodes
         self.max_steps = max_steps
         self.instant = {} 
-        self.evolution = []        
+        self.evolution = []
+        self.df = pd.DataFrame()
         
         # Creamos el entorno que carga el CSV y discretiza
         self.env = MultiAgentEnv(csv_filename="Case1_energy_data_with_pv_power.csv", num_demand_bins=7)
@@ -672,11 +676,12 @@ class Simulation:
         ]
         
         # Parámetros de entrenamiento
-        self.epsilon = 1  # Exploración \epsilon (0=explotación, 1=exploración)
+        self.epsilon = epsilon  # Exploración \epsilon (0=explotación, 1=exploración)
         
         # Inicializamos Q-tables
-        for agent in self.agents:
-            agent.initialize_q_table(self.env)
+        if learning:
+            for agent in self.agents:
+                agent.initialize_q_table(self.env)
 
     def step(self, index):
         self.env._get_discretized_state(index)
@@ -707,6 +712,7 @@ class Simulation:
                 self.instant["demand"] = self.env.demand_power
                 self.instant["demand_discrete"] = self.env.demand_power_idx
                 self.instant["price"] = self.env.price
+                self.instant["time"] = self.env.time
 
                 # Selecciona la acción 
                 for agent in self.agents:
@@ -840,7 +846,6 @@ class Simulation:
                             SOC=battery_agent.battery_power_idx,
                             C_mercado=self.env.price)
                         self.instant["reward_grid"] = reward
-                        #self.instant["price"] = self.env.price
                         
                     elif isinstance(agent, LoadAgent):
                         reward = agent.calculate_reward(
@@ -859,7 +864,6 @@ class Simulation:
                 #print(i)
                 # Actualizamos el estado actual
                 state = next_state
-
                 self.evolution.append(copy.deepcopy(self.instant))
             
             # Visualizamos las Q-tables
@@ -875,12 +879,23 @@ class Simulation:
             print(self.evolution)
             print(f"Fin episodio {ep+1}/{self.num_episodes}")
 
-        df = pd.DataFrame(self.evolution)
-        df.to_csv("evolution_learning.csv", index=False)
+        self.df = pd.DataFrame(self.evolution)
+        self.df.to_csv("evolution_learning.csv", index=False)
+        
+        return self.agents
 
 # -----------------------------------------------------
 # Punto de entrada principal
 # -----------------------------------------------------
 if __name__ == "__main__":
-    sim = Simulation(num_episodes=5, max_steps=8762)
-    sim.run()
+    sim1 = Simulation(num_episodes=1, max_steps=8762, epsilon=1, learning=True)
+    print(sim1.df)
+    sim1.run()
+
+    sim2 = Simulation(num_episodes=1, max_steps=8762, epsilon=0, learning=False)
+    print(sim2.df)
+    sim2.agents = sim1.agents
+    sim2.run()
+    
+    print(sim1.df['dif'].mean())
+    print(sim2.df['dif'].mean())

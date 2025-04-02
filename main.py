@@ -5,6 +5,7 @@ import random
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons
+import copy
 
 # Parámetros físicos y constantes
 ETA = 0.15        # Eficiencia de conversión solar
@@ -61,9 +62,6 @@ class MultiAgentEnv:
         self.demand_bins = np.linspace(0, self.max_value, num_demand_bins)
         self.renewable_bins = np.linspace(0, self.max_value, num_renewable_bins)
 
-        # Índice actual dentro del dataset (simularemos step a step)
-        self.current_index = 0
-        
         # Estado inicial (discretizado)
         self.state = None
 
@@ -184,11 +182,9 @@ class MultiAgentEnv:
         devolviendo una tupla como (idx_solar, idx_wind, idx_battery, idx_demand, idx_price).
         """
         row = self.dataset.iloc[index]
-        print(row)
         
         self.demand_power = row["demand"]
         self.price = row["price"]
-
 
         # Discretizamos
         self.demand_power_idx = np.digitize([row["demand"]], self.demand_bins)[0] - 1
@@ -475,7 +471,7 @@ class WindAgent(BaseAgent):
         return 0.0
 
 class BatteryAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, capacity_ah= 500000, num_battery_soc_bins=4):
+    def __init__(self, env: MultiAgentEnv, capacity_ah= 5000000, num_battery_soc_bins=4):
         super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9)
         
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
@@ -507,15 +503,9 @@ class BatteryAgent(BaseAgent):
         delta_soc = (energy_wh / (self.capacity_ah))   # Expresado de 0 a 1
         
         # Actualizamos el SOC asegurándonos de que se mantenga en los límites de 0 a 1
-        self.soc = max(0.0, min(1.0, self.soc + delta_soc))
+        self.soc = max(0.0, min(1.0, self.soc - delta_soc))
+        self.battery_power_idx = np.digitize([self.soc], self.battery_soc_bins)[0] - 1
 
-    def get_state(self) -> str:
-        """
-        Retorna el estado actual de la batería.
-        
-        :return: "charging", "discharging" o "idle".
-        """
-        return self.battery_state
     
     def get_soc(self) -> float:
         """
@@ -669,6 +659,7 @@ class Simulation:
         self.num_episodes = num_episodes
         self.max_steps = max_steps
         self.instant = {} 
+        self.evolution = []        
         
         # Creamos el entorno que carga el CSV y discretiza
         self.env = MultiAgentEnv(csv_filename="Case1_energy_data_with_pv_power.csv", num_demand_bins=7)
@@ -708,10 +699,11 @@ class Simulation:
             bat_power = 0.0
             grid_power = 0.0
 
-            for i in range(self.max_steps):
+            for i in range(self.max_steps-1):
 
                 # Reseteamos entorno y los agentes al inicio de cada episodio
                 state = self.step(i)
+                
                 
                 self.instant["demand"] = self.env.demand_power
                 self.instant["demand_discrete"] = self.env.demand_power_idx
@@ -745,7 +737,6 @@ class Simulation:
                         self.instant["wind_state"] = agent.wind_state
                     elif isinstance(agent, BatteryAgent):
                         agent.choose_action(state['BatteryAgent'], self.epsilon)
-                        print("battey.action -> " + str(agent.action))
 
                         if agent.action == 1:
                             agent.battery_state = 1 # "charging" 
@@ -796,12 +787,7 @@ class Simulation:
 
                 # Ahora calculamos la recompensa individual por agente
                 # y actualizamos la Q-table                
-                self.env.current_index += 1
-
-                if self.env.current_index >= len(self.env.dataset):
-                    self.env.current_index = 0  
-
-                next_state = self.step(self.env.current_index)  # Avanzamos el entorno un índice
+                next_state = self.step(i + 1)  # Avanzamos el entorno un índice
                 
                 # Extrae el agente bateria
                 battery_agent = None
@@ -870,11 +856,12 @@ class Simulation:
                     # Actualizamos Q-table                    
                     agent.update_q_table(state[agent_type], agent.action, reward, next_state[agent_type])
 
-
-                print(self.instant)
-                sys.exit(0)
+                #print(self.instant)
+                #print(i)
                 # Actualizamos el estado actual
                 state = next_state
+
+                self.evolution.append(copy.deepcopy(self.instant))
             
             # Visualizamos las Q-tables
             for agent in self.agents:
@@ -886,11 +873,20 @@ class Simulation:
                     # Mostrar histograma de Q[1] (producir)
                     agent.show_q_histogram(action=1)
             
+            print(self.evolution)
             print(f"Fin episodio {ep+1}/{self.num_episodes}")
+
+        df = pd.DataFrame(self.evolution)
+        df.to_csv("evolution_learning.csv", index=False)
+
+
+
+            
+
 
 # -----------------------------------------------------
 # Punto de entrada principal
 # -----------------------------------------------------
 if __name__ == "__main__":
-    sim = Simulation(num_episodes=1, max_steps=1)
+    sim = Simulation(num_episodes=1, max_steps=8762)
     sim.run()

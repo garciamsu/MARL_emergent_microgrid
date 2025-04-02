@@ -551,7 +551,7 @@ class BatteryAgent(BaseAgent):
             return -self.sigma * (2 - self.battery_power_idx)  * (P_T - P_L)
         elif self.battery_power_idx == 0 and P_T < P_L and self.battery_state == 2:
             return -self.mu * (2 - self.battery_power_idx) * (P_L - P_T)
-        if self.battery_power_idx < 2 and P_T > P_L and self.battery_state == 1:
+        if self.battery_power_idx <= 2 and P_T > P_L and self.battery_state == 1:
             return self.nu * (2 - self.battery_power_idx) * (P_T - P_L)
         elif self.battery_power_idx < 2 and P_T <= P_L and self.battery_state == 1:
             return -self.beta * self.battery_power_idx * (P_L - P_T)
@@ -693,13 +693,13 @@ class Simulation:
 
         for ep in range(self.num_episodes):
 
-            # Para cada episodio se inicializa los valores de potencia
-            self.env.renewable_power = 0.0
-            self.env.total_power = 0
-            bat_power = 0.0
-            grid_power = 0.0
-
             for i in range(self.max_steps-1):
+                
+                # Para cada episodio se inicializa los valores de potencia
+                self.env.renewable_power = 0.0
+                self.env.total_power = 0
+                bat_power = 0.0
+                grid_power = 0.0
 
                 # Reseteamos entorno y los agentes al inicio de cada episodio
                 state = self.step(i)
@@ -780,7 +780,7 @@ class Simulation:
                 self.total_power_idx = np.digitize([self.env.total_power], self.env.renewable_bins)[0] - 1
 
                 self.instant["renewable"] = self.env.renewable_power
-                self.instant["renewable_discrete"] = self.env.renewable_power_idx
+                self.instant["renewable_discrete"] = self.renewable_power_idx
                 self.instant["total"] = self.env.total_power
                 self.instant["total_discrete"] = self.total_power_idx
                 self.instant["dif"] = self.dif_power

@@ -888,6 +888,7 @@ class Simulation:
 # Punto de entrada principal
 # -----------------------------------------------------
 if __name__ == "__main__":
+    
     sim1 = Simulation(num_episodes=1, max_steps=8762, epsilon=1, learning=True)
     print(sim1.df)
     sim1.run()

@@ -505,7 +505,6 @@ class BatteryAgent(BaseAgent):
         # Actualizamos el SOC asegurándonos de que se mantenga en los límites de 0 a 1
         self.soc = max(0.0, min(1.0, self.soc - delta_soc))
         self.battery_power_idx = np.digitize([self.soc], self.battery_soc_bins)[0] - 1
-
     
     def get_soc(self) -> float:
         """
@@ -740,12 +739,12 @@ class Simulation:
 
                         if agent.action == 1:
                             agent.battery_state = 1 # "charging" 
-                            #agent.battery_power = abs(self.env.demand_power - self.env.renewable_power)
-                            agent.battery_power = -99999
+                            agent.battery_power = self.env.demand_power - self.env.renewable_power
+                            #agent.battery_power = -99999
                         elif agent.action == 2:
                             agent.battery_state = 2  # "discharging" 
-                            #agent.battery_power = - abs(self.env.demand_power - self.env.renewable_power)
-                            agent.battery_power = 99999
+                            agent.battery_power = self.env.demand_power - self.env.renewable_power
+                            #agent.battery_power = 99999
                         else:
                             agent.battery_state = 0 
                             agent.battery_power = 0.0
@@ -760,8 +759,8 @@ class Simulation:
                         agent.choose_action(state['GridAgent'], self.epsilon)
                         if agent.action == 1: # "sell"
                             agent.grid_state = 1 # "selling" 
-                            #agent.grid_power = abs(self.env.demand_power - self.env.renewable_power)
-                            agent.grid_power = 999999
+                            agent.grid_power = self.env.demand_power - self.env.renewable_power - bat_power
+                            #agent.grid_power = 999999
                         else: 
                             agent.grid_state = 0 
                             agent.grid_power = 0
@@ -879,14 +878,9 @@ class Simulation:
         df = pd.DataFrame(self.evolution)
         df.to_csv("evolution_learning.csv", index=False)
 
-
-
-            
-
-
 # -----------------------------------------------------
 # Punto de entrada principal
 # -----------------------------------------------------
 if __name__ == "__main__":
-    sim = Simulation(num_episodes=1, max_steps=8762)
+    sim = Simulation(num_episodes=5, max_steps=8762)
     sim.run()

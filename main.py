@@ -876,7 +876,6 @@ class Simulation:
                     # Mostrar histograma de Q[1] (producir)
                     agent.show_q_histogram(action=1)
             
-            print(self.evolution)
             print(f"Fin episodio {ep+1}/{self.num_episodes}")
 
         self.df = pd.DataFrame(self.evolution)
@@ -924,6 +923,20 @@ class Simulation:
         rep = (total_renewable_energy / total_energy) * 100
         return rep
 
+    def calculate_grid(self) -> float:
+        """
+        Calcula el REP (Renewable Energy Penetration), porcentaje de energía renovable sobre la total.
+
+        :return: Valor de REP como porcentaje.
+        """
+        total_grid_energy = self.df['grid'].sum()
+        total_energy = self.df['total'].sum()
+        if total_energy == 0:
+            return 0.0  # evitar división por cero
+        rep = (total_grid_energy / total_energy) * 100
+        return rep
+
+
     def show_performance_metrics(self):
         """
         Muestra una tabla con las métricas de rendimiento calculadas: ISE, IAE y REP.
@@ -932,7 +945,8 @@ class Simulation:
             ["MEAN (Mean)", f"{self.calculate_mean():.3f}"],
             ["ISE (Integral Square Error)", f"{self.calculate_ise():.3f}"],
             ["IAE (Integral Absolute Error)", f"{self.calculate_iae():.3f}"],
-            ["REP (Renewable Energy Penetration)", f"{self.calculate_rep():.2f}%"]
+            ["REP (Renewable Energy Penetration)", f"{self.calculate_rep():.2f}%"],
+            ["GEP (Grid Energy Penetration)", f"{self.calculate_grid():.2f}%"]
         ]
         print(tabulate(results, headers=["Métrica", "Valor"], tablefmt="fancy_grid"))
 # -----------------------------------------------------
@@ -941,11 +955,9 @@ class Simulation:
 if __name__ == "__main__":
     
     sim1 = Simulation(num_episodes=1, max_steps=8762, epsilon=1, learning=True)
-    print(sim1.df)
     sim1.run()
 
     sim2 = Simulation(num_episodes=1, max_steps=8762, epsilon=0, learning=False)
-    print(sim2.df)
     sim2.agents = sim1.agents
     sim2.run()
     

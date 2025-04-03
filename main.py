@@ -474,7 +474,7 @@ class WindAgent(BaseAgent):
         return 0.0
 
 class BatteryAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, capacity_ah= 5000000, num_battery_soc_bins=4):
+    def __init__(self, env: MultiAgentEnv, capacity_ah= 50000000, num_battery_soc_bins=4):
         super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9)
         
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
@@ -485,6 +485,7 @@ class BatteryAgent(BaseAgent):
         """
         self.capacity_ah = capacity_ah  # Capacidad fija en Ah
         self.soc = 0.5  # Estado de carga inicial en %
+        print(self.soc)
         self.battery_power = 0.0  # Potencia en W
         self.battery_state = 0  # Estado inicial de operación
         self.battery_power_idx = 0 # Estado SOC discretizado
@@ -667,12 +668,14 @@ class Simulation:
         # Creamos el entorno que carga el CSV y discretiza
         self.env = MultiAgentEnv(csv_filename="Case1_energy_data_with_pv_power.csv", num_demand_bins=7)
         
+        bat_ag = BatteryAgent(self.env)
+
         # Definimos un conjunto de agentes
         self.agents = [
             SolarAgent(self.env),
             #WindAgent(self.env),
-            BatteryAgent(self.env),
-            GridAgent(self.env, BatteryAgent(self.env))
+            bat_ag,
+            GridAgent(self.env, bat_ag)
         ]
         
         # Parámetros de entrenamiento
@@ -936,6 +939,18 @@ class Simulation:
         rep = (total_grid_energy / total_energy) * 100
         return rep
 
+    def calculate_bat(self) -> float:
+        """
+        Calcula el REP (Renewable Energy Penetration), porcentaje de energía renovable sobre la total.
+
+        :return: Valor de REP como porcentaje.
+        """
+        total_battery_energy = self.df['battery'].sum()
+        total_energy = self.df['total'].sum()
+        if total_energy == 0:
+            return 0.0  # evitar división por cero
+        rep = (total_battery_energy / total_energy) * 100
+        return rep
 
     def show_performance_metrics(self):
         """
@@ -946,7 +961,8 @@ class Simulation:
             ["ISE (Integral Square Error)", f"{self.calculate_ise():.3f}"],
             ["IAE (Integral Absolute Error)", f"{self.calculate_iae():.3f}"],
             ["REP (Renewable Energy Penetration)", f"{self.calculate_rep():.2f}%"],
-            ["GEP (Grid Energy Penetration)", f"{self.calculate_grid():.2f}%"]
+            ["GEP (Grid Energy Penetration)", f"{self.calculate_grid():.2f}%"],
+            ["BEP (Battery Energy Penetration)", f"{self.calculate_bat():.2f}%"]
         ]
         print(tabulate(results, headers=["Métrica", "Valor"], tablefmt="fancy_grid"))
 # -----------------------------------------------------
@@ -959,6 +975,9 @@ if __name__ == "__main__":
 
     sim2 = Simulation(num_episodes=1, max_steps=8762, epsilon=0, learning=False)
     sim2.agents = sim1.agents
+    for agent in sim2.agents:
+        if isinstance(agent, BatteryAgent):
+            agent.soc = 0.5
     sim2.run()
     
     sim1.show_performance_metrics()

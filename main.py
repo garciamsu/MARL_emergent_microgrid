@@ -6,7 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons
 import copy
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from tabulate import tabulate
 
 
 # Parámetros físicos y constantes
@@ -884,6 +884,57 @@ class Simulation:
         
         return self.agents
 
+    def calculate_ise(self) -> float:
+        """
+        Calcula el ISE (Integral Square Error) sobre la columna 'dif'.
+
+        :return: Valor de ISE.
+        """
+        ise = (self.df['dif'] ** 2).sum()
+        return ise
+
+    def calculate_mean(self) -> float:
+        """
+        Calcula el ISE (Integral Square Error) sobre la columna 'dif'.
+
+        :return: Valor de ISE.
+        """
+        mean= self.df['dif'].mean()
+        return mean
+
+    def calculate_iae(self) -> float:
+        """
+        Calcula el IAE (Integral Absolute Error) sobre la columna 'dif'.
+
+        :return: Valor de IAE.
+        """
+        iae = self.df['dif'].abs().sum()
+        return iae
+
+    def calculate_rep(self) -> float:
+        """
+        Calcula el REP (Renewable Energy Penetration), porcentaje de energía renovable sobre la total.
+
+        :return: Valor de REP como porcentaje.
+        """
+        total_renewable_energy = self.df['renewable'].sum()
+        total_energy = self.df['total'].sum()
+        if total_energy == 0:
+            return 0.0  # evitar división por cero
+        rep = (total_renewable_energy / total_energy) * 100
+        return rep
+
+    def show_performance_metrics(self):
+        """
+        Muestra una tabla con las métricas de rendimiento calculadas: ISE, IAE y REP.
+        """
+        results = [
+            ["MEAN (Mean)", f"{self.calculate_mean():.3f}"],
+            ["ISE (Integral Square Error)", f"{self.calculate_ise():.3f}"],
+            ["IAE (Integral Absolute Error)", f"{self.calculate_iae():.3f}"],
+            ["REP (Renewable Energy Penetration)", f"{self.calculate_rep():.2f}%"]
+        ]
+        print(tabulate(results, headers=["Métrica", "Valor"], tablefmt="fancy_grid"))
 # -----------------------------------------------------
 # Punto de entrada principal
 # -----------------------------------------------------
@@ -898,5 +949,5 @@ if __name__ == "__main__":
     sim2.agents = sim1.agents
     sim2.run()
     
-    print(sim1.df['dif'].mean())
-    print(sim2.df['dif'].mean())
+    sim1.show_performance_metrics()
+    sim2.show_performance_metrics()

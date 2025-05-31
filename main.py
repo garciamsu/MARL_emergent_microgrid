@@ -1,5 +1,6 @@
 import os
 import sys
+import matplotlib
 import numpy as np
 import random
 import pandas as pd
@@ -31,7 +32,7 @@ class MultiAgentEnv:
     - Puede gestionarse en un bucle de episodios.
     """
 
-    def __init__(self, csv_filename="Case1_energy_data_with_pv_power.csv", num_demand_bins=7, num_renewable_bins=7):
+    def __init__(self, csv_filename, num_demand_bins=7, num_renewable_bins=7):
         """
         Parámetros:
           - num_*_bins: define cuántos intervalos se utilizan para discretizar cada variable.
@@ -45,10 +46,13 @@ class MultiAgentEnv:
         self.price = 0
         self.dif_power = 0
         self.total_power_idx = 0
+        self.max_step = 0
         
         # Cargamos el DataFrame con offsets
-        offsets_dict = {"demand": -9000, "price": 0, "solar_power": 0, "wind_power": 0}
+        offsets_dict = {"demand": 0, "price": 0, "solar_power": 0, "wind_power": 0}
         self.dataset = self._load_data(csv_filename, offsets_dict)
+
+        self.max_step = len(self.dataset)
         
         # Graficas interactiva
         self.plot_data_interactive(csv_filename,
@@ -88,7 +92,7 @@ class MultiAgentEnv:
         """
         # Ruta al archivo
         file_path = os.path.join(os.getcwd(), "assets", "datasets", filename)
-        df = pd.read_csv(file_path, sep=';', engine='python')
+        df = pd.read_csv(file_path, sep='[;,]', engine='python')
 
         # 1. Aplica offsets a las columnas indicadas
         if offsets is not None:
@@ -119,6 +123,7 @@ class MultiAgentEnv:
         title : str, opcional
             Título a mostrar en el gráfico principal.
         """
+        print(filename)
         df = self._load_data(filename, offsets_dict)
 
         if df.empty:
@@ -658,15 +663,17 @@ class LoadAgent(BaseAgent):
 # Simulación de entrenamiento
 # -----------------------------------------------------
 class Simulation:
-    def __init__(self, num_episodes=10, max_steps=5, epsilon=1, learning=True):
+    def __init__(self, num_episodes=10, epsilon=1, learning=True):
         self.num_episodes = num_episodes
-        self.max_steps = max_steps
         self.instant = {} 
         self.evolution = []
         self.df = pd.DataFrame()
         
         # Creamos el entorno que carga el CSV y discretiza
-        self.env = MultiAgentEnv(csv_filename="Case1_energy_data_with_pv_power.csv", num_demand_bins=7)
+        self.env = MultiAgentEnv(csv_filename="Case1.csv", num_demand_bins=7)
+        
+        # Obtiene los puntos de manera automatica de la base de datos
+        self.max_steps = self.env.max_step
         
         bat_ag = BatteryAgent(self.env)
 
@@ -970,15 +977,15 @@ class Simulation:
 # -----------------------------------------------------
 if __name__ == "__main__":
     
-    sim1 = Simulation(num_episodes=1, max_steps=8762, epsilon=1, learning=True)
+    sim1 = Simulation(num_episodes=1, epsilon=1, learning=True)
     sim1.run()
 
-    sim2 = Simulation(num_episodes=1, max_steps=8762, epsilon=0, learning=False)
-    sim2.agents = sim1.agents
-    for agent in sim2.agents:
-        if isinstance(agent, BatteryAgent):
-            agent.soc = 0.5
-    sim2.run()
+    #sim2 = Simulation(num_episodes=1, epsilon=0, learning=False)
+    #sim2.agents = sim1.agents
+    #for agent in sim2.agents:
+    #    if isinstance(agent, BatteryAgent):
+    #        agent.soc = 0.5
+    #sim2.run()
     
-    sim1.show_performance_metrics()
-    sim2.show_performance_metrics()
+    #sim1.show_performance_metrics()
+    #sim2.show_performance_metrics()

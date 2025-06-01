@@ -915,9 +915,9 @@ class Simulation:
             for agent in self.agents:
                 if isinstance(agent, SolarAgent):
                     # Mostrar heatmap para acción "producir" (1)
-                    agent.show_heatmap(b_fixed=0, c_fixed=0, action=1)
+                    # agent.show_heatmap(b_fixed=0, c_fixed=0, action=1)
                     # Mostrar mapa de política greedy
-                    agent.show_policy_map(b_fixed=0, c_fixed=0)
+                    # agent.show_policy_map(b_fixed=0, c_fixed=0)
                     # Mostrar histograma de Q[1] (producir)
                     agent.show_q_histogram(action=1)
             

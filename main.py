@@ -19,6 +19,7 @@ RHO = 1.225       # Densidad del aire en kg/m^3
 BLADE_AREA = 5    # Área de los álabes de la turbina en m^2
 C_P = 0.4         # Coeficiente de potencia
 C_CONFORT = 0.5   # Umbral de confort para el costo del mercado
+BINS = 30          # Define cuántos intervalos se utilizan para discretizar las variables de potencia (renovables + demanda).
 
 # -----------------------------------------------------
 # Definimos el entorno
@@ -46,13 +47,15 @@ class MultiAgentEnv:
         self.price = 0
         self.dif_power = 0
         self.total_power_idx = 0
-        self.max_step = 0
+        self.max_steps = 0
+        self.num_demand_bins = num_demand_bins
+        self.num_renewable_bins = num_renewable_bins
         
         # Cargamos el DataFrame con offsets
         offsets_dict = {"demand": 0, "price": 0, "solar_power": 0, "wind_power": 0}
         self.dataset = self._load_data(csv_filename, offsets_dict)
 
-        self.max_step = len(self.dataset)
+        self.max_steps = len(self.dataset)
         
         # Graficas interactiva
         self.plot_data_interactive(csv_filename,
@@ -267,7 +270,7 @@ class BaseAgent:
 #    Heredan de BaseAgent y añaden sus recompensas
 # -----------------------------------------------------
 class SolarAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, num_solar_bins=7):
+    def __init__(self, env: MultiAgentEnv):
         super().__init__("solar", [0, 1], alpha=0.1, gamma=0.9, isPower=True)
 
         # ["idle", "produce"] -> [0, 1]
@@ -275,7 +278,7 @@ class SolarAgent(BaseAgent):
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
         # Ajusta los rangos según tu dataset real
-        self.solar_power_bins = np.linspace(0, env.max_value, num_solar_bins)
+        self.solar_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
         self.solar_state_bins = [0, 1] # 0=idle, 1=producing
         self.solar_state = 0        
 
@@ -366,6 +369,34 @@ class SolarAgent(BaseAgent):
         # Retornamos la tupla de estado discretizado
         return (solar_power_idx, solar_state_idx, env.renewable_power_idx, env.demand_power_idx)
 
+    def plot_discretized_indices(self, env: MultiAgentEnv):
+        """
+        Recorre el dataset del entorno, obtiene los estados discretizados
+        y grafica los índices de potencia solar y demanda.
+        """
+        solar_power_indices = []
+        demand_power_indices = []
+
+        # Recorremos todos los pasos definidos por el entorno
+        for i in range(env.max_steps):
+            solar_power_idx, _, _, demand_power_idx = self._get_discretized_state(env, i)
+            solar_power_indices.append(solar_power_idx)
+            demand_power_indices.append(demand_power_idx)
+
+        print(solar_power_indices)
+
+        # Graficamos los resultados
+        plt.figure(figsize=(12, 5))
+        plt.plot(range(env.max_steps), solar_power_indices, label='solar_power_idx', marker='o')
+        plt.plot(range(env.max_steps), demand_power_indices, label='demand_power_idx', marker='x')
+        plt.xlabel("Timestep")
+        plt.ylabel("Índice Discretizado")
+        plt.title("Evolución de índices discretizados: Potencia solar vs. Demanda")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
     def initialize_q_table(self, env: MultiAgentEnv):
         """
         Crea la Q-table para todos los posibles estados discretizados.
@@ -412,7 +443,7 @@ class SolarAgent(BaseAgent):
         return 0.0
 
 class WindAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, num_wind_bins=7):
+    def __init__(self, env: MultiAgentEnv):
         super().__init__("wind", [0, 1], alpha=0.1, gamma=0.9, isPower=True)
         
         # ["idle", "produce"] -> [0, 1]
@@ -420,7 +451,7 @@ class WindAgent(BaseAgent):
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
         # Ajusta los rangos según tu dataset real
-        self.wind_power_bins = np.linspace(0, env.max_value, num_wind_bins)
+        self.wind_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
         self.wind_state_bins = [0, 1]
         self.wind_state = 0
 
@@ -670,10 +701,10 @@ class Simulation:
         self.df = pd.DataFrame()
         
         # Creamos el entorno que carga el CSV y discretiza
-        self.env = MultiAgentEnv(csv_filename="Case1.csv", num_demand_bins=7)
+        self.env = MultiAgentEnv(csv_filename="Case1.csv", num_demand_bins=BINS, num_renewable_bins=BINS)
         
         # Obtiene los puntos de manera automatica de la base de datos
-        self.max_steps = self.env.max_step
+        self.max_steps = self.env.max_steps
         
         bat_ag = BatteryAgent(self.env)
 
@@ -707,6 +738,11 @@ class Simulation:
 
         for ep in range(self.num_episodes):
 
+            # Para graficar los estados discretos de los agentes para analisis
+            for agent in self.agents:
+                if isinstance(agent, SolarAgent):
+                    agent.plot_discretized_indices(self.env)
+
             for i in range(self.max_steps-1):
                 
                 # Para cada episodio se inicializa los valores de potencia
@@ -716,8 +752,7 @@ class Simulation:
                 grid_power = 0.0
 
                 # Reseteamos entorno y los agentes al inicio de cada episodio
-                state = self.step(i)
-                
+                state = self.step(i)                
                 
                 self.instant["demand"] = self.env.demand_power
                 self.instant["demand_discrete"] = self.env.demand_power_idx
@@ -987,5 +1022,5 @@ if __name__ == "__main__":
     #        agent.soc = 0.5
     #sim2.run()
     
-    #sim1.show_performance_metrics()
+    sim1.show_performance_metrics()
     #sim2.show_performance_metrics()

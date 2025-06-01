@@ -19,7 +19,7 @@ RHO = 1.225       # Densidad del aire en kg/m^3
 BLADE_AREA = 5    # Área de los álabes de la turbina en m^2
 C_P = 0.4         # Coeficiente de potencia
 C_CONFORT = 0.5   # Umbral de confort para el costo del mercado
-BINS = 30          # Define cuántos intervalos se utilizan para discretizar las variables de potencia (renovables + demanda).
+BINS = 6          # Define cuántos intervalos se utilizan para discretizar las variables de potencia (renovables + demanda).
 
 # -----------------------------------------------------
 # Definimos el entorno
@@ -593,6 +593,8 @@ class BatteryAgent(BaseAgent):
         if self.battery_power_idx <= 2 and P_T > P_L and self.battery_state == 1:
             return self.nu * (2 - self.battery_power_idx) * (P_T - P_L)
         elif self.battery_power_idx < 2 and P_T <= P_L and self.battery_state == 1:
+            return -self.beta * self.battery_power_idx * (P_L - P_T)
+        elif self.battery_power_idx > 0 and P_T <= P_L and self.battery_state == 0:
             return -self.beta * self.battery_power_idx * (P_L - P_T)
         return 0.0  
 

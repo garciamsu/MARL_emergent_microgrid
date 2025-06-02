@@ -585,6 +585,8 @@ class BatteryAgent(BaseAgent):
     def calculate_reward(self, P_T, P_L):
         if self.battery_power_idx > 0  and P_T < P_L and self.battery_state == 2:
             return self.kappa * self.battery_power_idx * (P_L - P_T)
+        if self.battery_power_idx > 0  and P_T > P_L and self.battery_state == 2:
+            return - self.kappa * self.battery_power_idx * (P_T - P_L)
         elif self.battery_power_idx == 0 and P_T > P_L and self.battery_state == 2:
             return -self.sigma * (2 - self.battery_power_idx)  * (P_T - P_L)
         elif self.battery_power_idx == 0 and P_T < P_L and self.battery_state == 2:
@@ -751,6 +753,10 @@ class Simulation:
                 self.env.total_power = 0
                 bat_power = 0.0
                 grid_power = 0.0
+                solar_power = 0.0
+                wind_power = 0.0
+                renewable_power_real  = 0.0
+                renewable_power_real_idx = 0
 
                 # Reseteamos entorno y los agentes al inicio de cada episodio
                 state = self.step(i)                
@@ -768,6 +774,7 @@ class Simulation:
 
                         self.env.renewable_power += agent.current_power
                         agent.solar_state = agent.action
+                        solar_power = agent.current_power*agent.action
 
                         self.instant["solar"] = agent.current_power
                         self.instant["solar_state"] = agent.solar_state
@@ -777,6 +784,7 @@ class Simulation:
 
                         self.env.renewable_power += agent.current_power
                         agent.solar_state = agent.action
+                        wind_power = agent.current_power*agent.action
 
                         self.instant["wind"] = agent.current_power
                         self.instant["wind_state"] = agent.wind_state
@@ -786,11 +794,11 @@ class Simulation:
 
                         if agent.action == 1:
                             agent.battery_state = 1 # "charging" 
-                            agent.battery_power = self.env.demand_power - self.env.renewable_power
+                            agent.battery_power = -abs(self.env.demand_power - self.env.renewable_power)
                             #agent.battery_power = -99999
                         elif agent.action == 2:
                             agent.battery_state = 2  # "discharging" 
-                            agent.battery_power = self.env.demand_power - self.env.renewable_power
+                            agent.battery_power = abs(self.env.demand_power - self.env.renewable_power)
                             #agent.battery_power = 99999
                         else:
                             agent.battery_state = 0 
@@ -820,7 +828,9 @@ class Simulation:
                         # LoadAgent no generan en este ejemplo
                         _ = agent.choose_action(state["LoadAgent"], self.epsilon)               
 
-                self.env.total_power = self.env.renewable_power + bat_power + grid_power
+                renewable_power_real = wind_power + solar_power
+                self.env.total_power = renewable_power_real + bat_power + grid_power
+                renewable_power_real_idx = np.digitize([renewable_power_real], self.env.renewable_bins)[0] - 1
                 self.dif_power = self.env.total_power - self.env.demand_power
                 self.renewable_power_idx = np.digitize([self.env.renewable_power], self.env.renewable_bins)[0] - 1
                 self.total_power_idx = np.digitize([self.env.total_power], self.env.renewable_bins)[0] - 1
@@ -871,9 +881,9 @@ class Simulation:
                         )
                         self.instant["reward_wind"] = reward
                     elif isinstance(agent, BatteryAgent):
-
+                        
                         reward = agent.calculate_reward(
-                                P_T=self.env.total_power_idx, 
+                                P_T=renewable_power_real_idx, 
                                 P_L=self.env.demand_power_idx)
 
                         agent.update_soc(agent.battery_power)

@@ -509,6 +509,59 @@ class WindAgent(BaseAgent):
             return - self.sigma * (P_H - P_L)
         return 0.0
 
+    def show_heatmap(self, b_fixed=0, c_fixed=0, action=1, max_a=6, max_d=6):
+        """
+        Muestra un heatmap de Q-values para una acción dada, fijando b y c.
+        """
+        matriz = np.zeros((max_a + 1, max_d + 1))
+        for (a, b, c, d), acciones in self.q_table.items():
+            if b == b_fixed and c == c_fixed:
+                matriz[a][d] = acciones.get(action, 0)
+        plt.figure(figsize=(8, 6))
+        plt.imshow(matriz, cmap='viridis', origin='lower')
+        plt.colorbar(label=f'Q[{action}]')
+        plt.xlabel('Demanda (d)')
+        plt.ylabel('Potencia solar (a)')
+        plt.title(f'Heatmap Q[{action}] para b={b_fixed}, c={c_fixed}')
+        plt.xticks(range(max_d + 1))
+        plt.yticks(range(max_a + 1))
+        plt.grid(False)
+        plt.show()
+
+    def show_policy_map(self, b_fixed=0, c_fixed=0, max_a=6, max_d=6):
+        """
+        Muestra un mapa de política greedy (mejor acción por estado).
+        """
+        matriz = np.full((max_a + 1, max_d + 1), -1)
+        for (a, b, c, d), acciones in self.q_table.items():
+            if b == b_fixed and c == c_fixed:
+                mejor_accion = max(acciones, key=acciones.get)
+                matriz[a][d] = mejor_accion
+        plt.figure(figsize=(8, 6))
+        plt.imshow(matriz, cmap='coolwarm', origin='lower', vmin=0, vmax=1)
+        plt.colorbar(label='Mejor acción (0: no produce, 1: produce)')
+        plt.xlabel('Demanda (d)')
+        plt.ylabel('Potencia solar (a)')
+        plt.title(f'Mapa de política greedy para b={b_fixed}, c={c_fixed}')
+        plt.xticks(range(max_d + 1))
+        plt.yticks(range(max_a + 1))
+        plt.grid(False)
+        plt.show()
+
+    def show_q_histogram(self, action=1):
+        """
+        Muestra un histograma de todos los Q-values para una acción específica.
+        """
+        valores_q = [acciones.get(action, 0) for acciones in self.q_table.values()]
+        plt.figure(figsize=(8, 5))
+        plt.hist(valores_q, bins=20, color='skyblue', edgecolor='black')
+        plt.title(f'Histograma de Q[{action}]')
+        plt.xlabel('Valor Q')
+        plt.ylabel('Frecuencia')
+        plt.grid(True)
+        plt.show()
+
+
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 50000000, num_battery_soc_bins=4):
         super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9)
@@ -599,6 +652,59 @@ class BatteryAgent(BaseAgent):
             return -self.beta * self.battery_power_idx * (P_L - P_T)
         return 0.0  
 
+    def show_heatmap(self, b_fixed=0, c_fixed=0, action=1, max_a=6, max_d=6):
+        """
+        Muestra un heatmap de Q-values para una acción dada, fijando b y c.
+        """
+        matriz = np.zeros((max_a + 1, max_d + 1))
+        for (a, b, c, d), acciones in self.q_table.items():
+            if b == b_fixed and c == c_fixed:
+                matriz[a][d] = acciones.get(action, 0)
+        plt.figure(figsize=(8, 6))
+        plt.imshow(matriz, cmap='viridis', origin='lower')
+        plt.colorbar(label=f'Q[{action}]')
+        plt.xlabel('Demanda (d)')
+        plt.ylabel('Potencia solar (a)')
+        plt.title(f'Heatmap Q[{action}] para b={b_fixed}, c={c_fixed}')
+        plt.xticks(range(max_d + 1))
+        plt.yticks(range(max_a + 1))
+        plt.grid(False)
+        plt.show()
+
+    def show_policy_map(self, b_fixed=0, c_fixed=0, max_a=6, max_d=6):
+        """
+        Muestra un mapa de política greedy (mejor acción por estado).
+        """
+        matriz = np.full((max_a + 1, max_d + 1), -1)
+        for (a, b, c, d), acciones in self.q_table.items():
+            if b == b_fixed and c == c_fixed:
+                mejor_accion = max(acciones, key=acciones.get)
+                matriz[a][d] = mejor_accion
+        plt.figure(figsize=(8, 6))
+        plt.imshow(matriz, cmap='coolwarm', origin='lower', vmin=0, vmax=1)
+        plt.colorbar(label='Mejor acción (0: no produce, 1: produce)')
+        plt.xlabel('Demanda (d)')
+        plt.ylabel('Potencia solar (a)')
+        plt.title(f'Mapa de política greedy para b={b_fixed}, c={c_fixed}')
+        plt.xticks(range(max_d + 1))
+        plt.yticks(range(max_a + 1))
+        plt.grid(False)
+        plt.show()
+
+    def show_q_histogram(self, action=1):
+        """
+        Muestra un histograma de todos los Q-values para una acción específica.
+        """
+        valores_q = [acciones.get(action, 0) for acciones in self.q_table.values()]
+        plt.figure(figsize=(8, 5))
+        plt.hist(valores_q, bins=20, color='skyblue', edgecolor='black')
+        plt.title(f'Histograma de Q[{action}]')
+        plt.xlabel('Valor Q')
+        plt.ylabel('Frecuencia')
+        plt.grid(True)
+        plt.show()
+  
+
 class GridAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
         super().__init__("grid", [0, 1], alpha=0.1, gamma=0.9)
@@ -655,6 +761,59 @@ class GridAgent(BaseAgent):
             return -self.nu * C_mercado
         else:
             return 0.0
+
+    def show_heatmap(self, b_fixed=0, c_fixed=0, action=1, max_a=6, max_d=6):
+        """
+        Muestra un heatmap de Q-values para una acción dada, fijando b y c.
+        """
+        matriz = np.zeros((max_a + 1, max_d + 1))
+        for (a, b, c, d), acciones in self.q_table.items():
+            if b == b_fixed and c == c_fixed:
+                matriz[a][d] = acciones.get(action, 0)
+        plt.figure(figsize=(8, 6))
+        plt.imshow(matriz, cmap='viridis', origin='lower')
+        plt.colorbar(label=f'Q[{action}]')
+        plt.xlabel('Demanda (d)')
+        plt.ylabel('Bateria (a)')
+        plt.title(f'Heatmap Q[{action}] para b={b_fixed}, c={c_fixed}')
+        plt.xticks(range(max_d + 1))
+        plt.yticks(range(max_a + 1))
+        plt.grid(False)
+        plt.show()
+
+    def show_policy_map(self, b_fixed=0, c_fixed=0, max_a=6, max_d=6):
+        """
+        Muestra un mapa de política greedy (mejor acción por estado).
+        """
+        matriz = np.full((max_a + 1, max_d + 1), -1)
+        for (a, b, c, d), acciones in self.q_table.items():
+            if b == b_fixed and c == c_fixed:
+                mejor_accion = max(acciones, key=acciones.get)
+                matriz[a][d] = mejor_accion
+        plt.figure(figsize=(8, 6))
+        plt.imshow(matriz, cmap='coolwarm', origin='lower', vmin=0, vmax=1)
+        plt.colorbar(label='Mejor acción (0: no produce, 1: produce)')
+        plt.xlabel('Demanda (d)')
+        plt.ylabel('Potencia solar (a)')
+        plt.title(f'Mapa de política greedy para b={b_fixed}, c={c_fixed}')
+        plt.xticks(range(max_d + 1))
+        plt.yticks(range(max_a + 1))
+        plt.grid(False)
+        plt.show()
+
+    def show_q_histogram(self, action=1):
+        """
+        Muestra un histograma de todos los Q-values para una acción específica.
+        """
+        valores_q = [acciones.get(action, 0) for acciones in self.q_table.values()]
+        plt.figure(figsize=(8, 5))
+        plt.hist(valores_q, bins=20, color='skyblue', edgecolor='black')
+        plt.title(f'Histograma de Q[{action}]')
+        plt.xlabel('Valor Q')
+        plt.ylabel('Frecuencia')
+        plt.grid(True)
+        plt.show()
+  
 
 class LoadAgent(BaseAgent):
     def __init__(self):
@@ -918,11 +1077,11 @@ class Simulation:
             
             # Visualizamos las Q-tables
             for agent in self.agents:
-                if isinstance(agent, SolarAgent):
+                if isinstance(agent, BatteryAgent):
                     # Mostrar heatmap para acción "producir" (1)
-                    # agent.show_heatmap(b_fixed=0, c_fixed=0, action=1)
+                    agent.show_heatmap(b_fixed=0, c_fixed=0, action=1)
                     # Mostrar mapa de política greedy
-                    # agent.show_policy_map(b_fixed=0, c_fixed=0)
+                    agent.show_policy_map(b_fixed=0, c_fixed=0)
                     # Mostrar histograma de Q[1] (producir)
                     agent.show_q_histogram(action=1)
             

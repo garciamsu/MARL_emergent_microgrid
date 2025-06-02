@@ -429,9 +429,9 @@ class SolarAgent(BaseAgent):
 
     def calculate_reward(self, P_H, P_L, S_PV):
         """
-        P_H: potencia generada por el panel local
-        P_L: demanda local (o parte de la demanda)
-        SOC: estado de la batería
+        P_H: potencia generada por el panel solar
+        P_L: demanda 
+        S_PV: estado del panel solar
         """
         
         if P_H <= P_L and S_PV == 1:
@@ -521,7 +521,6 @@ class BatteryAgent(BaseAgent):
         """
         self.capacity_ah = capacity_ah  # Capacidad fija en Ah
         self.soc = 0.5  # Estado de carga inicial en %
-        print(self.soc)
         self.battery_power = 0.0  # Potencia en W
         self.battery_state = 0  # Estado inicial de operación
         self.battery_power_idx = 0 # Estado SOC discretizado
@@ -767,26 +766,21 @@ class Simulation:
                         # Escoger acción
                         agent.choose_action(state['SolarAgent'], self.epsilon)
 
-                        if agent.action == 1: #"produce"
-                            agent.solar_state = 1
-                            self.env.renewable_power += agent.solar_state*agent.current_power
-                        else:
-                            agent.solar_state = 0
-                            self.env.renewable_power += 0.0
+                        self.env.renewable_power += agent.current_power
+                        agent.solar_state = agent.action
 
                         self.instant["solar"] = agent.current_power
                         self.instant["solar_state"] = agent.solar_state
+                        self.instant["solar_discrete"] = np.digitize([agent.current_power], self.env.renewable_bins)[0] - 1
                     elif isinstance(agent, WindAgent):
                         agent.choose_action(state['WindAgent'], self.epsilon)
-                        if agent.action == 1: #"produce"
-                            agent.wind_state = 1
-                            self.env.renewable_power += agent.wind_state*agent.current_power
-                        else:
-                            agent.wind_state = 0
-                            self.env.renewable_power += 0.0
+
+                        self.env.renewable_power += agent.current_power
+                        agent.solar_state = agent.action
 
                         self.instant["wind"] = agent.current_power
                         self.instant["wind_state"] = agent.wind_state
+                        self.instant["wind_discrete"] = np.digitize([agent.current_power], self.env.renewable_bins)[0] - 1
                     elif isinstance(agent, BatteryAgent):
                         agent.choose_action(state['BatteryAgent'], self.epsilon)
 
@@ -804,9 +798,9 @@ class Simulation:
 
                         bat_power = agent.battery_power
 
-                        self.instant["battery"] = agent.battery_power
-                        self.instant["soc"] = agent.get_soc()
-                        self.instant["soc_discrete"] = agent.battery_power_idx
+                        self.instant["bat"] = agent.battery_power
+                        self.instant["bat_soc"] = agent.get_soc()
+                        self.instant["bat_soc_discrete"] = agent.battery_power_idx
                         self.instant["bat_state"] = agent.battery_state
                     elif isinstance(agent, GridAgent):
                         agent.choose_action(state['GridAgent'], self.epsilon)
@@ -864,14 +858,14 @@ class Simulation:
                     # Calculamos la recompensa según el tipo de agente
                     if isinstance(agent, SolarAgent):
                         reward = agent.calculate_reward(
-                            P_H=self.env.renewable_power_idx,
+                            P_H=agent._get_discretized_state(self.env, i)[0],
                             P_L=self.env.demand_power_idx,
                             S_PV=agent.action
                         )
                         self.instant["reward_solar"] = reward
                     elif isinstance(agent, WindAgent):
                         reward = agent.calculate_reward(
-                            P_H=self.env.renewable_power_idx, 
+                            P_H=agent._get_discretized_state(self.env, i)[0],
                             P_L=self.env.demand_power_idx,
                             S_WD=agent.action
                         )
@@ -884,7 +878,7 @@ class Simulation:
 
                         agent.update_soc(agent.battery_power)
                         #battery_agent = agent
-                        self.instant["soc"] = agent.get_soc()
+                        self.instant["bat_soc"] = agent.get_soc()
                         self.instant["reward_bat"] = reward
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
@@ -989,7 +983,7 @@ class Simulation:
 
         :return: Valor de REP como porcentaje.
         """
-        total_battery_energy = self.df['battery'].sum()
+        total_battery_energy = self.df['bat'].sum()
         total_energy = self.df['total'].sum()
         if total_energy == 0:
             return 0.0  # evitar división por cero

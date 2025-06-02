@@ -651,7 +651,7 @@ class GridAgent(BaseAgent):
             return -self.mu * C_mercado
         elif (SOC > 0 or P_H > P_L) and self.grid_state == 1:
             return -self.sigma * C_mercado
-        elif SOC == 0 and P_H <= P_L and self.grid_state == 0:
+        elif (SOC == 0 and P_H <= P_L) and self.grid_state == 0:
             return -self.nu * C_mercado
         else:
             return 0.0
@@ -814,8 +814,7 @@ class Simulation:
                         agent.choose_action(state['GridAgent'], self.epsilon)
                         if agent.action == 1: # "sell"
                             agent.grid_state = 1 # "selling" 
-                            agent.grid_power = self.env.demand_power - self.env.renewable_power - bat_power
-                            #agent.grid_power = 999999
+                            agent.grid_power = abs(self.env.demand_power - (solar_power + wind_power) - bat_power)
                         else: 
                             agent.grid_state = 0 
                             agent.grid_power = 0
@@ -892,7 +891,7 @@ class Simulation:
                         self.instant["reward_bat"] = reward
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
-                            P_H=self.env.renewable_power_idx,
+                            P_H=renewable_power_real_idx,
                             P_L=self.env.demand_power_idx, 
                             SOC=battery_agent.battery_power_idx,
                             C_mercado=self.env.price)

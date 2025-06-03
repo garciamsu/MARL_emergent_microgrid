@@ -185,7 +185,7 @@ class MultiAgentEnv:
         # Mostrar la ventana con el gráfico interactivo
         plt.show()
 
-    def _get_discretized_state(self, index):
+    def get_discretized_state(self, index):
         """
         Toma valores reales (irradancia, viento, demanda, precio, etc.) y los discretiza en bins,
         devolviendo una tupla como (idx_solar, idx_wind, idx_battery, idx_demand, idx_price).
@@ -220,7 +220,6 @@ class BaseAgent:
         self.name = name
         self.actions = actions
         self.action = 0
-        self.idx = 0
         self.alpha = alpha
         self.gamma = gamma
         self.kappa = kappa
@@ -231,7 +230,7 @@ class BaseAgent:
         self.isPower = isPower
         self.q_table = {}   
         self.current_power = 0.0
-        
+        self.idx = 0
     
     def choose_action(self, state, epsilon=0.1):
         """
@@ -268,7 +267,6 @@ class BaseAgent:
         #discretización robusta y reutilizable
         idx = np.digitize([value], bins)[0] - 1
         idx = np.clip(idx, 0, len(bins)-2)        # evita -1 y último overflow
-        self.idx = idx
 
         return int(idx)
 
@@ -287,8 +285,8 @@ class SolarAgent(BaseAgent):
         # Ajusta los rangos según tu dataset real
         self.solar_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
         self.solar_state_bins = [0, 1] # 0=idle, 1=producing
-        self.solar_state = 0        
-
+        self.solar_state = 0  
+ 
     def to_dataframe(self):
         """
         Convierte la Q-table en un DataFrame de pandas.
@@ -361,7 +359,7 @@ class SolarAgent(BaseAgent):
         plt.grid(True)
         plt.show()
   
-    def _get_discretized_state(self, env: MultiAgentEnv, index):
+    def get_discretized_state(self, env: MultiAgentEnv, index):
         """
         Toma valores reales y los discretiza en bins,
         devolviendo (idx_solar).
@@ -372,6 +370,7 @@ class SolarAgent(BaseAgent):
         # Discretizamos
         solar_power_idx = self.digitize_clip(self.current_power, self.solar_power_bins)
         solar_state_idx = self.digitize_clip(self.solar_state, self.solar_state_bins)
+        self.idx = solar_power_idx
         
         # Retornamos la tupla de estado discretizado
         return (solar_power_idx, solar_state_idx, env.renewable_power_idx, env.demand_power_idx)
@@ -451,7 +450,7 @@ class WindAgent(BaseAgent):
             for state in states
         }
 
-    def _get_discretized_state(self, env: MultiAgentEnv, index):
+    def get_discretized_state(self, env: MultiAgentEnv, index):
         """
         Toma valores reales y los discretiza en bins,
         devolviendo (idx_solar).
@@ -462,6 +461,7 @@ class WindAgent(BaseAgent):
         # Discretizamos
         wind_power_idx = self.digitize_clip(self.current_power, self.wind_power_bins)
         wind_state_idx = self.digitize_clip(self.wind_state, self.wind_state_bins)
+        self.idx = wind_power_idx
         
         # Retornamos la tupla de estado discretizado
         return (wind_power_idx, wind_state_idx, env.renewable_power_idx, env.demand_power_idx)
@@ -575,7 +575,6 @@ class BatteryAgent(BaseAgent):
         # Actualizamos el SOC asegurándonos de que se mantenga en los límites de 0 a 1
         self.soc = max(0.0, min(1.0, self.soc - delta_soc))
         self.battery_power_idx = self.digitize_clip(self.soc, self.battery_soc_bins)
-        
     
     def get_soc(self) -> float:
         """
@@ -602,7 +601,7 @@ class BatteryAgent(BaseAgent):
             for state in states
         }
 
-    def _get_discretized_state(self, env: MultiAgentEnv, index):
+    def get_discretized_state(self, env: MultiAgentEnv, index):
         """
         Toma valores reales y los discretiza en bins,
         devolviendo (idx_solar).
@@ -610,7 +609,7 @@ class BatteryAgent(BaseAgent):
        
         # Discretizamos
         self.battery_power_idx = self.digitize_clip(self.soc, self.battery_soc_bins)
-       
+        self.idx = self.battery_power_idx       
         
         # Retornamos la tupla de estado discretizado
         return (self.battery_power_idx, self.battery_state, env.renewable_power_idx, env.demand_power_idx)
@@ -716,7 +715,7 @@ class GridAgent(BaseAgent):
             for state in states
         }
 
-    def _get_discretized_state(self, env: MultiAgentEnv, index):
+    def get_discretized_state(self, env: MultiAgentEnv, index):
         """
         Toma valores reales y los discretiza en bins,
         devolviendo (idx_solar).
@@ -724,6 +723,7 @@ class GridAgent(BaseAgent):
        
         # Discretizamos
         battery_power_idx = self.digitize_clip(self.ess.soc, self.ess.battery_soc_bins)
+        self.idx = battery_power_idx
         
         # Retornamos la tupla de estado discretizado
         return (self.grid_state, battery_power_idx, self.ess.battery_state, env.renewable_power_idx, env.demand_power_idx)
@@ -865,14 +865,14 @@ class Simulation:
                 agent.initialize_q_table(self.env)
 
     def step(self, index):
-        self.env._get_discretized_state(index)
+        self.env.get_discretized_state(index)
         agent_states = {}
         
         for agent in self.agents:
             agent_type = type(agent).__name__  # Obtiene el nombre de la clase del agente
-            agent_states[agent_type] = agent._get_discretized_state(self.env, index)
+            agent_states[agent_type] = agent.get_discretized_state(self.env, index)
+            agent.idx = agent_states[agent_type][0]
         
-        print(agent_states)
         return agent_states
         
     def run(self):
@@ -990,14 +990,14 @@ class Simulation:
                     # Calculamos la recompensa según el tipo de agente
                     if isinstance(agent, SolarAgent):
                         reward = agent.calculate_reward(
-                            P_H=agent._get_discretized_state(self.env, i)[0],
+                            P_H=agent.get_discretized_state(self.env, i)[0],
                             P_L=self.env.demand_power_idx,
                             S_PV=agent.action
                         )
                         self.instant["reward_solar"] = reward
                     elif isinstance(agent, WindAgent):
                         reward = agent.calculate_reward(
-                            P_H=agent._get_discretized_state(self.env, i)[0],
+                            P_H=agent.get_discretized_state(self.env, i)[0],
                             P_L=self.env.demand_power_idx,
                             S_WD=agent.action
                         )

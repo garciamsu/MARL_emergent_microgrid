@@ -197,11 +197,17 @@ class MultiAgentEnv:
         self.time = row["Datetime"]
 
         # Discretizamos
-        self.demand_power_idx = np.digitize([row["demand"]], self.demand_bins)[0] - 1
-        self.renewable_power_idx = np.digitize([self.renewable_power], self.renewable_bins)[0] - 1
+        self.demand_power_idx = self.digitize_clip(row["demand"], self.demand_bins)
+        self.renewable_power_idx = self.digitize_clip(row["demand"], self.renewable_bins)
         
         # Retornamos la tupla de estado discretizado
         return (self.demand_power_idx, self.renewable_power_idx)
+
+    def digitize_clip(value: float, bins: np.ndarray) -> int:
+        #discretización robusta y reutilizable
+        idx = np.digitize([value], bins)[0] - 1
+        idx = np.clip(idx, 0, len(bins)-2)        # evita -1 y último overflow
+        return int(idx)
 
 # -----------------------------------------------------
 # Definimos la clase base de Agente con Q-Table
@@ -214,6 +220,7 @@ class BaseAgent:
         self.name = name
         self.actions = actions
         self.action = 0
+        self.idx = 0
         self.alpha = alpha
         self.gamma = gamma
         self.kappa = kappa
@@ -224,6 +231,7 @@ class BaseAgent:
         self.isPower = isPower
         self.q_table = {}   
         self.current_power = 0.0
+        
     
     def choose_action(self, state, epsilon=0.1):
         """
@@ -255,6 +263,14 @@ class BaseAgent:
         
         new_q = current_q + self.alpha * (reward + self.gamma * max_next_q - current_q)
         self.q_table[state][action] = new_q
+
+    def digitize_clip(value: float, bins: np.ndarray) -> int:
+        #discretización robusta y reutilizable
+        idx = np.digitize([value], bins)[0] - 1
+        idx = np.clip(idx, 0, len(bins)-2)        # evita -1 y último overflow
+        self.idx = idx
+
+        return int(idx)
 
 # -----------------------------------------------------
 # Agentes Especializados (Solar, Wind, Battery, Grid, Load)
@@ -354,8 +370,8 @@ class SolarAgent(BaseAgent):
         self.current_power = row["solar_power"]
         
         # Discretizamos
-        solar_power_idx = np.digitize([self.current_power], self.solar_power_bins)[0] - 1
-        solar_state_idx = np.digitize([self.solar_state], self.solar_state_bins)[0] - 1
+        solar_power_idx = self.digitize_clip(self.current_power, self.solar_power_bins)
+        solar_state_idx = self.digitize_clip(self.solar_state, self.solar_state_bins)
         
         # Retornamos la tupla de estado discretizado
         return (solar_power_idx, solar_state_idx, env.renewable_power_idx, env.demand_power_idx)
@@ -444,8 +460,8 @@ class WindAgent(BaseAgent):
         self.current_power = row["wind_power"]
         
         # Discretizamos
-        wind_power_idx = np.digitize([self.current_power], self.wind_power_bins)[0] - 1
-        wind_state_idx = np.digitize([self.wind_state], self.wind_state_bins)[0] - 1
+        wind_power_idx = self.digitize_clip(self.current_power, self.wind_power_bins)
+        wind_state_idx = self.digitize_clip(self.wind_state, self.wind_state_bins)
         
         # Retornamos la tupla de estado discretizado
         return (wind_power_idx, wind_state_idx, env.renewable_power_idx, env.demand_power_idx)
@@ -558,7 +574,8 @@ class BatteryAgent(BaseAgent):
         
         # Actualizamos el SOC asegurándonos de que se mantenga en los límites de 0 a 1
         self.soc = max(0.0, min(1.0, self.soc - delta_soc))
-        self.battery_power_idx = np.digitize([self.soc], self.battery_soc_bins)[0] - 1
+        self.battery_power_idx = self.digitize_clip(self.soc, self.battery_soc_bins)
+        
     
     def get_soc(self) -> float:
         """
@@ -592,7 +609,8 @@ class BatteryAgent(BaseAgent):
         """
        
         # Discretizamos
-        self.battery_power_idx = np.digitize([self.soc], self.battery_soc_bins)[0] - 1
+        self.battery_power_idx = self.digitize_clip(self.soc, self.battery_soc_bins)
+       
         
         # Retornamos la tupla de estado discretizado
         return (self.battery_power_idx, self.battery_state, env.renewable_power_idx, env.demand_power_idx)
@@ -705,7 +723,7 @@ class GridAgent(BaseAgent):
         """
        
         # Discretizamos
-        battery_power_idx = np.digitize([self.ess.soc], self.ess.battery_soc_bins)[0] - 1
+        battery_power_idx = self.digitize_clip(self.ess.soc, self.ess.battery_soc_bins)
         
         # Retornamos la tupla de estado discretizado
         return (self.grid_state, battery_power_idx, self.ess.battery_state, env.renewable_power_idx, env.demand_power_idx)
@@ -890,7 +908,7 @@ class Simulation:
 
                         self.instant["solar"] = agent.current_power
                         self.instant["solar_state"] = agent.solar_state
-                        self.instant["solar_discrete"] = np.digitize([agent.current_power], self.env.renewable_bins)[0] - 1
+                        self.instant["solar_discrete"] = agent.idx
                     elif isinstance(agent, WindAgent):
                         agent.choose_action(state['WindAgent'], self.epsilon)
 
@@ -900,7 +918,7 @@ class Simulation:
 
                         self.instant["wind"] = agent.current_power
                         self.instant["wind_state"] = agent.wind_state
-                        self.instant["wind_discrete"] = np.digitize([agent.current_power], self.env.renewable_bins)[0] - 1
+                        self.instant["wind_discrete"] = agent.idx
                     elif isinstance(agent, BatteryAgent):
                         agent.choose_action(state['BatteryAgent'], self.epsilon)
 

@@ -203,7 +203,7 @@ class MultiAgentEnv:
         # Retornamos la tupla de estado discretizado
         return (self.demand_power_idx, self.renewable_power_idx)
 
-    def digitize_clip(value: float, bins: np.ndarray) -> int:
+    def digitize_clip(self, value: float, bins: np.ndarray) -> int:
         #discretización robusta y reutilizable
         idx = np.digitize([value], bins)[0] - 1
         idx = np.clip(idx, 0, len(bins)-2)        # evita -1 y último overflow
@@ -264,7 +264,7 @@ class BaseAgent:
         new_q = current_q + self.alpha * (reward + self.gamma * max_next_q - current_q)
         self.q_table[state][action] = new_q
 
-    def digitize_clip(value: float, bins: np.ndarray) -> int:
+    def digitize_clip(self, value: float, bins: np.ndarray) -> int:
         #discretización robusta y reutilizable
         idx = np.digitize([value], bins)[0] - 1
         idx = np.clip(idx, 0, len(bins)-2)        # evita -1 y último overflow

@@ -9,7 +9,6 @@ from matplotlib.widgets import CheckButtons
 import copy
 from tabulate import tabulate
 
-
 # Parámetros físicos y constantes
 ETA = 0.15        # Eficiencia de conversión solar
 SOLAR_AREA = 10   # Área de paneles solares en m^2
@@ -19,7 +18,7 @@ RHO = 1.225       # Densidad del aire en kg/m^3
 BLADE_AREA = 5    # Área de los álabes de la turbina en m^2
 C_P = 0.4         # Coeficiente de potencia
 C_CONFORT = 0.5   # Umbral de confort para el costo del mercado
-BINS = 6          # Define cuántos intervalos se utilizan para discretizar las variables de potencia (renovables + demanda).
+BINS = 7          # Define cuántos intervalos se utilizan para discretizar las variables de potencia (renovables + demanda).
 
 # -----------------------------------------------------
 # Definimos el entorno
@@ -211,7 +210,7 @@ class BaseAgent:
     """
     Clase base para agentes con Q-table.
     """
-    def __init__(self, name, actions, alpha=0.1, gamma=0.9, kappa=0.1, sigma=0.1, mu=0.1, nu=0.1, beta=0.1, isPower=True):
+    def __init__(self, name, actions, alpha=10, gamma=10, kappa=10, sigma=10, mu=10, nu=10, beta=10, isPower=True):
         self.name = name
         self.actions = actions
         self.action = 0
@@ -242,14 +241,6 @@ class BaseAgent:
 
     def update_q_table(self, state, action, reward, next_state):
 
-        #print("------------- state")
-        #print(state)
-        #print("------------- action")
-        #print(action)
-        #print("------------- reward")
-        #print(reward) 
-        #print("------------- next_state")
-        #print(next_state)        
         """
         Actualiza la Q-table según Q-Learning:
           Q(s, a) <- Q(s, a) + alpha * [r + gamma * max_a' Q(s', a') - Q(s, a)]
@@ -368,34 +359,6 @@ class SolarAgent(BaseAgent):
         
         # Retornamos la tupla de estado discretizado
         return (solar_power_idx, solar_state_idx, env.renewable_power_idx, env.demand_power_idx)
-
-    def plot_discretized_indices(self, env: MultiAgentEnv):
-        """
-        Recorre el dataset del entorno, obtiene los estados discretizados
-        y grafica los índices de potencia solar y demanda.
-        """
-        solar_power_indices = []
-        demand_power_indices = []
-
-        # Recorremos todos los pasos definidos por el entorno
-        for i in range(env.max_steps):
-            solar_power_idx, _, _, demand_power_idx = self._get_discretized_state(env, i)
-            solar_power_indices.append(solar_power_idx)
-            demand_power_indices.append(demand_power_idx)
-
-        print(solar_power_indices)
-
-        # Graficamos los resultados
-        plt.figure(figsize=(12, 5))
-        plt.plot(range(env.max_steps), solar_power_indices, label='solar_power_idx', marker='o')
-        plt.plot(range(env.max_steps), demand_power_indices, label='demand_power_idx', marker='x')
-        plt.xlabel("Timestep")
-        plt.ylabel("Índice Discretizado")
-        plt.title("Evolución de índices discretizados: Potencia solar vs. Demanda")
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        plt.show()
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
@@ -561,7 +524,6 @@ class WindAgent(BaseAgent):
         plt.grid(True)
         plt.show()
 
-
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 50000000, num_battery_soc_bins=4):
         super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9)
@@ -704,7 +666,6 @@ class BatteryAgent(BaseAgent):
         plt.grid(True)
         plt.show()
   
-
 class GridAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
         super().__init__("grid", [0, 1], alpha=0.1, gamma=0.9)
@@ -794,7 +755,7 @@ class GridAgent(BaseAgent):
         plt.imshow(matriz, cmap='coolwarm', origin='lower', vmin=0, vmax=1)
         plt.colorbar(label='Mejor acción (0: no produce, 1: produce)')
         plt.xlabel('Demanda (d)')
-        plt.ylabel('Potencia solar (a)')
+        plt.ylabel('Potencia de la bateria')
         plt.title(f'Mapa de política greedy para b={b_fixed}, c={c_fixed}')
         plt.xticks(range(max_d + 1))
         plt.yticks(range(max_a + 1))
@@ -813,7 +774,6 @@ class GridAgent(BaseAgent):
         plt.ylabel('Frecuencia')
         plt.grid(True)
         plt.show()
-  
 
 class LoadAgent(BaseAgent):
     def __init__(self):
@@ -894,16 +854,12 @@ class Simulation:
             agent_type = type(agent).__name__  # Obtiene el nombre de la clase del agente
             agent_states[agent_type] = agent._get_discretized_state(self.env, index)
         
+        print(agent_states)
         return agent_states
         
     def run(self):
 
         for ep in range(self.num_episodes):
-
-            # Para graficar los estados discretos de los agentes para analisis
-            for agent in self.agents:
-                if isinstance(agent, SolarAgent):
-                    agent.plot_discretized_indices(self.env)
 
             for i in range(self.max_steps-1):
                 
@@ -919,11 +875,8 @@ class Simulation:
 
                 # Reseteamos entorno y los agentes al inicio de cada episodio
                 state = self.step(i)                
-                
-                self.instant["demand"] = self.env.demand_power
-                self.instant["demand_discrete"] = self.env.demand_power_idx
-                self.instant["price"] = self.env.price
-                self.instant["time"] = self.env.time
+
+                self.instant["time"] = self.env.time                
 
                 # Selecciona la acción 
                 for agent in self.agents:
@@ -954,11 +907,9 @@ class Simulation:
                         if agent.action == 1:
                             agent.battery_state = 1 # "charging" 
                             agent.battery_power = -abs(self.env.demand_power - self.env.renewable_power)
-                            #agent.battery_power = -99999
                         elif agent.action == 2:
                             agent.battery_state = 2  # "discharging" 
                             agent.battery_power = abs(self.env.demand_power - self.env.renewable_power)
-                            #agent.battery_power = 99999
                         else:
                             agent.battery_state = 0 
                             agent.battery_power = 0.0
@@ -986,6 +937,7 @@ class Simulation:
                         # LoadAgent no generan en este ejemplo
                         _ = agent.choose_action(state["LoadAgent"], self.epsilon)               
 
+                # Calcula el balance de energia
                 renewable_power_real = wind_power + solar_power
                 self.env.total_power = renewable_power_real + bat_power + grid_power
                 renewable_power_real_idx = np.digitize([renewable_power_real], self.env.renewable_bins)[0] - 1
@@ -996,8 +948,11 @@ class Simulation:
                 self.instant["renewable"] = self.env.renewable_power
                 self.instant["renewable_discrete"] = self.renewable_power_idx
                 self.instant["total"] = self.env.total_power
-                self.instant["total_discrete"] = self.total_power_idx
+                self.instant["demand"] = self.env.demand_power
                 self.instant["dif"] = self.dif_power
+                self.instant["total_discrete"] = self.total_power_idx
+                self.instant["demand_discrete"] = self.env.demand_power_idx
+                self.instant["price"] = self.env.price
 
                 # Ahora calculamos la recompensa individual por agente
                 # y actualizamos la Q-table                
@@ -1011,15 +966,6 @@ class Simulation:
                         break  # Detiene el bucle al encontrar el primer BatteryAgent
 
                 for agent in self.agents:
-                    # Recuperamos la acción que tomó este agente en este step
-                    # Para un enfoque riguroso, cada agente debería almacenar su "acción" actual,
-                    # aquí simplificamos volviendo a elegir la misma acción con choose_action(...) 
-                    # o se podría guardar en un diccionario {agent:action} en el bucle anterior
-                    # para no volver a generarla.
-                    
-                    # -- EJEMPLO: asumiremos la misma acción que generamos antes (guardándola):
-                    # Para hacerlo rápido, repetimos la llamada (no es lo ideal).
-                    
                     agent_type = type(agent).__name__  # Obtiene el nombre de la clase del agente
                     #action = agent.choose_action(state[agent_type], self.epsilon)
                     
@@ -1069,23 +1015,21 @@ class Simulation:
                     # Actualizamos Q-table                    
                     agent.update_q_table(state[agent_type], agent.action, reward, next_state[agent_type])
 
-                #print(self.instant)
-                #print(i)
                 # Actualizamos el estado actual
                 state = next_state
-                self.evolution.append(copy.deepcopy(self.instant))
-            
-            # Visualizamos las Q-tables
-            for agent in self.agents:
-                if isinstance(agent, BatteryAgent):
-                    # Mostrar heatmap para acción "producir" (1)
-                    agent.show_heatmap(b_fixed=0, c_fixed=0, action=1)
-                    # Mostrar mapa de política greedy
-                    agent.show_policy_map(b_fixed=0, c_fixed=0)
-                    # Mostrar histograma de Q[1] (producir)
-                    agent.show_q_histogram(action=1)
+                self.evolution.append(copy.deepcopy(self.instant))            
             
             print(f"Fin episodio {ep+1}/{self.num_episodes}")
+
+        # Visualizamos las Q-tables
+        #for agent in self.agents:
+            #if isinstance(agent, BatteryAgent):
+                # Mostrar heatmap para acción "producir" (1)
+                # agent.show_heatmap(b_fixed=0, c_fixed=0, action=1)
+                # Mostrar mapa de política greedy
+                # agent.show_policy_map(b_fixed=0, c_fixed=0)
+                # Mostrar histograma de Q[1] (producir)
+                # agent.show_q_histogram(action=1)
 
         self.df = pd.DataFrame(self.evolution)
         self.df.to_csv("evolution_learning.csv", index=False)

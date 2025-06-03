@@ -958,10 +958,10 @@ class Simulation:
                 # Calcula el balance de energia
                 renewable_power_real = wind_power + solar_power
                 self.env.total_power = renewable_power_real + bat_power + grid_power
-                renewable_power_real_idx = np.digitize([renewable_power_real], self.env.renewable_bins)[0] - 1
+                renewable_power_real_idx = self.env.digitize_clip(renewable_power_real, self.env.renewable_bins)
                 self.dif_power = self.env.total_power - self.env.demand_power
-                self.renewable_power_idx = np.digitize([self.env.renewable_power], self.env.renewable_bins)[0] - 1
-                self.total_power_idx = np.digitize([self.env.total_power], self.env.renewable_bins)[0] - 1
+                self.renewable_power_idx = self.env.digitize_clip(self.env.renewable_power, self.env.renewable_bins)
+                self.total_power_idx = self.env.digitize_clip(self.env.total_power, self.env.renewable_bins)
 
                 self.instant["renewable"] = self.env.renewable_power
                 self.instant["renewable_discrete"] = self.renewable_power_idx

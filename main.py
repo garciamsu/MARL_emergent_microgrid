@@ -20,6 +20,8 @@ C_P = 0.4         # Coeficiente de potencia
 C_CONFORT = 0.5   # Umbral de confort para el costo del mercado
 BINS = 7          # Define cuántos intervalos se utilizan para discretizar las variables de potencia (renovables + demanda).
 
+os.makedirs("results", exist_ok=True)
+
 # -----------------------------------------------------
 # Definimos el entorno
 # -----------------------------------------------------
@@ -1041,7 +1043,7 @@ class Simulation:
                 self.epsilon = self.epsilon                
             
             self.df = pd.DataFrame(self.evolution)
-            self.df.to_csv("evolution_learning_{ep}.csv", index=False)
+            self.df.to_csv(f"results/evolution_learning_{ep}.csv", index=False)
             
             self.update_episode_metrics(ep, self.df)                    
             print(f"Fin episodio {ep+1}/{self.num_episodes} con epsilon {self.epsilon}")
@@ -1093,8 +1095,8 @@ class Simulation:
 
         :return: Valor de REP como porcentaje.
         """
-        total_renewable_energy = self.df['renewable'].sum()
-        total_energy = self.df['total'].sum()
+        total_renewable_energy = self.df['solar_state'].sum()
+        total_energy = self.df.shape[0]
         if total_energy == 0:
             return 0.0  # evitar división por cero
         rep = (total_renewable_energy / total_energy) * 100
@@ -1106,24 +1108,11 @@ class Simulation:
 
         :return: Valor de REP como porcentaje.
         """
-        total_grid_energy = self.df['grid'].sum()
-        total_energy = self.df['total'].sum()
+        total_grid_energy = self.df['grid_state'].sum()
+        total_energy = self.df.shape[0]
         if total_energy == 0:
             return 0.0  # evitar división por cero
         rep = (total_grid_energy / total_energy) * 100
-        return rep
-
-    def calculate_bat(self) -> float:
-        """
-        Calcula el REP (Renewable Energy Penetration), porcentaje de energía renovable sobre la total.
-
-        :return: Valor de REP como porcentaje.
-        """
-        total_battery_energy = self.df['bat'].sum()
-        total_energy = self.df['total'].sum()
-        if total_energy == 0:
-            return 0.0  # evitar división por cero
-        rep = (total_battery_energy / total_energy) * 100
         return rep
 
     def show_performance_metrics(self):
@@ -1135,8 +1124,7 @@ class Simulation:
             ["ISE (Integral Square Error)", f"{self.calculate_ise():.3f}"],
             ["IAE (Integral Absolute Error)", f"{self.calculate_iae():.3f}"],
             ["REP (Renewable Energy Penetration)", f"{self.calculate_rep():.2f}%"],
-            ["GEP (Grid Energy Penetration)", f"{self.calculate_grid():.2f}%"],
-            ["BEP (Battery Energy Penetration)", f"{self.calculate_bat():.2f}%"]
+            ["GEP (Grid Energy Penetration)", f"{self.calculate_grid():.2f}%"]
         ]
         print(tabulate(results, headers=["Métrica", "Valor"], tablefmt="fancy_grid"))
     
@@ -1193,18 +1181,9 @@ class Simulation:
 # -----------------------------------------------------
 if __name__ == "__main__":
     
-    sim1 = Simulation(num_episodes=10, epsilon=1, learning=True)
+    sim1 = Simulation(num_episodes=1000, epsilon=1, learning=True)
     sim1.run()
-
-    #sim2 = Simulation(num_episodes=1, epsilon=0, learning=False)
-    #sim2.agents = sim1.agents
-    #for agent in sim2.agents:
-    #    if isinstance(agent, BatteryAgent):
-    #        agent.soc = 0.5
-    #sim2.run()
+    sim1.show_performance_metrics()
+        
     
-    #sim1.show_performance_metrics()
-    #sim2.show_performance_metrics()
     
-    #sim1.compute_reward_metrics()
-    #sim2.compute_reward_metrics()

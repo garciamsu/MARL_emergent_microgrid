@@ -193,12 +193,13 @@ class MultiAgentEnv:
         row = self.dataset.iloc[index]
         
         self.demand_power = row["demand"]
+        self.renewable_power = row["solar_power"] + row["wind_power"]
         self.price = row["price"]
         self.time = row["Datetime"]
 
         # Discretizamos
-        self.demand_power_idx = self.digitize_clip(row["demand"], self.demand_bins)
-        self.renewable_power_idx = self.digitize_clip(row["demand"], self.renewable_bins)
+        self.demand_power_idx = self.digitize_clip(self.demand_power, self.demand_bins)
+        self.renewable_power_idx = self.digitize_clip(self.renewable_power, self.renewable_bins)
         
         # Retornamos la tupla de estado discretizado
         return (self.demand_power_idx, self.renewable_power_idx)
@@ -366,7 +367,7 @@ class SolarAgent(BaseAgent):
         """
         row = env.dataset.iloc[index]
         self.current_power = row["solar_power"]
-        
+
         # Discretizamos
         solar_power_idx = self.digitize_clip(self.current_power, self.solar_power_bins)
         solar_state_idx = self.digitize_clip(self.solar_state, self.solar_state_bins)
@@ -457,7 +458,7 @@ class WindAgent(BaseAgent):
         """
         row = env.dataset.iloc[index]
         self.current_power = row["wind_power"]
-        
+
         # Discretizamos
         wind_power_idx = self.digitize_clip(self.current_power, self.wind_power_bins)
         wind_state_idx = self.digitize_clip(self.wind_state, self.wind_state_bins)
@@ -554,7 +555,7 @@ class BatteryAgent(BaseAgent):
         self.soc = 0.5  # Estado de carga inicial en %
         self.battery_power = 0.0  # Potencia en W
         self.battery_state = 0  # Estado inicial de operación
-        self.battery_power_idx = 0 # Estado SOC discretizado
+        self.battery_soc_idx = 0 # Estado SOC discretizado
 
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
@@ -574,16 +575,8 @@ class BatteryAgent(BaseAgent):
         
         # Actualizamos el SOC asegurándonos de que se mantenga en los límites de 0 a 1
         self.soc = max(0.0, min(1.0, self.soc - delta_soc))
-        self.battery_power_idx = self.digitize_clip(self.soc, self.battery_soc_bins)
+        self.battery_soc_idx = self.digitize_clip(self.soc, self.battery_soc_bins)
     
-    def get_soc(self) -> float:
-        """
-        Retorna el estado de carga actual en porcentaje.
-        
-        :return: SOC en porcentaje (0 - 1).
-        """
-        return self.soc
-
     def initialize_q_table(self, env: MultiAgentEnv):
         """
         Crea la Q-table para todos los posibles estados discretizados.
@@ -608,27 +601,27 @@ class BatteryAgent(BaseAgent):
         """
        
         # Discretizamos
-        self.battery_power_idx = self.digitize_clip(self.soc, self.battery_soc_bins)
-        self.idx = self.battery_power_idx       
+        self.battery_soc_idx = self.digitize_clip(self.soc, self.battery_soc_bins)
+        self.idx = self.battery_soc_idx       
         
         # Retornamos la tupla de estado discretizado
-        return (self.battery_power_idx, self.battery_state, env.renewable_power_idx, env.demand_power_idx)
+        return (self.battery_soc_idx, self.battery_state, env.renewable_power_idx, env.demand_power_idx)
 
     def calculate_reward(self, P_T, P_L):
-        if self.battery_power_idx > 0  and P_T < P_L and self.battery_state == 2:
-            return self.kappa * self.battery_power_idx * (P_L - P_T)
-        if self.battery_power_idx > 0  and P_T > P_L and self.battery_state == 2:
-            return - self.kappa * self.battery_power_idx * (P_T - P_L)
-        elif self.battery_power_idx == 0 and P_T > P_L and self.battery_state == 2:
-            return -self.sigma * (2 - self.battery_power_idx)  * (P_T - P_L)
-        elif self.battery_power_idx == 0 and P_T < P_L and self.battery_state == 2:
-            return -self.mu * (2 - self.battery_power_idx) * (P_L - P_T)
-        if self.battery_power_idx <= 2 and P_T > P_L and self.battery_state == 1:
-            return self.nu * (2 - self.battery_power_idx) * (P_T - P_L)
-        elif self.battery_power_idx < 2 and P_T <= P_L and self.battery_state == 1:
-            return -self.beta * self.battery_power_idx * (P_L - P_T)
-        elif self.battery_power_idx > 0 and P_T <= P_L and self.battery_state == 0:
-            return -self.beta * self.battery_power_idx * (P_L - P_T)
+        if self.battery_soc_idx > 0  and P_T < P_L and self.battery_state == 2:
+            return self.kappa * self.battery_soc_idx * (P_L - P_T)
+        if self.battery_soc_idx > 0  and P_T > P_L and self.battery_state == 2:
+            return - self.kappa * self.battery_soc_idx * (P_T - P_L)
+        elif self.battery_soc_idx == 0 and P_T > P_L and self.battery_state == 2:
+            return -self.sigma * (2 - self.battery_soc_idx)  * (P_T - P_L)
+        elif self.battery_soc_idx == 0 and P_T < P_L and self.battery_state == 2:
+            return -self.mu * (2 - self.battery_soc_idx) * (P_L - P_T)
+        if self.battery_soc_idx <= 2 and P_T > P_L and self.battery_state == 1:
+            return self.nu * (2 - self.battery_soc_idx) * (P_T - P_L)
+        elif self.battery_soc_idx < 2 and P_T <= P_L and self.battery_state == 1:
+            return -self.beta * self.battery_soc_idx * (P_L - P_T)
+        elif self.battery_soc_idx > 0 and P_T <= P_L and self.battery_state == 0:
+            return -self.beta * self.battery_soc_idx * (P_L - P_T)
         return 0.0  
 
     def show_heatmap(self, b_fixed=0, c_fixed=0, action=1, max_a=6, max_d=6):
@@ -722,11 +715,11 @@ class GridAgent(BaseAgent):
         """
        
         # Discretizamos
-        battery_power_idx = self.digitize_clip(self.ess.soc, self.ess.battery_soc_bins)
-        self.idx = battery_power_idx
+        battery_soc_idx = self.digitize_clip(self.ess.soc, self.ess.battery_soc_bins)
+        self.idx = battery_soc_idx
         
         # Retornamos la tupla de estado discretizado
-        return (self.grid_state, battery_power_idx, self.ess.battery_state, env.renewable_power_idx, env.demand_power_idx)
+        return (self.grid_state, battery_soc_idx, self.ess.battery_state, env.renewable_power_idx, env.demand_power_idx)
 
     def calculate_reward(self, P_H, P_L, SOC, C_mercado):
         
@@ -902,7 +895,7 @@ class Simulation:
                         # Escoger acción
                         agent.choose_action(state['SolarAgent'], self.epsilon)
 
-                        self.env.renewable_power += agent.current_power
+                        #self.env.renewable_power += agent.current_power
                         agent.solar_state = agent.action
                         solar_power = agent.current_power*agent.action
 
@@ -912,7 +905,7 @@ class Simulation:
                     elif isinstance(agent, WindAgent):
                         agent.choose_action(state['WindAgent'], self.epsilon)
 
-                        self.env.renewable_power += agent.current_power
+                        #self.env.renewable_power += agent.current_power
                         agent.solar_state = agent.action
                         wind_power = agent.current_power*agent.action
 
@@ -924,19 +917,19 @@ class Simulation:
 
                         if agent.action == 1:
                             agent.battery_state = 1 # "charging" 
-                            agent.battery_power = -abs(self.env.demand_power - self.env.renewable_power)
+                            agent.battery_power = -abs(self.env.demand_power - (solar_power + wind_power))
                         elif agent.action == 2:
                             agent.battery_state = 2  # "discharging" 
-                            agent.battery_power = abs(self.env.demand_power - self.env.renewable_power)
-                        else:
+                            agent.battery_power = abs(self.env.demand_power - (solar_power + wind_power))
+                        else:                        # "idle" 
                             agent.battery_state = 0 
                             agent.battery_power = 0.0
 
                         bat_power = agent.battery_power
 
                         self.instant["bat"] = agent.battery_power
-                        self.instant["bat_soc"] = agent.get_soc()
-                        self.instant["bat_soc_discrete"] = agent.battery_power_idx
+                        self.instant["bat_soc"] = agent.soc
+                        self.instant["bat_soc_discrete"] = agent.battery_soc_idx
                         self.instant["bat_state"] = agent.battery_state
                     elif isinstance(agent, GridAgent):
                         agent.choose_action(state['GridAgent'], self.epsilon)
@@ -951,6 +944,7 @@ class Simulation:
 
                         self.instant["grid"] = agent.grid_power
                         self.instant["grid_state"] = agent.grid_state
+                        self.instant["grid_discrete"] = agent.idx
                     else:
                         # LoadAgent no generan en este ejemplo
                         _ = agent.choose_action(state["LoadAgent"], self.epsilon)               
@@ -1010,13 +1004,13 @@ class Simulation:
 
                         agent.update_soc(agent.battery_power)
                         #battery_agent = agent
-                        self.instant["bat_soc"] = agent.get_soc()
+                        self.instant["bat_soc"] = agent.soc
                         self.instant["reward_bat"] = reward
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
                             P_H=renewable_power_real_idx,
                             P_L=self.env.demand_power_idx, 
-                            SOC=battery_agent.battery_power_idx,
+                            SOC=battery_agent.battery_soc_idx,
                             C_mercado=self.env.price)
                         self.instant["reward_grid"] = reward
                         
@@ -1025,7 +1019,7 @@ class Simulation:
                             agent.action,
                             P_H=self.env.renewable_power,
                             P_L=self.env.demand_power,
-                            SOC=battery_agent.get_soc(),
+                            SOC=battery_agent.soc,
                             C_mercado=self.env.price)
                     else:
                         reward = 0.0
@@ -1141,12 +1135,12 @@ if __name__ == "__main__":
     sim1 = Simulation(num_episodes=1, epsilon=1, learning=True)
     sim1.run()
 
-    #sim2 = Simulation(num_episodes=1, epsilon=0, learning=False)
-    #sim2.agents = sim1.agents
-    #for agent in sim2.agents:
-    #    if isinstance(agent, BatteryAgent):
-    #        agent.soc = 0.5
-    #sim2.run()
+    sim2 = Simulation(num_episodes=1, epsilon=0, learning=False)
+    sim2.agents = sim1.agents
+    for agent in sim2.agents:
+        if isinstance(agent, BatteryAgent):
+            agent.soc = 0.5
+    sim2.run()
     
     sim1.show_performance_metrics()
-    #sim2.show_performance_metrics()
+    sim2.show_performance_metrics()

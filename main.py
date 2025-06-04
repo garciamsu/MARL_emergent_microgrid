@@ -697,10 +697,9 @@ class GridAgent(BaseAgent):
         states = []
         for a in range(2):
             for b in range(len(self.ess.battery_soc_bins)):
-                for c in range(3):
-                    for d in range(len(env.renewable_bins)):
-                        for e in range(len(env.demand_bins)):
-                            states.append((a, b, c, d, e))
+                for c in range(len(env.renewable_bins)):
+                    for d in range(len(env.demand_bins)):
+                        states.append((a, b, c, d))
         
         # Para cada estado, creamos un diccionario de acción->Q
         self.q_table = {
@@ -716,10 +715,10 @@ class GridAgent(BaseAgent):
        
         # Discretizamos
         battery_soc_idx = self.digitize_clip(self.ess.soc, self.ess.battery_soc_bins)
-        self.idx = battery_soc_idx
+        self.idx = self.grid_state
         
         # Retornamos la tupla de estado discretizado
-        return (self.grid_state, battery_soc_idx, self.ess.battery_state, env.renewable_power_idx, env.demand_power_idx)
+        return (self.grid_state, battery_soc_idx, env.renewable_power_idx, env.demand_power_idx)
 
     def calculate_reward(self, P_H, P_L, SOC, C_mercado):
         
@@ -832,6 +831,7 @@ class Simulation:
         self.instant = {} 
         self.evolution = []
         self.df = pd.DataFrame()
+        self.df_episode_metrics = pd.DataFrame()
         
         # Creamos el entorno que carga el CSV y discretiza
         self.env = MultiAgentEnv(csv_filename="Case1.csv", num_demand_bins=BINS, num_renewable_bins=BINS)
@@ -864,13 +864,16 @@ class Simulation:
         for agent in self.agents:
             agent_type = type(agent).__name__  # Obtiene el nombre de la clase del agente
             agent_states[agent_type] = agent.get_discretized_state(self.env, index)
-            agent.idx = agent_states[agent_type][0]
-        
+            agent.idx = agent_states[agent_type][0]        
+       
         return agent_states
         
     def run(self):
 
         for ep in range(self.num_episodes):
+            
+            # Inicializacion de la evaluacion por episodio
+            self.evolution = []
 
             for i in range(self.max_steps-1):
                 
@@ -1029,23 +1032,32 @@ class Simulation:
 
                 # Actualizamos el estado actual
                 state = next_state
-                self.evolution.append(copy.deepcopy(self.instant))            
+                self.evolution.append(copy.deepcopy(self.instant))
+              
+            # Cambia la relación de aprendizaje con cada episodio  
+            if self.num_episodes > 1:
+                self.epsilon = max(0, 1 - (ep / (self.num_episodes - 1)))
+            else:
+                self.epsilon = self.epsilon                
             
-            print(f"Fin episodio {ep+1}/{self.num_episodes}")
+            self.df = pd.DataFrame(self.evolution)
+            self.df.to_csv("evolution_learning_{ep}.csv", index=False)
+            
+            self.update_episode_metrics(ep, self.df)                    
+            print(f"Fin episodio {ep+1}/{self.num_episodes} con epsilon {self.epsilon}")
 
+        self.plot_metric('Average Reward')  # Puedes usar 'Total Reward' u otra métrica
+        
         # Visualizamos las Q-tables
         #for agent in self.agents:
-            #if isinstance(agent, BatteryAgent):
-                # Mostrar heatmap para acción "producir" (1)
-                # agent.show_heatmap(b_fixed=0, c_fixed=0, action=1)
-                # Mostrar mapa de política greedy
-                # agent.show_policy_map(b_fixed=0, c_fixed=0)
-                # Mostrar histograma de Q[1] (producir)
-                # agent.show_q_histogram(action=1)
-
-        self.df = pd.DataFrame(self.evolution)
-        self.df.to_csv("evolution_learning.csv", index=False)
-        
+        #    if isinstance(agent, BatteryAgent):
+        #        # Mostrar heatmap para acción "producir" (1)
+        #        agent.show_heatmap(b_fixed=0, c_fixed=0, action=1)
+        #        # Mostrar mapa de política greedy
+        #        agent.show_policy_map(b_fixed=0, c_fixed=0)
+        #        # Mostrar histograma de Q[1] (producir)
+        #        agent.show_q_histogram(action=1)
+       
         return self.agents
 
     def calculate_ise(self) -> float:
@@ -1127,20 +1139,72 @@ class Simulation:
             ["BEP (Battery Energy Penetration)", f"{self.calculate_bat():.2f}%"]
         ]
         print(tabulate(results, headers=["Métrica", "Valor"], tablefmt="fancy_grid"))
+    
+    def compute_reward_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
+        summary = []
+
+        for agent in ['solar', 'bat', 'grid']:
+            rewards = df[f'reward_{agent}']
+            metrics = {
+                'Agent': agent,
+                'Rewards (count)': (rewards > 0).sum(),
+                'Penalties (count)': (rewards < 0).sum(),
+                'Total Reward': rewards.sum(),
+                'Average Reward': rewards.mean(),
+                'Max Reward': rewards.max(),
+                'Min Reward': rewards.min(),
+                'Variance': rewards.var(),
+                'Interpretation': ''
+            }
+
+            if metrics['Average Reward'] > 0.1:
+                metrics['Interpretation'] = 'Consistently positive learning'
+            elif metrics['Average Reward'] > 0:
+                metrics['Interpretation'] = 'Acceptable learning'
+            else:
+                metrics['Interpretation'] = 'High level of penalties, review needed'
+
+            summary.append(metrics)
+
+        return pd.DataFrame(summary)
+
+    def update_episode_metrics(self, episode: int, df_episode: pd.DataFrame):
+        df_metrics = self.compute_reward_metrics(df_episode)
+        df_metrics['Episode'] = episode
+        self.df_episode_metrics = pd.concat([self.df_episode_metrics, df_metrics], ignore_index=True)
+
+    def plot_metric(self, metric_field='Average Reward'):
+        plt.figure(figsize=(10, 6))
+        for agent in self.df_episode_metrics['Agent'].unique():
+            agent_df = self.df_episode_metrics[self.df_episode_metrics['Agent'] == agent]
+            plt.plot(agent_df['Episode'], agent_df[metric_field], label=f'{agent} - {metric_field}')
+
+        plt.xlabel("Episode")
+        plt.ylabel(metric_field)
+        plt.title(f"{metric_field} per Episode by Agent")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+        return self.df_episode_metrics     
 # -----------------------------------------------------
 # Punto de entrada principal
 # -----------------------------------------------------
 if __name__ == "__main__":
     
-    sim1 = Simulation(num_episodes=1, epsilon=1, learning=True)
+    sim1 = Simulation(num_episodes=10, epsilon=1, learning=True)
     sim1.run()
 
-    sim2 = Simulation(num_episodes=1, epsilon=0, learning=False)
-    sim2.agents = sim1.agents
-    for agent in sim2.agents:
-        if isinstance(agent, BatteryAgent):
-            agent.soc = 0.5
-    sim2.run()
+    #sim2 = Simulation(num_episodes=1, epsilon=0, learning=False)
+    #sim2.agents = sim1.agents
+    #for agent in sim2.agents:
+    #    if isinstance(agent, BatteryAgent):
+    #        agent.soc = 0.5
+    #sim2.run()
     
-    sim1.show_performance_metrics()
-    sim2.show_performance_metrics()
+    #sim1.show_performance_metrics()
+    #sim2.show_performance_metrics()
+    
+    #sim1.compute_reward_metrics()
+    #sim2.compute_reward_metrics()

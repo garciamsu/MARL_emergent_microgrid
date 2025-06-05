@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons
 import copy
 from tabulate import tabulate
+from itertools import cycle
 
 # Parámetros físicos y constantes
 ETA = 0.15        # Eficiencia de conversión solar
@@ -59,17 +60,6 @@ class MultiAgentEnv:
 
         self.max_steps = len(self.dataset)
         
-        # Graficas interactiva
-        self.plot_data_interactive(
-            filename=csv_filename,
-            offsets_dict=offsets_dict,
-            columns_to_plot=["solar_power", "demand", "battery_soc"],
-            title="Environment variables",
-            save_static_plot=True,
-            static_format="svg",  # o "png", "pdf"
-            static_filename="env_plot"
-        )
-
         self.max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
         
         # Discretizacion por cuantizacion uniforme
@@ -118,93 +108,6 @@ class MultiAgentEnv:
             df['demand'] = df['demand'].clip(lower=0)
 
         return df
-
-    def plot_data_interactive(self, filename: str, offsets_dict, columns_to_plot=None,
-                          title: str = "Environment variables",
-                          save_static_plot: bool = False,
-                          static_format: str = "svg",
-                          static_filename: str = "interactive_plot_export"):
-        """
-        Carga datos desde CSV y los grafica de forma interactiva. Puede además guardar una versión estática en alta resolución.
-
-        Parámetros:
-        -----------
-        filename : str
-            Nombre del archivo CSV a cargar.
-        offsets_dict : dict
-            Diccionario de offsets para procesar el archivo.
-        columns_to_plot : list, opcional
-            Columnas a graficar. Si None, se grafican todas.
-        title : str, opcional
-            Título del gráfico.
-        save_static_plot : bool, opcional
-            Si True, guarda una versión estática en alta resolución/vectorial.
-        static_format : str, opcional
-            Formato de guardado ('svg', 'png', 'pdf').
-        static_filename : str, opcional
-            Nombre base del archivo exportado.
-        """
-        print(filename)
-        df = self._load_data(filename, offsets_dict)
-
-        if df.empty:
-            print("No hay datos para graficar (DataFrame vacío).")
-            return
-
-        if not columns_to_plot:
-            columns_to_plot = df.columns.tolist()
-
-        valid_columns = [col for col in columns_to_plot if col in df.columns]
-        invalid_columns = set(columns_to_plot) - set(valid_columns)
-
-        if invalid_columns:
-            print("Advertencia: Las siguientes columnas no existen en el DataFrame:")
-            for col in invalid_columns:
-                print(f"  - {col}")
-
-        if not valid_columns:
-            print("No se encontraron columnas válidas para graficar.")
-            return
-
-        # Crear figura
-        fig = plt.figure(figsize=(10, 6))
-        ax = fig.add_axes([0.25, 0.1, 0.7, 0.8])
-
-        lines = []
-        for col in valid_columns:
-            line, = ax.plot(df[col], label=col)
-            lines.append(line)
-
-        ax.set_title(title)
-        ax.set_xlabel("Hours")
-        ax.set_ylabel("Potencia [KW]")
-        ax.legend()
-        ax.grid(True)
-
-        # Guardar versión estática si se solicita
-        if save_static_plot:
-            supported_formats = ["svg", "png", "pdf"]
-            if static_format.lower() not in supported_formats:
-                raise ValueError(f"Formato '{static_format}' no soportado. Usa uno de: {supported_formats}")
-            dpi = 300 if static_format == "png" else None
-            fig.savefig(f"{static_filename}.{static_format}", format=static_format, dpi=dpi)
-            print(f"Gráfico guardado como {static_filename}.{static_format}")
-
-        # Área de checkboxes (solo si se muestra interactivamente)
-        rax = fig.add_axes([0.05, 0.4, 0.15, 0.15])
-        labels = valid_columns
-        visibility = [True] * len(labels)
-        check = CheckButtons(rax, labels, visibility)
-
-        def toggle_line(label):
-            index = labels.index(label)
-            lines[index].set_visible(not lines[index].get_visible())
-            plt.draw()
-
-        check.on_clicked(toggle_line)
-
-        plt.show()
-
 
     def get_discretized_state(self, index):
         """
@@ -1092,8 +995,19 @@ class Simulation:
             self.df = pd.DataFrame(self.evolution)
             self.df.to_csv(f"results/evolution_learning_{ep}.csv", index=False)
             
-            self.update_episode_metrics(ep, self.df)                    
+            self.update_episode_metrics(ep, self.df)      
+            
             print(f"Fin episodio {ep+1}/{self.num_episodes} con epsilon {self.epsilon}")
+
+        # Graficas interactiva
+        self.plot_data_interactive(
+            df=self.df,
+            columns_to_plot=["solar", "demand", "bat_soc"],
+            title="Environment variables",
+            save_static_plot=True,
+            static_format="svg",  # o "png", "pdf"
+            static_filename="env_plot"
+        )              
 
         self.plot_metric('Average Reward')  # Puedes usar 'Total Reward' u otra métrica
         
@@ -1240,6 +1154,112 @@ class Simulation:
         plt.close()  # Cierra la figura para liberar memoria
 
         return self.df_episode_metrics     
+
+    def plot_data_interactive(
+            self,
+            df: pd.DataFrame,                     # <-- ahora entra un DataFrame
+            columns_to_plot: list[str] | None = None,
+            title: str = "Environment variables",
+            save_static_plot: bool = False,
+            static_format: str = "svg",
+            static_filename: str = "interactive_plot_export",
+            soc_keyword: str = "soc",             # patrón que detecta columnas SOC
+            soc_scale: float = 100.0              # 0-1  → 0-100 %
+        ):
+        """
+        Grafica de forma interactiva las columnas de `df`.
+        Las que contengan `soc_keyword` se dibujan en un eje Y secundario.
+
+        Parámetros relevantes
+        ---------------------
+        df : pandas.DataFrame
+            Datos ya cargados y limpios que se desean graficar.
+        columns_to_plot : list[str] | None
+            Subconjunto de columnas a graficar; si None se usan todas.
+        soc_keyword : str
+            Subcadena que identifica columnas para el eje secundario.
+        soc_scale : float
+            Factor de escala aplicado a esas columnas (ej. 0-1 → 0-100 %).
+        """
+        # ---------- 1. Validaciones -------------------------------
+        if df.empty:
+            print("No hay datos para graficar (DataFrame vacío).")
+            return
+
+        if columns_to_plot is None:
+            columns_to_plot = df.columns.tolist()
+
+        valid_cols = [c for c in columns_to_plot if c in df.columns]
+        if not valid_cols:
+            print("Las columnas indicadas no existen en el DataFrame.")
+            return
+
+        # ---------- 2. Clasificación ------------------------------
+        soc_cols  = [c for c in valid_cols if soc_keyword.lower() in c.lower()]
+        prim_cols = [c for c in valid_cols if c not in soc_cols]
+
+        # ---------- 3. Figura y ejes ------------------------------
+        fig, ax1 = plt.subplots(figsize=(10, 6))
+        ax2 = ax1.twinx() if soc_cols else None
+        if ax2:
+            ax2.patch.set_visible(False)          # fondo transparente
+
+        # Ciclos de color diferenciados
+        base_colors  = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        color_cycle1 = cycle(base_colors)
+        color_cycle2 = cycle(base_colors[1:] + base_colors[:1])
+
+        lines, labels = [], []
+
+        # ---------- 4. Potencias (eje primario) -------------------
+        for col in prim_cols:
+            l, = ax1.plot(df[col], label=col,
+                        color=next(color_cycle1), zorder=3)
+            lines.append(l); labels.append(col)
+
+        # ---------- 5. SOC (eje secundario) ----------------------
+        if ax2:
+            for col in soc_cols:
+                data  = df[col] * soc_scale
+                label = f"{col} [%]"
+                l, = ax2.plot(data, '--', lw=2,
+                            color=next(color_cycle2), label=label, zorder=4)
+                lines.append(l); labels.append(label)
+
+            ax2.set_ylabel("State of Charge [%]")
+            ax2.set_ylim(0, 100)
+
+        # ---------- 6. Estilo ------------------------------------
+        ax1.set_title(title)
+        ax1.set_xlabel("Hours")
+        ax1.set_ylabel("Power [kW]")
+        ax1.grid(True, zorder=0)
+
+        ax1.legend(lines, labels, loc="upper right")
+
+        # ---------- 7. Check-boxes -------------------------------
+        rax = fig.add_axes([0.05, 0.4, 0.17, 0.2])
+        checks = CheckButtons(rax, labels, [True]*len(labels))
+
+        def toggle(label: str):
+            idx = labels.index(label)
+            lines[idx].set_visible(not lines[idx].get_visible())
+            plt.draw()
+
+        checks.on_clicked(toggle)
+
+        # ---------- 8. Exportación estática ----------------------
+        if save_static_plot:
+            valid_formats = {"svg", "png", "pdf"}
+            if static_format.lower() not in valid_formats:
+                raise ValueError(f"Formato '{static_format}' no soportado ({valid_formats})")
+            dpi = 300 if static_format.lower() == "png" else None
+            fig.savefig(f"{static_filename}.{static_format}",
+                        format=static_format, dpi=dpi)
+            print(f"Gráfico guardado como {static_filename}.{static_format}")
+
+        plt.show()
+
 # -----------------------------------------------------
 # Punto de entrada principal
 # -----------------------------------------------------

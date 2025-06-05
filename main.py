@@ -59,10 +59,15 @@ class MultiAgentEnv:
         self.max_steps = len(self.dataset)
         
         # Graficas interactiva
-        self.plot_data_interactive(csv_filename,
-                                  offsets_dict,
-                                  columns_to_plot=["demand", "price", "solar_power", "wind_power"],
-                                  title="Gráfico imteractivo de variables de entorno")
+        self.plot_data_interactive(
+            filename=csv_filename,
+            offsets_dict=offsets_dict,
+            columns_to_plot=["solar_power", "demand", "battery_soc"],
+            title="Environment variables",
+            save_static_plot=True,
+            static_format="svg",  # o "png", "pdf"
+            static_filename="env_plot"
+        )
 
         self.max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
         
@@ -113,19 +118,30 @@ class MultiAgentEnv:
 
         return df
 
-    def plot_data_interactive(self, filename: str, offsets_dict, columns_to_plot=None, title: str = "Gráfico Interactivo"):
+    def plot_data_interactive(self, filename: str, offsets_dict, columns_to_plot=None,
+                          title: str = "Environment variables",
+                          save_static_plot: bool = False,
+                          static_format: str = "svg",
+                          static_filename: str = "interactive_plot_export"):
         """
-        Carga los datos desde un archivo CSV y los grafica en una ventana interactiva
-        que permite mostrar/ocultar cada traza usando checkboxes.
+        Carga datos desde CSV y los grafica de forma interactiva. Puede además guardar una versión estática en alta resolución.
 
-        Parámetros
-        ----------
+        Parámetros:
+        -----------
         filename : str
-            Nombre del archivo CSV a cargar (se buscará en la ruta definida en _load_data).
+            Nombre del archivo CSV a cargar.
+        offsets_dict : dict
+            Diccionario de offsets para procesar el archivo.
         columns_to_plot : list, opcional
-            Lista de columnas a graficar. Si es None, se graficarán todas las columnas del DataFrame.
+            Columnas a graficar. Si None, se grafican todas.
         title : str, opcional
-            Título a mostrar en el gráfico principal.
+            Título del gráfico.
+        save_static_plot : bool, opcional
+            Si True, guarda una versión estática en alta resolución/vectorial.
+        static_format : str, opcional
+            Formato de guardado ('svg', 'png', 'pdf').
+        static_filename : str, opcional
+            Nombre base del archivo exportado.
         """
         print(filename)
         df = self._load_data(filename, offsets_dict)
@@ -134,11 +150,9 @@ class MultiAgentEnv:
             print("No hay datos para graficar (DataFrame vacío).")
             return
 
-        # Determina qué columnas se van a graficar
         if not columns_to_plot:
             columns_to_plot = df.columns.tolist()
 
-        # Verificamos que las columnas existan realmente en el DataFrame
         valid_columns = [col for col in columns_to_plot if col in df.columns]
         invalid_columns = set(columns_to_plot) - set(valid_columns)
 
@@ -151,41 +165,45 @@ class MultiAgentEnv:
             print("No se encontraron columnas válidas para graficar.")
             return
 
-        # Preparar la figura principal y el área para los checkboxes
-        fig = plt.figure(figsize=(8, 6))
-        # Área para el gráfico principal (izquierda y parte central de la ventana)
+        # Crear figura
+        fig = plt.figure(figsize=(10, 6))
         ax = fig.add_axes([0.25, 0.1, 0.7, 0.8])
 
-        # Graficar cada columna y guardar la referencia a la línea
         lines = []
         for col in valid_columns:
-            line, = ax.plot(df[col], label=col)  # la coma tras 'line,' es necesaria para desempaquetar la tupla
+            line, = ax.plot(df[col], label=col)
             lines.append(line)
 
         ax.set_title(title)
-        ax.set_xlabel("Índice")
-        ax.set_ylabel("Valores")
+        ax.set_xlabel("Hours")
+        ax.set_ylabel("Potencia [KW]")
         ax.legend()
+        ax.grid(True)
 
-        # Área para el panel de checkboxes (en la parte izquierda de la ventana)
-        rax = fig.add_axes([0.05, 0.4, 0.15, 0.15])  # [left, bottom, width, height] en fracción de la figura
+        # Guardar versión estática si se solicita
+        if save_static_plot:
+            supported_formats = ["svg", "png", "pdf"]
+            if static_format.lower() not in supported_formats:
+                raise ValueError(f"Formato '{static_format}' no soportado. Usa uno de: {supported_formats}")
+            dpi = 300 if static_format == "png" else None
+            fig.savefig(f"{static_filename}.{static_format}", format=static_format, dpi=dpi)
+            print(f"Gráfico guardado como {static_filename}.{static_format}")
+
+        # Área de checkboxes (solo si se muestra interactivamente)
+        rax = fig.add_axes([0.05, 0.4, 0.15, 0.15])
         labels = valid_columns
         visibility = [True] * len(labels)
-
-        # Crear los checkboxes a partir de las etiquetas de las columnas
         check = CheckButtons(rax, labels, visibility)
 
-        # Función para mostrar/ocultar la línea correspondiente cuando se activa el checkbox
         def toggle_line(label):
             index = labels.index(label)
             lines[index].set_visible(not lines[index].get_visible())
-            plt.draw()  # Se actualiza el gráfico
+            plt.draw()
 
-        # Asignar la función de callback al evento "on_clicked"
         check.on_clicked(toggle_line)
 
-        # Mostrar la ventana con el gráfico interactivo
         plt.show()
+
 
     def get_discretized_state(self, index):
         """
@@ -544,7 +562,7 @@ class WindAgent(BaseAgent):
         plt.show()
 
 class BatteryAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, capacity_ah= 50000000, num_battery_soc_bins=4):
+    def __init__(self, env: MultiAgentEnv, capacity_ah= 50000, num_battery_soc_bins=4):
         super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9)
         
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
@@ -567,7 +585,7 @@ class BatteryAgent(BaseAgent):
         """
         Actualiza el SOC basado en la potencia suministrada o extraída en una unidad de tiempo de 1 hora.
         
-        :param power_w: Potencia en Watts (positiva si está cargando, negativa si está descargando).
+        :param power_w: Potencia en Watts (positiva si está descargando, negativa si está cargando).
         """
         # Convertimos potencia en energía transferida en Wh
         energy_wh = power_w  # Asumimos 1 hora de tiempo fijo
@@ -1161,7 +1179,15 @@ class Simulation:
         df_metrics['Episode'] = episode
         self.df_episode_metrics = pd.concat([self.df_episode_metrics, df_metrics], ignore_index=True)
 
-    def plot_metric(self, metric_field='Average Reward'):
+    def plot_metric(self, metric_field='Average Reward', output_format='svg', filename='metric_plot'):
+        """
+        Genera una gráfica de métricas por agente y la guarda como archivo vectorial o de alta resolución.
+        
+        Parámetros:
+            metric_field (str): Nombre del campo de métrica a graficar.
+            output_format (str): 'svg' para vectorial, 'png' para imagen de alta resolución.
+            filename (str): Nombre base del archivo sin extensión.
+        """
         plt.figure(figsize=(10, 6))
         for agent in self.df_episode_metrics['Agent'].unique():
             agent_df = self.df_episode_metrics[self.df_episode_metrics['Agent'] == agent]
@@ -1173,7 +1199,16 @@ class Simulation:
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
-        plt.show()
+
+        # Guardar con alta calidad
+        if output_format == 'svg':
+            plt.savefig(f"{filename}.svg", format='svg')
+        elif output_format == 'png':
+            plt.savefig(f"{filename}.png", format='png', dpi=300)  # Alta resolución
+        else:
+            raise ValueError("output_format debe ser 'svg' o 'png'")
+
+        plt.close()  # Cierra la figura para liberar memoria
 
         return self.df_episode_metrics     
 # -----------------------------------------------------
@@ -1181,9 +1216,6 @@ class Simulation:
 # -----------------------------------------------------
 if __name__ == "__main__":
     
-    sim1 = Simulation(num_episodes=1000, epsilon=1, learning=True)
+    sim1 = Simulation(num_episodes=450, epsilon=1, learning=True)
     sim1.run()
     sim1.show_performance_metrics()
-        
-    
-    

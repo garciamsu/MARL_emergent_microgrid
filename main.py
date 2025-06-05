@@ -562,7 +562,7 @@ class WindAgent(BaseAgent):
         plt.show()
 
 class BatteryAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, capacity_ah= 50000, num_battery_soc_bins=4):
+    def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=4):
         super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9)
         
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
@@ -581,22 +581,43 @@ class BatteryAgent(BaseAgent):
         # Definimos los "bins" para discretizar cada variable de interés
         self.battery_soc_bins = np.linspace(0, 1, num_battery_soc_bins)
 
-    def update_soc(self, power_w: float):
+    def update_soc(
+            self,
+            power_w: float,
+            dt_h: float = 1.0,
+            nominal_voltage: float = 48.0  # ← valor por defecto en voltios
+        ) -> None:
         """
-        Actualiza el SOC basado en la potencia suministrada o extraída en una unidad de tiempo de 1 hora.
-        
-        :param power_w: Potencia en Watts (positiva si está descargando, negativa si está cargando).
+        Actualiza el estado de carga (SOC) de la batería.
+
+        Parameters
+        ----------
+        power_w : float
+            Potencia instantánea (W).  
+            +  descarga  → SOC ↓  
+            –  carga     → SOC ↑
+        dt_h : float, default 1.0
+            Duración del paso de simulación en horas.
+        nominal_voltage : float, default 48.0
+            Tensión nominal de la batería (V).  Se puede sobreescribir si
+            se desea usar otro valor en alguna llamada concreta.
         """
-        # Convertimos potencia en energía transferida en Wh
-        energy_wh = power_w  # Asumimos 1 hora de tiempo fijo
-        
-        # Convertimos la energía en Wh a Ah usando la capacidad de la batería
-        delta_soc = (energy_wh / (self.capacity_ah))   # Expresado de 0 a 1
-        
-        # Actualizamos el SOC asegurándonos de que se mantenga en los límites de 0 a 1
-        self.soc = max(0.0, min(1.0, self.soc - delta_soc))
-        self.battery_soc_idx = self.digitize_clip(self.soc, self.battery_soc_bins)
-    
+        # Capacidad en Wh usando el voltaje nominal
+        capacity_wh = self.capacity_ah * nominal_voltage
+
+        # Energía transferida en el paso de tiempo
+        energy_wh = power_w * dt_h
+        capacity_wh_new = self.soc*capacity_wh - energy_wh
+
+        # Integrar y saturar en [0, 1]
+        new_soc = capacity_wh_new/capacity_wh
+        self.soc = max(0.0, min(1.0, new_soc))
+
+        # Índice discreto (opcional, para tu agente)
+        self.battery_soc_idx = self.digitize_clip(
+            self.soc, self.battery_soc_bins
+        )
+
     def initialize_q_table(self, env: MultiAgentEnv):
         """
         Crea la Q-table para todos los posibles estados discretizados.
@@ -895,6 +916,11 @@ class Simulation:
             # Inicializacion de la evaluacion por episodio
             self.evolution = []
 
+            for agent in self.agents:
+                if isinstance(agent, BatteryAgent):
+                    agent.soc = 0.5
+                    break  # Detiene el bucle al encontrar el primer BatteryAgent
+
             for i in range(self.max_steps-1):
                 
                 # Para cada episodio se inicializa los valores de potencia
@@ -954,6 +980,8 @@ class Simulation:
                         self.instant["bat_soc"] = agent.soc
                         self.instant["bat_soc_discrete"] = agent.battery_soc_idx
                         self.instant["bat_state"] = agent.battery_state
+                        
+                        agent.update_soc(power_w=agent.battery_power)
                     elif isinstance(agent, GridAgent):
                         agent.choose_action(state['GridAgent'], self.epsilon)
                         if agent.action == 1: # "sell"
@@ -1025,10 +1053,10 @@ class Simulation:
                                 P_T=renewable_power_real_idx, 
                                 P_L=self.env.demand_power_idx)
 
-                        agent.update_soc(agent.battery_power)
-                        #battery_agent = agent
-                        self.instant["bat_soc"] = agent.soc
+                        #self.instant["bat_soc"] = agent.soc
                         self.instant["reward_bat"] = reward
+                        #agent.update_soc(power_w=agent.battery_power)
+                        #battery_agent = agent
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
                             P_H=renewable_power_real_idx,

@@ -999,7 +999,7 @@ class Simulation:
             
             print(f"Fin episodio {ep+1}/{self.num_episodes} con epsilon {self.epsilon}")
 
-        # Graficas interactiva
+        # Graficas interactiva de potencia
         self.plot_data_interactive(
             df=self.df,
             columns_to_plot=["solar", "demand", "bat_soc", "grid"],
@@ -1008,6 +1008,16 @@ class Simulation:
             static_format="svg",  # o "png", "pdf"
             static_filename="env_plot"
         )              
+        
+        # Graficas interactiva de acciones y df
+        self.plot_data_interactive(
+            df=self.df,
+            columns_to_plot=["dif"],
+            title="Energy balance",
+            save_static_plot=True,
+            static_format="svg",  # o "png", "pdf"
+            static_filename="actions_plot"
+        ) 
 
         self.plot_metric('Average Reward')  # Puedes usar 'Total Reward' u otra métrica
         

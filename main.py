@@ -1002,7 +1002,7 @@ class Simulation:
         # Graficas interactiva
         self.plot_data_interactive(
             df=self.df,
-            columns_to_plot=["solar", "demand", "bat_soc"],
+            columns_to_plot=["solar", "demand", "bat_soc", "grid"],
             title="Environment variables",
             save_static_plot=True,
             static_format="svg",  # o "png", "pdf"
@@ -1157,7 +1157,7 @@ class Simulation:
 
     def plot_data_interactive(
             self,
-            df: pd.DataFrame,                     # <-- ahora entra un DataFrame
+            df: pd.DataFrame,                     # ahora entra un DataFrame
             columns_to_plot: list[str] | None = None,
             title: str = "Environment variables",
             save_static_plot: bool = False,
@@ -1166,21 +1166,6 @@ class Simulation:
             soc_keyword: str = "soc",             # patrón que detecta columnas SOC
             soc_scale: float = 100.0              # 0-1  → 0-100 %
         ):
-        """
-        Grafica de forma interactiva las columnas de `df`.
-        Las que contengan `soc_keyword` se dibujan en un eje Y secundario.
-
-        Parámetros relevantes
-        ---------------------
-        df : pandas.DataFrame
-            Datos ya cargados y limpios que se desean graficar.
-        columns_to_plot : list[str] | None
-            Subconjunto de columnas a graficar; si None se usan todas.
-        soc_keyword : str
-            Subcadena que identifica columnas para el eje secundario.
-        soc_scale : float
-            Factor de escala aplicado a esas columnas (ej. 0-1 → 0-100 %).
-        """
         # ---------- 1. Validaciones -------------------------------
         if df.empty:
             print("No hay datos para graficar (DataFrame vacío).")
@@ -1204,10 +1189,9 @@ class Simulation:
         if ax2:
             ax2.patch.set_visible(False)          # fondo transparente
 
-        # Ciclos de color diferenciados
         base_colors  = plt.rcParams['axes.prop_cycle'].by_key()['color']
         color_cycle1 = cycle(base_colors)
-        color_cycle2 = cycle(base_colors[1:] + base_colors[:1])
+        color_cycle2 = cycle(base_colors[1:]+base_colors[:1])
 
         lines, labels = [], []
 
@@ -1225,7 +1209,6 @@ class Simulation:
                 l, = ax2.plot(data, '--', lw=2,
                             color=next(color_cycle2), label=label, zorder=4)
                 lines.append(l); labels.append(label)
-
             ax2.set_ylabel("State of Charge [%]")
             ax2.set_ylim(0, 100)
 
@@ -1234,7 +1217,6 @@ class Simulation:
         ax1.set_xlabel("Hours")
         ax1.set_ylabel("Power [kW]")
         ax1.grid(True, zorder=0)
-
         ax1.legend(lines, labels, loc="upper right")
 
         # ---------- 7. Check-boxes -------------------------------
@@ -1248,15 +1230,20 @@ class Simulation:
 
         checks.on_clicked(toggle)
 
-        # ---------- 8. Exportación estática ----------------------
+        # ---------- 8. Exportación estática (sin check-boxes) ----
         if save_static_plot:
             valid_formats = {"svg", "png", "pdf"}
             if static_format.lower() not in valid_formats:
                 raise ValueError(f"Formato '{static_format}' no soportado ({valid_formats})")
+
+            # Ocultamos temporalmente el eje de los check-boxes
+            rax.set_visible(False)
             dpi = 300 if static_format.lower() == "png" else None
             fig.savefig(f"{static_filename}.{static_format}",
                         format=static_format, dpi=dpi)
             print(f"Gráfico guardado como {static_filename}.{static_format}")
+            # Volvemos a mostrarlo para la vista interactiva
+            rax.set_visible(True)
 
         plt.show()
 

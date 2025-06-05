@@ -405,11 +405,11 @@ class WindAgent(BaseAgent):
         SOC: estado de la batería
         """
         
-        if P_H <= P_L and S_PV == 1:
+        if P_H <= P_L and S_WD == 1:
             return - self.kappa * (P_L - P_H)
-        elif P_H > P_L and S_PV == 1:
+        elif P_H > P_L and S_WD == 1:
             return self.sigma * (P_H - P_L)
-        elif P_H > P_L and S_PV == 0:
+        elif P_H > P_L and S_WD == 0:
             return - self.sigma * (P_H - P_L)
         return 0.0
 
@@ -779,7 +779,7 @@ class Simulation:
         self.df_episode_metrics = pd.DataFrame()
         
         # Creamos el entorno que carga el CSV y discretiza
-        self.env = MultiAgentEnv(csv_filename="Case1.csv", num_demand_bins=BINS, num_renewable_bins=BINS)
+        self.env = MultiAgentEnv(csv_filename="Case2.csv", num_demand_bins=BINS, num_renewable_bins=BINS)
         
         # Obtiene los puntos de manera automatica de la base de datos
         self.max_steps = self.env.max_steps
@@ -789,7 +789,7 @@ class Simulation:
         # Definimos un conjunto de agentes
         self.agents = [
             SolarAgent(self.env),
-            #WindAgent(self.env),
+            WindAgent(self.env),
             bat_ag,
             GridAgent(self.env, bat_ag)
         ]
@@ -859,7 +859,7 @@ class Simulation:
                         agent.choose_action(state['WindAgent'], self.epsilon)
 
                         #self.env.renewable_power += agent.current_power
-                        agent.solar_state = agent.action
+                        agent.wind_state = agent.action
                         wind_power = agent.current_power*agent.action
 
                         self.instant["wind"] = agent.current_power
@@ -957,10 +957,9 @@ class Simulation:
                                 P_T=renewable_power_real_idx, 
                                 P_L=self.env.demand_power_idx)
 
-                        #self.instant["bat_soc"] = agent.soc
+                        self.instant["bat_soc"] = agent.soc
                         self.instant["reward_bat"] = reward
-                        #agent.update_soc(power_w=agent.battery_power)
-                        #battery_agent = agent
+                        battery_agent = agent
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
                             P_H=renewable_power_real_idx,
@@ -1002,7 +1001,7 @@ class Simulation:
         # Graficas interactiva de potencia
         self.plot_data_interactive(
             df=self.df,
-            columns_to_plot=["solar", "demand", "bat_soc", "grid"],
+            columns_to_plot=["solar", "demand", "bat_soc", "grid", "wind"],
             title="Environment variables",
             save_static_plot=True,
             static_format="svg",  # o "png", "pdf"
@@ -1262,6 +1261,6 @@ class Simulation:
 # -----------------------------------------------------
 if __name__ == "__main__":
     
-    sim1 = Simulation(num_episodes=450, epsilon=1, learning=True)
+    sim1 = Simulation(num_episodes=1000, epsilon=1, learning=True)
     sim1.run()
     sim1.show_performance_metrics()

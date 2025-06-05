@@ -19,6 +19,7 @@ BLADE_AREA = 5    # Área de los álabes de la turbina en m^2
 C_P = 0.4         # Coeficiente de potencia
 C_CONFORT = 0.5   # Umbral de confort para el costo del mercado
 BINS = 7          # Define cuántos intervalos se utilizan para discretizar las variables de potencia (renovables + demanda).
+SOC_INITIAL = 0.6
 
 os.makedirs("results", exist_ok=True)
 
@@ -572,7 +573,7 @@ class BatteryAgent(BaseAgent):
         :param capacity_ah: Capacidad de la batería en Amperios-hora (Ah).
         """
         self.capacity_ah = capacity_ah  # Capacidad fija en Ah
-        self.soc = 0.5  # Estado de carga inicial en %
+        self.soc = SOC_INITIAL  # Estado de carga inicial en %
         self.battery_power = 0.0  # Potencia en W
         self.battery_state = 0  # Estado inicial de operación
         self.battery_soc_idx = 0 # Estado SOC discretizado
@@ -918,7 +919,7 @@ class Simulation:
 
             for agent in self.agents:
                 if isinstance(agent, BatteryAgent):
-                    agent.soc = 0.5
+                    agent.soc = SOC_INITIAL
                     break  # Detiene el bucle al encontrar el primer BatteryAgent
 
             for i in range(self.max_steps-1):

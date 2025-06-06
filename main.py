@@ -296,37 +296,40 @@ class SolarAgent(BaseAgent):
 class WindAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv):
         super().__init__("wind", [0, 1], alpha=0.1, gamma=0.9, isPower=True)
-        
+
         # ["idle", "produce"] -> [0, 1]
 
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
         # Ajusta los rangos según tu dataset real
         self.wind_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
-        self.wind_state_bins = [0, 1]
-        self.wind_state = 0
-
-    def initialize_q_table(self, env: MultiAgentEnv):
+        self.wind_state_bins = [0, 1] # 0=idle, 1=producing
+        self.wind_state = 0  
+ 
+    def to_dataframe(self):
         """
-        Crea la Q-table para todos los posibles estados discretizados.
+        Convierte la Q-table en un DataFrame de pandas.
         """
-        states = []
-        for a in range(len(self.wind_power_bins)):
-            for b in range(len(self.wind_state_bins)):
-                for c in range(len(env.renewable_bins)):
-                    for d in range(len(env.demand_bins)):
-                        states.append((a, b, c, d))
-        
-        # Para cada estado, creamos un diccionario de acción->Q
-        self.q_table = {
-            state: {action: 0 for action in self.actions} 
-            for state in states
-        }
+        registros = []
+        for estado, acciones in self.q_table.items():
+            a, b, c, d = estado
+            q0 = acciones.get(0, 0)
+            q1 = acciones.get(1, 0)
+            registros.append({
+                'a (solar)': a,
+                'b (panel)': b,
+                'c (renov)': c,
+                'd (dem)': d,
+                'Q[0] (no produce)': q0,
+                'Q[1] (produce)': q1,
+                'mejor acción': 0 if q0 >= q1 else 1
+            })
+        return pd.DataFrame(registros)
 
     def get_discretized_state(self, env: MultiAgentEnv, index):
         """
         Toma valores reales y los discretiza en bins,
-        devolviendo (idx_solar).
+        devolviendo (idx_wind).
         """
         row = env.dataset.iloc[index]
         self.current_power = row["wind_power"]
@@ -339,6 +342,23 @@ class WindAgent(BaseAgent):
         # Retornamos la tupla de estado discretizado
         return (wind_power_idx, wind_state_idx, env.renewable_power_idx, env.demand_power_idx)
 
+    def initialize_q_table(self, env: MultiAgentEnv):
+        """
+        Crea la Q-table para todos los posibles estados discretizados.
+        """
+        states = []
+        for a in range(len(self.wind_power_bins)):
+            for b in range(len(self.wind_state_bins)):
+                for c in range(len(env.renewable_bins)):
+                    for d in range(len(env.demand_bins)):
+                        states.append((a, b, c, d))
+        
+        # Para cada estado, creamos un diccionario de acción -> Q
+        self.q_table = {
+            state: {action: 0 for action in self.actions} 
+            for state in states
+        }
+
     def calculate_power(self, row):
 
         if self.isPower:
@@ -348,9 +368,9 @@ class WindAgent(BaseAgent):
 
     def calculate_reward(self, P_H, P_L, S_WD):
         """
-        P_H: potencia generada por el panel local
-        P_L: demanda local (o parte de la demanda)
-        SOC: estado de la batería
+        P_H: potencia generada por la turbina eólica
+        P_L: demanda 
+        S_WD: estado de la turbina eólica
         """
         
         if P_H <= P_L and S_WD == 1:
@@ -522,7 +542,6 @@ class GridAgent(BaseAgent):
         else:
             return 0.0
 
-
 class LoadAgent(BaseAgent):
     def __init__(self):
         super().__init__("load", [0, 1], alpha=0.1, gamma=0.9)
@@ -641,7 +660,6 @@ class Simulation:
                         # Escoger acción
                         agent.choose_action(state['SolarAgent'], self.epsilon)
 
-                        #self.env.renewable_power += agent.current_power
                         agent.solar_state = agent.action
                         solar_power = agent.current_power*agent.action
 
@@ -649,9 +667,9 @@ class Simulation:
                         self.instant["solar_state"] = agent.solar_state
                         self.instant["solar_discrete"] = agent.idx
                     elif isinstance(agent, WindAgent):
+                        # Escoger acción
                         agent.choose_action(state['WindAgent'], self.epsilon)
 
-                        #self.env.renewable_power += agent.current_power
                         agent.wind_state = agent.action
                         wind_power = agent.current_power*agent.action
 

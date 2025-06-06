@@ -471,15 +471,15 @@ class BatteryAgent(BaseAgent):
     def calculate_reward(self, P_T, P_L):
         if self.battery_soc_idx > 0  and P_T < P_L and self.battery_state == 2:
             return self.kappa * self.battery_soc_idx * (P_L - P_T)
-        if self.battery_soc_idx > 0  and P_T > P_L and self.battery_state == 2:
+        elif self.battery_soc_idx > 0  and P_T > P_L and self.battery_state == 2:
             return - self.kappa * self.battery_soc_idx * (P_T - P_L)
         elif self.battery_soc_idx == 0 and P_T > P_L and self.battery_state == 2:
             return -self.sigma * (2 - self.battery_soc_idx)  * (P_T - P_L)
         elif self.battery_soc_idx == 0 and P_T < P_L and self.battery_state == 2:
             return -self.mu * (2 - self.battery_soc_idx) * (P_L - P_T)
-        if self.battery_soc_idx <= 2 and P_T > P_L and self.battery_state == 1:
+        elif self.battery_soc_idx <= 2 and P_T > P_L and self.battery_state == 1:
             return self.nu * (2 - self.battery_soc_idx) * (P_T - P_L)
-        elif self.battery_soc_idx < 2 and P_T <= P_L and self.battery_state == 1:
+        elif P_T < P_L and self.battery_state == 1:
             return -self.beta * self.battery_soc_idx * (P_L - P_T)
         elif self.battery_soc_idx > 0 and P_T <= P_L and self.battery_state == 0:
             return -self.beta * self.battery_soc_idx * (P_L - P_T)
@@ -591,7 +591,7 @@ class Simulation:
         self.df_episode_metrics = pd.DataFrame()
         
         # Creamos el entorno que carga el CSV y discretiza
-        self.env = MultiAgentEnv(csv_filename="Case2.csv", num_demand_bins=BINS, num_renewable_bins=BINS)
+        self.env = MultiAgentEnv(csv_filename="Case3.csv", num_demand_bins=BINS, num_renewable_bins=BINS)
         
         # Obtiene los puntos de manera automatica de la base de datos
         self.max_steps = self.env.max_steps
@@ -765,7 +765,7 @@ class Simulation:
                     elif isinstance(agent, BatteryAgent):
                         
                         reward = agent.calculate_reward(
-                                P_T=renewable_power_real_idx, 
+                                P_T=self.renewable_power_idx, 
                                 P_L=self.env.demand_power_idx)
 
                         self.instant["bat_soc"] = agent.soc

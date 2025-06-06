@@ -264,10 +264,6 @@ class SolarAgent(BaseAgent):
             state: {action: 0 for action in self.actions} 
             for state in states
         }
-        
-        #print(self.q_table)
-        #print(self.actions)
-        #print(states)       
 
     def calculate_power(self, row):
 
@@ -543,24 +539,41 @@ class GridAgent(BaseAgent):
             return 0.0
 
 class LoadAgent(BaseAgent):
-    def __init__(self):
+    def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
         super().__init__("load", [0, 1], alpha=0.1, gamma=0.9)
 
-        # ["idle", "consume"] -> [0, 1]
+        # Acciones: ["apagar", "encender"] -> [0, 1]
+        self.comfort = 5
+        self.ess =  ess
+        self.load_state_bins = [0, 1] # 0=no encender, 1=encender
+        self.load_state = 1
+
+    def get_discretized_state(self, env: MultiAgentEnv, index):
+        """
+        Toma valores reales y los discretiza en bins,
+        devolviendo (idx).
+        """
+        row = env.dataset.iloc[index]
+        self.current_power = row["demand"]
+
+        # Discretizamos
+        battery_soc_idx = self.digitize_clip(self.ess.soc, self.ess.battery_soc_bins)
+        self.demand_power_idx = self.digitize_clip(self.current_power, self.demand_bins)
+        self.idx = self.demand_power_idx
+        
+        # Retornamos la tupla de estado discretizado
+        return (env.demand_power_idx, self.load_state, env.renewable_power_idx, battery_soc_idx)
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
         Crea la Q-table para todos los posibles estados discretizados.
-        (solar_bins, wind_bins, battery_soc_bins, demand_bins)
         """
         states = []
-        for a in range(len(env.solar_power_bins)):
-            for b in range(len(env.state_solar_bins)):
-                for c in range(len(env.wind_power_bins)):
-                    for d in range(len(env.state_wind_bins)):
-                        for e in range(len(env.demand_bins)):
-                            for f in range(len(env.battery_soc_bins)):
-                                states.append((a, b, c, d, e, f))
+        for a in range(len(env.demand_bins)):
+            for b in range(len(self.load_state_bins)):
+                for c in range(len(env.renewable_bins)):
+                    for d in range(len(self.ess.battery_soc_bins)):
+                        states.append((a, b, c, d))
         
         # Para cada estado, creamos un diccionario de acción->Q
         self.q_table = {
@@ -569,10 +582,10 @@ class LoadAgent(BaseAgent):
         }
 
     def calculate_reward(self, action, P_T, P_L, SOC, C_mercado):
-        if action == "consume":
+        if action == 1:
             if P_T > P_L or SOC >= 0.5:
-                return 1.0 * (1.0 / (P_T + C_mercado + 1e-6))
-            elif C_mercado > C_CONFORT:
+                return 1.0 * (1.0 / (P_T + C_mercado))
+            elif C_mercado > self.comfort:
                 return -1.0 * P_T * C_mercado
         elif action == 0:
             if P_T > P_L or SOC >= 0.5:
@@ -591,7 +604,7 @@ class Simulation:
         self.df_episode_metrics = pd.DataFrame()
         
         # Creamos el entorno que carga el CSV y discretiza
-        self.env = MultiAgentEnv(csv_filename="Case3.csv", num_demand_bins=BINS, num_renewable_bins=BINS)
+        self.env = MultiAgentEnv(csv_filename="Case4.csv", num_demand_bins=BINS, num_renewable_bins=BINS)
         
         # Obtiene los puntos de manera automatica de la base de datos
         self.max_steps = self.env.max_steps
@@ -603,7 +616,8 @@ class Simulation:
             SolarAgent(self.env),
             WindAgent(self.env),
             bat_ag,
-            GridAgent(self.env, bat_ag)
+            GridAgent(self.env, bat_ag),
+            LoadAgent(self.env)
         ]
         
         # Parámetros de entrenamiento
@@ -812,7 +826,7 @@ class Simulation:
         # Graficas interactiva de potencia
         self.plot_data_interactive(
             df=self.df,
-            columns_to_plot=["solar", "demand", "bat_soc", "grid", "wind"],
+            columns_to_plot=["solar", "demand", "bat_soc", "grid", "wind", "price"],
             title="Environment variables",
             save_static_plot=True,
             static_format="svg",  # o "png", "pdf"

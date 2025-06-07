@@ -818,6 +818,8 @@ class Simulation:
                             P_L=self.env.demand_power_idx,
                             SOC=battery_agent.battery_soc_idx,
                             C_mercado=self.env.price)
+                        
+                        self.instant["reward_demand"] = reward
                     else:
                         reward = 0.0
                     
@@ -934,7 +936,7 @@ class Simulation:
     def compute_reward_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         summary = []
 
-        for agent in ['solar', 'bat', 'grid', 'wind']:
+        for agent in ['solar', 'bat', 'grid', 'wind', 'demand']:
             rewards = df[f'reward_{agent}']
             metrics = {
                 'Agent': agent,

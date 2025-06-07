@@ -547,6 +547,7 @@ class LoadAgent(BaseAgent):
         self.ess =  ess
         self.load_state_bins = [0, 1] # 0=no encender, 1=encender
         self.load_state = 1
+        self.controllable_demand = 0.0 #kW
 
     def get_discretized_state(self, env: MultiAgentEnv, index):
         """
@@ -558,7 +559,7 @@ class LoadAgent(BaseAgent):
 
         # Discretizamos
         battery_soc_idx = self.digitize_clip(self.ess.soc, self.ess.battery_soc_bins)
-        self.demand_power_idx = self.digitize_clip(self.current_power, self.demand_bins)
+        self.demand_power_idx = self.digitize_clip(self.current_power, env.demand_bins)
         self.idx = self.demand_power_idx
         
         # Retornamos la tupla de estado discretizado
@@ -582,14 +583,20 @@ class LoadAgent(BaseAgent):
         }
 
     def calculate_reward(self, action, P_T, P_L, SOC, C_mercado):
-        if action == 1:
-            if P_T > P_L or SOC >= 0.5:
-                return 1.0 * (1.0 / (P_T + C_mercado))
-            elif C_mercado > self.comfort:
-                return -1.0 * P_T * C_mercado
-        elif action == 0:
-            if P_T > P_L or SOC >= 0.5:
-                return -1.0 * P_T * C_mercado
+        if action == 1: #Encender
+            if (P_T > P_L or SOC > 0):
+                return self.kappa
+            elif C_mercado < self.comfort:
+                return self.kappa
+            else:
+                return - self.kappa
+        elif action == 0: #Apagar
+            if (P_T > P_L or SOC > 0):
+                return - self.kappa
+            elif C_mercado < self.comfort:
+                return - self.kappa
+            else:
+                return self.kappa
         return 0.0
 
 # -----------------------------------------------------
@@ -617,7 +624,7 @@ class Simulation:
             WindAgent(self.env),
             bat_ag,
             GridAgent(self.env, bat_ag),
-            LoadAgent(self.env)
+            LoadAgent(self.env, bat_ag)
         ]
         
         # Parámetros de entrenamiento
@@ -660,6 +667,7 @@ class Simulation:
                 grid_power = 0.0
                 solar_power = 0.0
                 wind_power = 0.0
+                loadc_power = 0.0
                 renewable_power_real  = 0.0
                 renewable_power_real_idx = 0
 
@@ -726,21 +734,31 @@ class Simulation:
                         self.instant["grid_state"] = agent.grid_state
                         self.instant["grid_discrete"] = agent.idx
                     else:
-                        # LoadAgent no generan en este ejemplo
-                        _ = agent.choose_action(state["LoadAgent"], self.epsilon)               
+                        # LoadAgent
+                        agent.choose_action(state['LoadAgent'], self.epsilon)
+
+                        if agent.action == 1: # Encender
+                            agent.load_state = 1 
+                            agent.controllable_demand = 0
+                        else:                 # Apagar
+                            agent.load_state = 0 
+                            agent.controllable_demand = -15
+
+                        loadc_power = agent.controllable_demand
+
 
                 # Calcula el balance de energia
                 renewable_power_real = wind_power + solar_power
-                self.env.total_power = renewable_power_real + bat_power + grid_power
+                self.env.total_power = renewable_power_real + bat_power + grid_power + loadc_power
                 renewable_power_real_idx = self.env.digitize_clip(renewable_power_real, self.env.renewable_bins)
-                self.dif_power = self.env.total_power - self.env.demand_power
+                self.dif_power = self.env.total_power - (self.env.demand_power + loadc_power)
                 self.renewable_power_idx = self.env.digitize_clip(self.env.renewable_power, self.env.renewable_bins)
                 self.total_power_idx = self.env.digitize_clip(self.env.total_power, self.env.renewable_bins)
 
                 self.instant["renewable"] = self.env.renewable_power
                 self.instant["renewable_discrete"] = self.renewable_power_idx
                 self.instant["total"] = self.env.total_power
-                self.instant["demand"] = self.env.demand_power
+                self.instant["demand"] = self.env.demand_power + loadc_power
                 self.instant["dif"] = self.dif_power
                 self.instant["total_discrete"] = self.total_power_idx
                 self.instant["demand_discrete"] = self.env.demand_power_idx
@@ -795,10 +813,10 @@ class Simulation:
                         
                     elif isinstance(agent, LoadAgent):
                         reward = agent.calculate_reward(
-                            agent.action,
-                            P_H=self.env.renewable_power,
-                            P_L=self.env.demand_power,
-                            SOC=battery_agent.soc,
+                            action  =agent.action,
+                            P_T=renewable_power_real_idx,
+                            P_L=self.env.demand_power_idx,
+                            SOC=battery_agent.battery_soc_idx,
                             C_mercado=self.env.price)
                     else:
                         reward = 0.0

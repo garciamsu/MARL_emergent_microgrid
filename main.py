@@ -603,7 +603,7 @@ class LoadAgent(BaseAgent):
 # Simulación de entrenamiento
 # -----------------------------------------------------
 class Simulation:
-    def __init__(self, num_episodes=10, epsilon=1, learning=True):
+    def __init__(self, num_episodes=10, epsilon=1, learning=True, filename="Case1.csv"):
         self.num_episodes = num_episodes
         self.instant = {} 
         self.evolution = []
@@ -611,7 +611,7 @@ class Simulation:
         self.df_episode_metrics = pd.DataFrame()
         
         # Creamos el entorno que carga el CSV y discretiza
-        self.env = MultiAgentEnv(csv_filename="Case4.csv", num_demand_bins=BINS, num_renewable_bins=BINS)
+        self.env = MultiAgentEnv(csv_filename=filename, num_demand_bins=BINS, num_renewable_bins=BINS)
         
         # Obtiene los puntos de manera automatica de la base de datos
         self.max_steps = self.env.max_steps
@@ -1096,6 +1096,6 @@ class Simulation:
 # -----------------------------------------------------
 if __name__ == "__main__":
     
-    sim1 = Simulation(num_episodes=1000, epsilon=1, learning=True)
+    sim1 = Simulation(num_episodes=1000, epsilon=1, learning=True, filename="Case1.csv")
     sim1.run()
     sim1.show_performance_metrics()

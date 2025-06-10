@@ -485,7 +485,7 @@ class GridAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
         super().__init__("grid", [0, 1], alpha=0.1, gamma=0.9)
 
-        # ["idle", "sell"] -> [0, 1]
+        # ["idle", "produce"] -> [0, 1]
         self.grid_power = 0.0  # Potencia en W
         self.grid_state = 0  # Estado inicial de operación
 

@@ -9,8 +9,7 @@ from matplotlib.widgets import CheckButtons
 import copy
 from tabulate import tabulate
 from itertools import cycle
-from analysis_tools import compute_q_diff_norm
-from analysis_tools import plot_metric
+from analysis_tools import compute_q_diff_norm, plot_metric, check_stability
 
 
 # Parámetros físicos y constantes
@@ -960,6 +959,22 @@ class Simulation:
                 filename_svg=f"results/plots/Q_Norm_{agent.name}.svg"
             )
         
+        # Calcular umbral IAE como mediana de primeros 50 episodios ±10%
+        iae_median = self.df_episode_metrics[self.df_episode_metrics['Episode'] < 50]['IAE'].median()
+        iae_threshold = iae_median * 1.10  # +10%
+
+        # Verificar estabilidad
+        stability = check_stability(self.df_episode_metrics, iae_threshold=iae_threshold)
+
+        print("\n=== Stability Check ===")
+        print(f"IAE Threshold: {iae_threshold:.3f}")
+        print(f"Mean IAE (last 200 eps): {stability['IAE_mean']:.3f} -> {'OK' if stability['IAE_stable'] else 'NOT STABLE'}")
+        print(f"Mean Var (last 200 eps): {stability['Var_mean']:.3f} -> {'OK' if stability['Var_stable'] else 'NOT STABLE'}")
+
+        if stability['IAE_stable'] and stability['Var_stable']:
+            print("SYSTEM DECLARED STABLE ✅")
+        else:
+            print("SYSTEM NOT STABLE ⚠️")        
        
         return self.agents
 

@@ -837,7 +837,7 @@ class Simulation:
                 self.epsilon = self.epsilon                
             
             self.df = pd.DataFrame(self.evolution)
-            self.df.to_csv(f"results/evolution_learning_{ep}.csv", index=False)
+            self.df.to_csv(f"results/evolution/learning_{ep}.csv", index=False)
             
             self.update_episode_metrics(ep, self.df)      
             

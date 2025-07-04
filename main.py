@@ -25,6 +25,9 @@ BINS = 7          # Define cuántos intervalos se utilizan para discretizar las 
 SOC_INITIAL = 0.6
 
 os.makedirs("results", exist_ok=True)
+os.makedirs("results/evolution", exist_ok=True)
+os.makedirs("results/q_tables", exist_ok=True)
+os.makedirs("results/plots", exist_ok=True)
 
 # -----------------------------------------------------
 # Definimos el entorno

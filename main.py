@@ -9,6 +9,8 @@ from matplotlib.widgets import CheckButtons
 import copy
 from tabulate import tabulate
 from itertools import cycle
+from analysis_tools import compute_q_diff_norm
+
 
 # Parámetros físicos y constantes
 ETA = 0.15        # Eficiencia de conversión solar

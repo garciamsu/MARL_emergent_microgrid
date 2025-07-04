@@ -1,4 +1,20 @@
 import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_metric(df, field, ylabel, filename_svg):
+    """
+    Grafica la evolución de una métrica a lo largo de los episodios.
+    """
+    plt.figure(figsize=(10,6))
+    plt.plot(df['Episode'], df[field], marker='o')
+    plt.xlabel("Episode")
+    plt.ylabel(ylabel)
+    plt.title(f"{ylabel} over Episodes")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(filename_svg, format="svg")
+    plt.close()
+
 
 def compute_q_diff_norm(current_q, prev_q):
     """

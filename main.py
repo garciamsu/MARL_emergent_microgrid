@@ -10,6 +10,7 @@ import copy
 from tabulate import tabulate
 from itertools import cycle
 from analysis_tools import compute_q_diff_norm
+from analysis_tools import plot_metric
 
 
 # Parámetros físicos y constantes
@@ -851,8 +852,7 @@ class Simulation:
             self.df.to_csv(f"results/evolution/learning_{ep}.csv", index=False)
             
             self.update_episode_metrics(ep, self.df)      
-            
-            
+                        
             # Guarda Q-table actual en Excel
             for agent in self.agents:
                 df_q = pd.DataFrame([
@@ -933,6 +933,33 @@ class Simulation:
         ) 
 
         self.plot_metric('Average Reward')  # Puedes usar 'Total Reward' u otra métrica
+        
+        # Graficar IAE
+        plot_metric(
+            self.df_episode_metrics,
+            field="IAE",
+            ylabel="Integral Absolute Error",
+            filename_svg="results/plots/IAE_over_episodes.svg"
+        )
+
+        # Graficar Varianza de dif
+        plot_metric(
+            self.df_episode_metrics,
+            field="Var_dif",
+            ylabel="Variance of dif",
+            filename_svg="results/plots/Var_dif_over_episodes.svg"
+        )
+
+        # Graficar normas Q por agente
+        for agent in self.agents:
+            field_q = f"Q_Norm_{agent.name}"
+            plot_metric(
+                self.df_episode_metrics,
+                field=field_q,
+                ylabel=f"Q Norm Difference ({agent.name})",
+                filename_svg=f"results/plots/Q_Norm_{agent.name}.svg"
+            )
+        
        
         return self.agents
 

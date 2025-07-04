@@ -869,6 +869,46 @@ class Simulation:
                 filename_q = f"results/q_tables/qtable_{agent.name}_ep{ep}.xlsx"
 
                 df_q.to_excel(filename_q, index=False, engine="openpyxl")
+
+            # Calcular métricas del episodio
+            iae = self.calculate_iae()
+            var_dif = self.df['dif'].var()
+
+            # Calcular normas de diferencia Q
+            q_norms = {
+                agent.name: compute_q_diff_norm(agent.q_table, self.prev_q_tables[agent.name])
+                for agent in self.agents
+            }
+
+            # Calcular recompensas promedio
+            mean_rewards = {}
+            for agent in self.agents:
+                col_name = f"reward_{agent.name.lower()}"
+                if col_name in self.df.columns:
+                    mean_rewards[agent.name] = self.df[col_name].mean()
+                else:
+                    mean_rewards[agent.name] = 0.0
+
+            # Registrar en DataFrame
+            row = {
+                "Episode": ep,
+                "IAE": iae,
+                "Var_dif": var_dif,
+            }
+            row.update({f"Q_Norm_{k}": v for k, v in q_norms.items()})
+            row.update({f"Mean_Reward_{k}": v for k, v in mean_rewards.items()})
+
+            self.df_episode_metrics = pd.concat(
+                [self.df_episode_metrics, pd.DataFrame([row])],
+                ignore_index=True
+            )
+
+            # Guardar a Excel UTF-8
+            self.df_episode_metrics.to_excel(
+                "results/metrics_episode.xlsx",
+                index=False,
+                engine="openpyxl"
+            )
             
             print(f"Fin episodio {ep+1}/{self.num_episodes} con epsilon {self.epsilon}")
 

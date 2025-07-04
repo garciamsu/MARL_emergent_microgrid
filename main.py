@@ -656,10 +656,12 @@ class Simulation:
             # Guarda snapshot de Q-tables previas (solo si no es el primer episodio)
             if ep > 0:
                 for agent in self.agents:
-                    self.prev_q_tables[agent.name] = copy.deepcopy(agent.q_table)
+                    agent_key = type(agent).__name__
+                    self.prev_q_tables[agent_key] = copy.deepcopy(agent.q_table)
             else:
                 for agent in self.agents:
-                    agent.initialize_q_table(self.env)
+                    agent_key = type(agent).__name__
+                    self.prev_q_tables[agent_key] = {state: {a:0.0 for a in agent.actions} for state in agent.q_table}
             
             # Inicializacion de la evaluacion por episodio
             self.evolution = []
@@ -843,7 +845,7 @@ class Simulation:
               
             # Cambia la relación de aprendizaje con cada episodio  
             if self.num_episodes > 1:
-                self.epsilon = max(0, 1 - (ep / (self.num_episodes - 1)))
+                self.epsilon = max(0.05, 1 - (ep / (self.num_episodes - 1)))
             else:
                 self.epsilon = self.epsilon                
             
@@ -875,7 +877,7 @@ class Simulation:
 
             # Calcular normas de diferencia Q
             q_norms = {
-                agent.name: compute_q_diff_norm(agent.q_table, self.prev_q_tables[agent.name])
+                type(agent).__name__: compute_q_diff_norm(agent.q_table, self.prev_q_tables[type(agent).__name__])
                 for agent in self.agents
             }
 
@@ -951,13 +953,15 @@ class Simulation:
 
         # Graficar normas Q por agente
         for agent in self.agents:
-            field_q = f"Q_Norm_{agent.name}"
+            agent_key = type(agent).__name__
+            field_q = f"Q_Norm_{agent_key}"
             plot_metric(
                 self.df_episode_metrics,
                 field=field_q,
-                ylabel=f"Q Norm Difference ({agent.name})",
-                filename_svg=f"results/plots/Q_Norm_{agent.name}.svg"
+                ylabel=f"Q Norm Difference ({agent_key})",
+                filename_svg=f"results/plots/Q_Norm_{agent_key}.svg"
             )
+
         
         # Calcular umbral IAE como mediana de primeros 50 episodios ±10%
         iae_median = self.df_episode_metrics[self.df_episode_metrics['Episode'] < 50]['IAE'].median()
@@ -1207,6 +1211,6 @@ class Simulation:
 # -----------------------------------------------------
 if __name__ == "__main__":
     
-    sim1 = Simulation(num_episodes=1000, epsilon=1, learning=True, filename="Case1.csv")
+    sim1 = Simulation(num_episodes=100, epsilon=1, learning=True, filename="Case1.csv")
     sim1.run()
     sim1.show_performance_metrics()

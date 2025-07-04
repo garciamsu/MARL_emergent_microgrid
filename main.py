@@ -609,6 +609,7 @@ class Simulation:
         self.evolution = []
         self.df = pd.DataFrame()
         self.df_episode_metrics = pd.DataFrame()
+        self.prev_q_tables = {} # Diccionario para almacenar la Q-table previa de cada agente
         
         # Creamos el entorno que carga el CSV y discretiza
         self.env = MultiAgentEnv(csv_filename=filename, num_demand_bins=BINS, num_renewable_bins=BINS)
@@ -649,6 +650,14 @@ class Simulation:
     def run(self):
 
         for ep in range(self.num_episodes):
+            
+            # Guarda snapshot de Q-tables previas (solo si no es el primer episodio)
+            if ep > 0:
+                for agent in self.agents:
+                    self.prev_q_tables[agent.name] = copy.deepcopy(agent.q_table)
+            else:
+                for agent in self.agents:
+                    agent.initialize_q_table(self.env)
             
             # Inicializacion de la evaluacion por episodio
             self.evolution = []
@@ -840,6 +849,24 @@ class Simulation:
             self.df.to_csv(f"results/evolution/learning_{ep}.csv", index=False)
             
             self.update_episode_metrics(ep, self.df)      
+            
+            
+            # Guarda Q-table actual en Excel
+            for agent in self.agents:
+                df_q = pd.DataFrame([
+                    {
+                        "State": str(state),
+                        "Action": action,
+                        "Q_value": q_value
+                    }
+                    for state, actions in agent.q_table.items()
+                    for action, q_value in actions.items()
+                ])
+
+                # Nombre de archivo
+                filename_q = f"results/q_tables/qtable_{agent.name}_ep{ep}.xlsx"
+
+                df_q.to_excel(filename_q, index=False, engine="openpyxl")
             
             print(f"Fin episodio {ep+1}/{self.num_episodes} con epsilon {self.epsilon}")
 

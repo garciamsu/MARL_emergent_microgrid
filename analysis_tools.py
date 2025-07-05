@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import re
+import pandas as pd
+
 
 def load_latest_evolution_csv():
     """
@@ -43,8 +45,6 @@ def load_latest_evolution_csv():
 
     return df
 
-
-
 def plot_metric(df, field, ylabel, filename_svg):
     """
     Grafica la evolución de una métrica a lo largo de los episodios.
@@ -58,7 +58,6 @@ def plot_metric(df, field, ylabel, filename_svg):
     plt.tight_layout()
     plt.savefig(filename_svg, format="svg")
     plt.close()
-
 
 def compute_q_diff_norm(current_q, prev_q):
     """
@@ -100,3 +99,131 @@ def check_stability(df, iae_threshold, var_threshold=1.0):
         "Var_stable": var_mean <= var_threshold
     }
     return result
+
+def process_evolution_data(df):
+    """
+    Aplica la transformación de bat_state y valida columnas necesarias.
+    Devuelve el DataFrame listo para graficar.
+    """
+    required_columns = [
+        "solar_state",
+        "wind_state",
+        "bat_state",
+        "bat_soc",
+        "grid_state",
+        "dif",
+        "demand"
+    ]
+
+    # Verificar columnas
+    for col in required_columns:
+        if col not in df.columns:
+            raise ValueError(f"La columna '{col}' no está en el DataFrame.")
+
+    # Copiar para no modificar el original
+    df_plot = df.copy()
+
+    # Transformar bat_state según reglas
+    def transform_bat_state(x):
+        if x == 0:
+            return 0
+        elif x == 1:
+            return -1
+        elif x == 2:
+            return 1
+        else:
+            return 0  # Por seguridad
+
+    df_plot["bat_state_transformed"] = df_plot["bat_state"].apply(transform_bat_state)
+
+    return df_plot
+
+def plot_coordination(df):
+    """
+    Genera una gráfica SVG con 6 subgráficas alineadas verticalmente:
+    Solar, Wind, Battery (State + SOC), Grid, Demand, Dif.
+    """
+    # Mapeo de colores fijos
+    colors = {
+        "solar": "orange",
+        "wind": "blue",
+        "bat_state": "green",
+        "bat_soc": "green",
+        "grid": "purple",
+        "demand": "black",
+        "dif": "red"
+    }
+
+    fig, axes = plt.subplots(
+        6, 1,
+        figsize=(12, 18),
+        sharex=True,
+        constrained_layout=True
+    )
+
+    time = range(len(df))
+
+    # Subgráfica (A): Solar
+    ax = axes[0]
+    ax.plot(time, df["solar_state"], color=colors["solar"], linewidth=2.5, label="Solar State")
+    ax.set_ylabel("State")
+    ax.set_title("(A) Solar State")
+    ax.grid(True, which='both')
+    ax.legend(loc="upper right")
+
+    # Subgráfica (B): Wind
+    ax = axes[1]
+    ax.plot(time, df["wind_state"], color=colors["wind"], linewidth=2.5, label="Wind State")
+    ax.set_ylabel("State")
+    ax.set_title("(B) Wind State")
+    ax.grid(True, which='both')
+    ax.legend(loc="upper right")
+
+    # Subgráfica (C): Battery State + SOC
+    ax = axes[2]
+    ax2 = ax.twinx()
+    ax.plot(time, df["bat_state_transformed"], color=colors["bat_state"], linewidth=2.5, label="Battery State")
+    ax2.plot(time, df["bat_soc"], linestyle="--", color=colors["bat_soc"], linewidth=2.5, label="Battery SOC")
+
+    ax.set_ylabel("State (-1/0/1)")
+    ax2.set_ylabel("SOC [0-1]")
+
+    ax.set_title("(C) Battery State and SOC")
+    ax.grid(True, which='both')
+
+    # Leyendas combinadas
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
+
+    # Subgráfica (D): Grid
+    ax = axes[3]
+    ax.plot(time, df["grid_state"], color=colors["grid"], linewidth=2.5, label="Grid State")
+    ax.set_ylabel("State")
+    ax.set_title("(D) Grid State")
+    ax.grid(True, which='both')
+    ax.legend(loc="upper right")
+
+    # Subgráfica (E): Demand
+    ax = axes[4]
+    ax.plot(time, df["demand"], color=colors["demand"], linewidth=2.5, label="Demand")
+    ax.set_ylabel("Power")
+    ax.set_title("(E) Demand")
+    ax.grid(True, which='both')
+    ax.legend(loc="upper right")
+
+    # Subgráfica (F): Dif
+    ax = axes[5]
+    ax.plot(time, df["dif"], color=colors["dif"], linewidth=2.5, label="Energy Balance")
+    ax.set_ylabel("Power")
+    ax.set_xlabel("Time Steps")
+    ax.set_title("(F) Energy Balance (Dif)")
+    ax.grid(True, which='both')
+    ax.legend(loc="upper right")
+
+    # Guardar SVG
+    output_path = "results/plots/plot_coordination_last.svg"
+    fig.savefig(output_path, format="svg")
+    print(f"Gráfico guardado en {output_path}")
+
+    plt.show()

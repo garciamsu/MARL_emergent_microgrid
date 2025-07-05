@@ -9,7 +9,7 @@ from matplotlib.widgets import CheckButtons
 import copy
 from tabulate import tabulate
 from itertools import cycle
-from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv
+from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination
 
 
 # Parámetros físicos y constantes
@@ -964,7 +964,7 @@ class Simulation:
                 ylabel=f"Q Norm Difference ({agent_key})",
                 filename_svg=f"results/plots/Q_Norm_{agent_key}.svg"
             )
-
+        
         
         # Calcular umbral IAE como mediana de primeros 50 episodios ±10%
         iae_median = self.df_episode_metrics[self.df_episode_metrics['Episode'] < 50]['IAE'].median()
@@ -1217,3 +1217,8 @@ if __name__ == "__main__":
     sim1 = Simulation(num_episodes=200, epsilon=1, learning=True, filename="Case1.csv")
     sim1.run()
     sim1.show_performance_metrics()
+
+    # Graficas con los resultados de la interaccion cuando los agentes hayan completado el aprendizaje
+    df_raw = load_latest_evolution_csv()
+    df_clean = process_evolution_data(df_raw)
+    plot_coordination(df_clean)

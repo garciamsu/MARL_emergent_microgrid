@@ -759,6 +759,8 @@ class Simulation:
                         else:                 # Apagar
                             agent.load_state = 0 
                             agent.controllable_demand = -15
+                        
+                        self.instant["load_state"] = agent.load_state
 
                         loadc_power = agent.controllable_demand
 

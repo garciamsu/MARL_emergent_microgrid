@@ -247,9 +247,17 @@ def plot_coordination(df):
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
-    # Subgráfica (E): Demand (línea punteada)
+    # Subgráfica (E): Demand + Load State
     ax = axes[4]
-    ax.plot(
+    ax2 = ax.twinx()
+    ax.bar(
+        time,
+        df["load_state"],
+        color=colors["demand"],
+        alpha=0.6,
+        label="Load State"
+    )
+    ax2.plot(
         time,
         df["demand"],
         linestyle="--",
@@ -257,10 +265,13 @@ def plot_coordination(df):
         linewidth=2.5,
         label="Demand"
     )
-    ax.set_ylabel("Power")
+    ax.set_ylabel("Load State")
+    ax2.set_ylabel("Demand Power")
     ax.set_title("(E)", loc="center", pad=10)
     ax.grid(True, which='both')
-    ax.legend(loc="upper right")
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
     # Subgráfica (F): Dif (área)
     ax = axes[5]

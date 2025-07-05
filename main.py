@@ -923,7 +923,7 @@ class Simulation:
             title="Environment variables",
             save_static_plot=True,
             static_format="svg",  # o "png", "pdf"
-            static_filename="env_plot"
+            static_filename="results/plots/env_plot"
         )              
         
         # Graficas interactiva de acciones y df
@@ -933,7 +933,7 @@ class Simulation:
             title="Energy balance",
             save_static_plot=True,
             static_format="svg",  # o "png", "pdf"
-            static_filename="actions_plot"
+            static_filename="results/plots/actions_plot"
         ) 
 
         self.plot_metric('Average Reward')  # Puedes usar 'Total Reward' u otra métrica
@@ -1084,7 +1084,7 @@ class Simulation:
         df_metrics['Episode'] = episode
         self.df_episode_metrics = pd.concat([self.df_episode_metrics, df_metrics], ignore_index=True)
 
-    def plot_metric(self, metric_field='Average Reward', output_format='svg', filename='metric_plot'):
+    def plot_metric(self, metric_field='Average Reward', output_format='svg', filename='results/plots/metric_plot'):
         """
         Genera una gráfica de métricas por agente y la guarda como archivo vectorial o de alta resolución.
         
@@ -1214,6 +1214,6 @@ class Simulation:
 # -----------------------------------------------------
 if __name__ == "__main__":
     
-    sim1 = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1.csv")
+    sim1 = Simulation(num_episodes=200, epsilon=1, learning=True, filename="Case1.csv")
     sim1.run()
     sim1.show_performance_metrics()

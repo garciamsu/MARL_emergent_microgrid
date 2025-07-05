@@ -164,23 +164,48 @@ def plot_coordination(df):
         constrained_layout=True
     )
 
-    time = range(len(df))
+    # Eje X dinámico basado en el número de filas
+    time = list(range(1, len(df)+1))
 
     # Subgráfica (A): Solar
     ax = axes[0]
+    ax2 = ax.twinx()
     ax.bar(time, df["solar_state"], color=colors["solar"], label="Solar State")
+    ax2.plot(
+        time,
+        df["solar"],
+        linestyle="--",
+        color=colors["solar"],
+        linewidth=2.5,
+        label="Solar Power"
+    )
     ax.set_ylabel("State")
-    ax.set_title("(A)", loc="left", pad=10)
+    ax2.set_ylabel("Power")
+    ax.set_title("(A)", loc="center", pad=10)
     ax.grid(True, which='both')
-    ax.legend(loc="upper right")
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
     # Subgráfica (B): Wind
     ax = axes[1]
+    ax2 = ax.twinx()
     ax.bar(time, df["wind_state"], color=colors["wind"], label="Wind State")
+    ax2.plot(
+        time,
+        df["wind"],
+        linestyle="--",
+        color=colors["wind"],
+        linewidth=2.5,
+        label="Wind Power"
+    )
     ax.set_ylabel("State")
-    ax.set_title("(B)", loc="left", pad=10)
+    ax2.set_ylabel("Power")
+    ax.set_title("(B)", loc="center", pad=10)
     ax.grid(True, which='both')
-    ax.legend(loc="upper right")
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
     # Subgráfica (C): Battery State + SOC
     ax = axes[2]
@@ -194,37 +219,46 @@ def plot_coordination(df):
         linewidth=2.5,
         label="Battery SOC"
     )
-
     ax.set_ylabel("State (-1/0/1)")
     ax2.set_ylabel("SOC [0-1]")
-    ax.set_title("(C)", loc="left", pad=10)
+    ax.set_title("(C)", loc="center", pad=10)
     ax.grid(True, which='both')
-
-    # Leyendas combinadas
     lines1, labels1 = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
     # Subgráfica (D): Grid
     ax = axes[3]
+    ax2 = ax.twinx()
     ax.bar(time, df["grid_state"], color=colors["grid"], label="Grid State")
+    ax2.plot(
+        time,
+        df["price"],
+        linestyle="--",
+        color=colors["grid"],
+        linewidth=2.5,
+        label="Price"
+    )
     ax.set_ylabel("State")
-    ax.set_title("(D)", loc="left", pad=10)
+    ax2.set_ylabel("Price")
+    ax.set_title("(D)", loc="center", pad=10)
     ax.grid(True, which='both')
-    ax.legend(loc="upper right")
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
-    # Subgráfica (E): Demand (línea continua)
+    # Subgráfica (E): Demand (línea punteada)
     ax = axes[4]
     ax.plot(
         time,
         df["demand"],
-        linestyle="-",
+        linestyle="--",
         color=colors["demand"],
         linewidth=2.5,
         label="Demand"
     )
     ax.set_ylabel("Power")
-    ax.set_title("(E)", loc="left", pad=10)
+    ax.set_title("(E)", loc="center", pad=10)
     ax.grid(True, which='both')
     ax.legend(loc="upper right")
 
@@ -240,9 +274,13 @@ def plot_coordination(df):
     )
     ax.set_ylabel("Power")
     ax.set_xlabel("Time Steps")
-    ax.set_title("(F)", loc="left", pad=10)
+    ax.set_title("(F)", loc="center", pad=10)
     ax.grid(True, which='both')
     ax.legend(loc="upper right")
+
+    # Eje X con ticks enumerados
+    for ax in axes:
+        ax.set_xticks(time)
 
     # Guardar SVG
     output_path = "results/plots/plot_coordination_last.svg"
@@ -265,12 +303,10 @@ def clear_results_directories():
     ]
 
     for dir_path in directories:
-        # Verifica si existe
         if not os.path.exists(dir_path):
             print(f"Directorio no existe: {dir_path}")
             continue
 
-        # Busca todos los archivos (no carpetas)
         files = glob.glob(os.path.join(dir_path, "*"))
         if not files:
             print(f"No hay archivos en {dir_path}")

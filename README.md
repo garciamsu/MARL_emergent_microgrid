@@ -1,36 +1,180 @@
-# MARL_emergent_microgrid
+# Distributed Multi-Agent Reinforcement Learning Environment
 
-## Descripcion del conjunto de datos
+This repository provides a Python-based simulation framework for studying **distributed coordination of renewable energy resources** using **multi-agent reinforcement learning (MARL)**.  
+The system models the interaction between solar generation, wind generation, battery storage, controllable loads, and the main utility grid, applying Q-learning with discretized state-action spaces.
 
-<p align="justify">La presente investigación se fundamenta en la utilización de un conjunto de datos exhaustivo y diversificado, diseñado para entrenar nuestro modelo para que sea capaz de hacer frente a los desafios del ecosistema energético. Con el proposito de evitar sesgos y maximizar su capacidad de aprendizaje, se ha recopilado información detallada sobre la generación de energía solar/eólica, costos de energía del mercado y la demanda de los consumidores. La variabilidad inherente a estos datos, producto de los diversos escenarios que se presentan, permite acelerar el proceso de aprendizaje, garantizando una mayor cobertura del espacio de estados y aso como una exploración y robustez del modelo propuesto. Esta estrategia asegura que el modelo pueda adaptarse a diversas circunstancias y aprender una estrategia más robusta. El conjunto de datos utilizados incluyen: datos históricos de generación solar/eólica [1], precios del mercado de electricidad [2], y perfiles de carga [3]; los cuales abarcan un período anual completo, con una resolución temporal horaria.  </p>
+The codebase is designed for **engineers and researchers familiar with Python and reinforcement learning**, aiming to facilitate reproducibility and extensibility.
 
-<p align="justify">Los datos de energia solar exhiben una marcada variabilidad, influenciada directamente por condiciones atmosféricas tales como la cobertura nubosa, precipitaciones y la humedad relativa. La presencia de vapor de agua en la atmósfera induce fenómenos de dispersión y absorción de la radiación solar incidente, resultando en una atenuación de la energía que alcanza la superficie terrestre. Adicionalmente, se observa una clara estacionalidad en los datos, caracterizada por una mayor intensidad y duración de la radiación solar durante los meses estivales, en contraposición a una menor irradiación diaria durante el invierno. Asimismo, se contemplan las fluctuaciones en la eficiencia del sistema fotovoltaico, atribuibles a factores como la acumulación de suciedad en los paneles y posibles disfunciones técnicas. </p>
+---
 
-![Flow Chart](https://github.com/garciamsu/MARL_emergent_microgrid/blob/main/assets/images/power_solar.png)
+## Features
 
-<p align="justify">Por otra parte, la generación de energía eólica muestra una correlación directa con la velocidad del viento, caracterizada por un incremento durante las horas nocturnas y en presencia de eventos meteorológicos. Tambien se identifica una variación estacional en la densidad del aire, con valores máximos registrados en enero y diciembre, y mínimos a mediados de año, lo cual incide directamente en la generación de energía eólica. A escalas temporales más amplias, se manifiesta una estacionalidad vinculada a patrones de vientos más intensos en determinadas épocas del año. Finalmente, se reconoce la influencia de múltiples variables en la producción de energía eólica, siendo la velocidad del viento el factor predominante, seguido por la densidad del aire que depende también de la temperatura y la presión atmosférica, que no necesariamente cambian en la misma proporción que la velocidad del viento.  </p>
+- Multi-agent simulation of energy systems under dynamic conditions
+- Modular architecture with specialized agent classes
+- Discretization of state variables into configurable bins
+- Q-learning implementation with per-agent policies
+- Automatic generation of:
+  - Evolution logs (`CSV`)
+  - Episode metrics (`Excel`)
+  - Q-table snapshots (`Excel`)
+  - High-resolution and vector plots (`SVG`)
+- Analysis and visualization utilities
 
-![Flow Chart](https://github.com/garciamsu/MARL_emergent_microgrid/blob/main/assets/images/power_wind.png)
+---
 
-<p align="justify">Para los precios de la electricidad se toman como referencia los datos de España durante el año 2019, estructurada en 8.760 observaciones con una granularidad horaria, lo que permite analizar variaciones intradía, estacionales y anomalías en el mercado eléctrico. El análisis estadístico revela una media anual de 47.68 EUR/MWhe y una desviación estándar de 10.88 EUR/MWhe, evidenciando una alta volatilidad en los precios. La distribución presenta un primer cuartil de 42.01 EUR/MWhe, una mediana de 48.95 EUR/MWhe y un tercer cuartil de 54.52 EUR/MWhe, lo que refleja la presencia de valores extremos. El precio máximo registrado fue de 74.74 EUR/MWhe el 15 de enero a las 18:00 UTC, posiblemente debido a un aumento en la demanda invernal, mientras que el precio mínimo fue de 0.03 EUR/MWhe el 24 de diciembre a las 03:00 UTC, lo que podría estar asociado a un exceso de generación renovable o a una reducción significativa de la demanda en fechas festivas. Para analizar la tendencia subyacente, se aplicó una media móvil de 168 horas (7 días), la cual evidencia patrones estacionales y fluctuaciones recurrentes con picos en horarios de alta demanda y descensos en horas de menor consumo. Estos resultados aportan factores exógenos y estocásticos en la simulación del mercado eléctrico, proporcionando una base sólida para la validación del modelo propuesto.  </p>
+## Installation
 
-![Flow Chart](https://github.com/garciamsu/MARL_emergent_microgrid/blob/main/assets/images/prices.png)
+**Recommended platform:** Linux  
+**Python version:** 3.10+  
+**Environment manager:** Anaconda
 
-<p align="justify">Finalmente se presenta la demanda de energía eléctrica durante el año 2017 proporcionados por PJM Interconnection LLC (PJM), una organización regional de transmisión (Regional Transmission Organization, RTO) en los Estados Unidos, encargada de coordinar el movimiento de electricidad en varias regiones del país. Estos datos han sido procesados y ordenados cronológicamente para garantizar la coherencia temporal en la simulación del modelo propuesto. El análisis exploratorio revela fluctuaciones cíclicas y patrones estacionales asociados a factores climáticos y socioeconómicos, evidenciando incrementos en la demanda durante los meses de invierno y verano debido al uso intensivo de calefacción y aire acondicionado, respectivamente, mientras que en primavera y otoño se observa una moderación en el consumo. A nivel intra-diario, se identifican picos en la demanda energética durante las primeras horas de la mañana y al finalizar la tarde, en correlación con la actividad laboral y residencial, así como mínimos de consumo en la madrugada, reflejando la reducción en la actividad económica. Adicionalmente, se han detectado eventos atípicos caracterizados por perturbaciones abruptas en la serie temporal, los cuales pueden estar relacionados con interrupciones en el suministro, fenómenos meteorológicos extremos o variaciones en la actividad industrial y comercial. La caracterización detallada de estos patrones es esencial para la calibración y validación del modelo, permitiendo mejorar su capacidad para la gestión energética a través de estrategias adaptativas que incorporen la variabilidad estacional, las oscilaciones intra-diarias y la identificación de eventos anómalos.  </p>
+### Create a conda environment
 
-![Flow Chart](https://github.com/garciamsu/MARL_emergent_microgrid/blob/main/assets/images/demand.png)
+```bash
+conda create -n marl_env python=3.10
+```
 
-> [!NOTE]
-> Es importante destacar que los datos recopilados fueron homologados al mismo año 2019, escalados con un período de recolección de un año y un muestreo cada hora. Además, las estaciones del año analizadas coinciden entre Estados Unidos y España, ya que ambos países se encuentran en el hemisferio norte. Esto implica que experimentan las estaciones simultáneamente, aunque pueden existir ligeras variaciones en las fechas exactas de inicio y finalización.
+### Activate the environment
 
-![Flow Chart](https://github.com/garciamsu/MARL_emergent_microgrid/blob/main/assets/images/solar_demand_scaled_1.png)
+```bash
+conda activate marl_env
+```
 
-![Flow Chart](https://github.com/garciamsu/MARL_emergent_microgrid/blob/main/assets/images/wind_demand_scaled_1.png)
+### Install required packages
 
+```bash
+pip install -r requirements.txt
+```
 
-## Referencias
+*(Make sure `requirements.txt` includes `numpy`, `pandas`, `matplotlib`, `openpyxl`, etc.)*
 
-* [1] Liu, Yue (2024), “Wind and solar power generation dataset”, Mendeley Data, V1, doi: 10.17632/gxc6j5btrx.1
-* [2] Ember. (s.f.). European wholesale electricity price data. Ember. Recuperado el 23 de febrero de 2025, de https://ember-energy.org/data/european-wholesale-electricity-price-data/
-* [3] Mulla, R. (s.f.). Hourly Energy Consumption Dataset [Conjunto de datos]. Kaggle. Datos proporcionados por PJM Interconnection LLC (PJM). Recuperado el 23 de febrero de 2025, de https://www.kaggle.com/datasets/robikscube/hourly-energy-consumption
+---
+
+## Running the Simulation
+
+The main entry point is `main.py`.
+
+```bash
+python main.py
+```
+
+**Parameters** such as:
+
+- Number of episodes
+- Exploration factor (`epsilon`)
+- Input dataset (`csv_filename`)
+
+are set in the `Simulation` class instantiation.  
+**Details of parameter values are described in the accompanying scientific article.**
+
+Running the simulation will:
+
+1. Initialize the environment and all agents
+2. Train agents via Q-learning
+3. Generate results in the `results/` directory
+4. Output performance metrics to the console
+
+---
+
+## Folder Structure
+
+After a simulation run, your project will look like this:
+
+```
+results/
+├── evolution/
+│   └── learning_<episode>.csv          # Detailed logs per episode
+├── q_tables/
+│   └── qtable_<agent>_ep<episode>.xlsx # Q-table snapshots
+├── plots/
+│   ├── IAE_over_episodes.svg
+│   ├── Var_dif_over_episodes.svg
+│   ├── Q_Norm_<agent>.svg
+│   └── env_plot.svg
+└── metrics_episode.xlsx                # Episode summary metrics
+```
+
+---
+
+## Metrics Overview
+
+To **evaluate coordination effectiveness**, the system computes:
+
+- **Energy Balance (ΔP):** Instantaneous difference between generation and demand
+- **ISE:** Integral Square Error
+- **IAE:** Integral Absolute Error
+- **REP:** Renewable Energy Penetration (%)
+- **GEP:** Grid Energy Penetration (%)
+
+To **evaluate learning**, it also calculates:
+
+- **Average Reward per Episode**
+- **Average Cumulative Reward**
+
+**Additional stability metrics** are implemented and will be detailed in the publication.
+
+---
+
+## Extending the Framework
+
+You can create new agents or customize the environment:
+
+### Adding a New Agent
+
+1. **Subclass `BaseAgent`**
+2. Implement:
+   - `get_discretized_state()`: Define state representation
+   - `initialize_q_table()`: Configure state-action space
+   - `calculate_reward()`: Design the reward function
+
+### Customizing the Environment
+
+- Subclass `MultiAgentEnv` to load different datasets or apply new discretization schemes.
+
+This design supports **flexible experimentation without altering core components.**
+
+---
+
+## Utilities
+
+The module `analysis_tools.py` provides helper functions:
+
+| Function | Purpose |
+|---|---|
+| `load_latest_evolution_csv()` | Load the most recent simulation log |
+| `plot_metric()` | Generate metric plots |
+| `compute_q_diff_norm()` | Compute L2 norm between Q-tables |
+| `check_stability()` | Evaluate stability over episodes |
+| `process_evolution_data()` | Prepare logs for visualization |
+| `plot_coordination()` | Generate multi-panel plots of agent behavior |
+| `clear_results_directories()` | **Clean all files under `results/`** |
+
+> **Note:** `clear_results_directories()` removes previous outputs before a new simulation run.
+
+---
+
+## Outputs and Visualization
+
+By default, the simulation generates:
+
+- Time series plots of power and energy balance
+- SVG graphics of learning progress (`IAE`, `Var_dif`, `Q Norms`)
+- Per-agent Q-tables and rewards
+
+Visual outputs help validate whether agents learn effective coordination strategies.
+
+---
+
+## Notes
+
+- Input datasets should be placed in `assets/datasets/` in CSV format.
+- Default time resolution: **1 hour per time step**
+- For parameter explanations and case studies, see the accompanying article.
+
+---
+
+## License
+
+This project is released for **academic research** purposes.  
+Please **cite appropriately** if used in publications.
 

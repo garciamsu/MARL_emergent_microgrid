@@ -9,7 +9,7 @@ from matplotlib.widgets import CheckButtons
 import copy
 from tabulate import tabulate
 from itertools import cycle
-from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination
+from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination, clear_results_directories
 
 
 # Parámetros físicos y constantes
@@ -1214,7 +1214,10 @@ class Simulation:
 # -----------------------------------------------------
 if __name__ == "__main__":
     
-    sim1 = Simulation(num_episodes=200, epsilon=1, learning=True, filename="Case1.csv")
+    # Limpia los archivos contenidos en los directorios temporales
+    clear_results_directories()
+
+    sim1 = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1.csv")
     sim1.run()
     sim1.show_performance_metrics()
 

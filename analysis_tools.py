@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 import pandas as pd
+import glob
+import os
 
 
 def load_latest_evolution_csv():
@@ -142,6 +144,7 @@ def plot_coordination(df):
     """
     Genera una gráfica SVG con 6 subgráficas alineadas verticalmente:
     Solar, Wind, Battery (State + SOC), Grid, Demand, Dif.
+    Usa barras y líneas según corresponda.
     """
     # Mapeo de colores fijos
     colors = {
@@ -165,30 +168,36 @@ def plot_coordination(df):
 
     # Subgráfica (A): Solar
     ax = axes[0]
-    ax.plot(time, df["solar_state"], color=colors["solar"], linewidth=2.5, label="Solar State")
+    ax.bar(time, df["solar_state"], color=colors["solar"], label="Solar State")
     ax.set_ylabel("State")
-    ax.set_title("(A) Solar State")
+    ax.set_title("(A)", loc="left", pad=10)
     ax.grid(True, which='both')
     ax.legend(loc="upper right")
 
     # Subgráfica (B): Wind
     ax = axes[1]
-    ax.plot(time, df["wind_state"], color=colors["wind"], linewidth=2.5, label="Wind State")
+    ax.bar(time, df["wind_state"], color=colors["wind"], label="Wind State")
     ax.set_ylabel("State")
-    ax.set_title("(B) Wind State")
+    ax.set_title("(B)", loc="left", pad=10)
     ax.grid(True, which='both')
     ax.legend(loc="upper right")
 
     # Subgráfica (C): Battery State + SOC
     ax = axes[2]
     ax2 = ax.twinx()
-    ax.plot(time, df["bat_state_transformed"], color=colors["bat_state"], linewidth=2.5, label="Battery State")
-    ax2.plot(time, df["bat_soc"], linestyle="--", color=colors["bat_soc"], linewidth=2.5, label="Battery SOC")
+    ax.bar(time, df["bat_state_transformed"], color=colors["bat_state"], label="Battery State")
+    ax2.plot(
+        time,
+        df["bat_soc"],
+        linestyle="--",
+        color=colors["bat_soc"],
+        linewidth=2.5,
+        label="Battery SOC"
+    )
 
     ax.set_ylabel("State (-1/0/1)")
     ax2.set_ylabel("SOC [0-1]")
-
-    ax.set_title("(C) Battery State and SOC")
+    ax.set_title("(C)", loc="left", pad=10)
     ax.grid(True, which='both')
 
     # Leyendas combinadas
@@ -198,26 +207,40 @@ def plot_coordination(df):
 
     # Subgráfica (D): Grid
     ax = axes[3]
-    ax.plot(time, df["grid_state"], color=colors["grid"], linewidth=2.5, label="Grid State")
+    ax.bar(time, df["grid_state"], color=colors["grid"], label="Grid State")
     ax.set_ylabel("State")
-    ax.set_title("(D) Grid State")
+    ax.set_title("(D)", loc="left", pad=10)
     ax.grid(True, which='both')
     ax.legend(loc="upper right")
 
-    # Subgráfica (E): Demand
+    # Subgráfica (E): Demand (línea continua)
     ax = axes[4]
-    ax.plot(time, df["demand"], color=colors["demand"], linewidth=2.5, label="Demand")
+    ax.plot(
+        time,
+        df["demand"],
+        linestyle="-",
+        color=colors["demand"],
+        linewidth=2.5,
+        label="Demand"
+    )
     ax.set_ylabel("Power")
-    ax.set_title("(E) Demand")
+    ax.set_title("(E)", loc="left", pad=10)
     ax.grid(True, which='both')
     ax.legend(loc="upper right")
 
-    # Subgráfica (F): Dif
+    # Subgráfica (F): Dif (área)
     ax = axes[5]
-    ax.plot(time, df["dif"], color=colors["dif"], linewidth=2.5, label="Energy Balance")
+    ax.fill_between(
+        time,
+        0,
+        df["dif"],
+        color=colors["dif"],
+        alpha=0.5,
+        label="Energy Balance"
+    )
     ax.set_ylabel("Power")
     ax.set_xlabel("Time Steps")
-    ax.set_title("(F) Energy Balance (Dif)")
+    ax.set_title("(F)", loc="left", pad=10)
     ax.grid(True, which='both')
     ax.legend(loc="upper right")
 
@@ -227,3 +250,40 @@ def plot_coordination(df):
     print(f"Gráfico guardado en {output_path}")
 
     plt.show()
+
+def clear_results_directories():
+    """
+    Elimina todos los archivos dentro de los directorios:
+    results/, results/evolution/, results/plots/, results/q_tables/.
+    No elimina los directorios en sí, solo los contenidos.
+    """
+    directories = [
+        "results/",
+        "results/evolution/",
+        "results/plots/",
+        "results/q_tables/"
+    ]
+
+    for dir_path in directories:
+        # Verifica si existe
+        if not os.path.exists(dir_path):
+            print(f"Directorio no existe: {dir_path}")
+            continue
+
+        # Busca todos los archivos (no carpetas)
+        files = glob.glob(os.path.join(dir_path, "*"))
+        if not files:
+            print(f"No hay archivos en {dir_path}")
+            continue
+
+        for file_path in files:
+            if os.path.isfile(file_path):
+                try:
+                    os.remove(file_path)
+                    print(f"Eliminado: {file_path}")
+                except Exception as e:
+                    print(f"No se pudo eliminar {file_path}: {e}")
+            else:
+                print(f"Ignorado (no es un archivo): {file_path}")
+
+    print("Limpieza completada.")

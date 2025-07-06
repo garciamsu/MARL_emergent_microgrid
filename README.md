@@ -24,14 +24,14 @@ The codebase is designed for **engineers and researchers familiar with Python an
 
 ## Installation
 
-**Recommended platform:** Linux  
-**Python version:** 3.10+  
-**Environment manager:** Anaconda
+**Recommended platform:** Linux Ubuntu 22.04.5 LTS  
+**Python version:** 3.11.7  
+**Environment manager:** Anaconda (conda 24.9.1)
 
 ### Create a conda environment
 
 ```bash
-conda create -n marl_env python=3.10
+conda create -n marl_env python=3.11.7
 ```
 
 ### Activate the environment

@@ -292,7 +292,9 @@ class SolarAgent(BaseAgent):
             return self.sigma * (P_H - P_L)
         elif P_H > P_L and S_PV == 0:
             return - self.sigma * (P_H - P_L)
-        return 0.0
+        elif P_H <= P_L and S_PV == 0:
+            return self.sigma * (P_L - P_H)
+        return -self.sigma
 
 class WindAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv):
@@ -380,7 +382,9 @@ class WindAgent(BaseAgent):
             return self.sigma * (P_H - P_L)
         elif P_H > P_L and S_WD == 0:
             return - self.sigma * (P_H - P_L)
-        return 0.0
+        if P_H <= P_L and S_WD == 0:
+            return self.kappa * (P_L - P_H)
+        return -self.kappa
 
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=4):
@@ -484,7 +488,7 @@ class BatteryAgent(BaseAgent):
             return -self.beta * self.battery_soc_idx * (P_L - P_T)
         elif self.battery_soc_idx > 0 and P_T <= P_L and self.battery_state == 0:
             return -self.beta * self.battery_soc_idx * (P_L - P_T)
-        return 0.0  
+        return -self.beta  
 
 class GridAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):

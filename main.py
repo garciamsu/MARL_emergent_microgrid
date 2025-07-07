@@ -401,6 +401,7 @@ class BatteryAgent(BaseAgent):
         self.battery_power = 0.0  # Potencia en W
         self.battery_state = 0  # Estado inicial de operación
         self.battery_soc_idx = 0 # Estado SOC discretizado
+        self.max_soc_idx = 2
 
         # Discretizacion por cuantizacion uniforme
         # Definimos los "bins" para discretizar cada variable de interés
@@ -474,21 +475,46 @@ class BatteryAgent(BaseAgent):
         return (self.battery_soc_idx, self.battery_state, env.renewable_power_idx, env.demand_power_idx)
 
     def calculate_reward(self, P_T, P_L):
-        if self.battery_soc_idx > 0  and P_T < P_L and self.battery_state == 2:
-            return self.kappa * self.battery_soc_idx * (P_L - P_T)
-        elif self.battery_soc_idx > 0  and P_T > P_L and self.battery_state == 2:
-            return - self.kappa * self.battery_soc_idx * (P_T - P_L)
-        elif self.battery_soc_idx == 0 and P_T > P_L and self.battery_state == 2:
-            return -self.sigma * (2 - self.battery_soc_idx)  * (P_T - P_L)
-        elif self.battery_soc_idx == 0 and P_T < P_L and self.battery_state == 2:
-            return -self.mu * (2 - self.battery_soc_idx) * (P_L - P_T)
-        elif self.battery_soc_idx <= 2 and P_T > P_L and self.battery_state == 1:
-            return self.nu * (2 - self.battery_soc_idx) * (P_T - P_L)
-        elif P_T < P_L and self.battery_state == 1:
-            return -self.beta * self.battery_soc_idx * (P_L - P_T)
-        elif self.battery_soc_idx > 0 and P_T <= P_L and self.battery_state == 0:
-            return -self.beta * self.battery_soc_idx * (P_L - P_T)
-        return -self.beta  
+        """
+        Calculates the reward based on grid and battery state.
+        Battery states (battery_state):
+        - 0: Standby
+        - 1: Charging
+        - 2: Discharging
+        """
+        power_surplus = P_T - P_L
+        normalized_soc = self.battery_soc_idx / self.max_soc_idx
+
+        # --- Positive Incentives (Rewards) ---
+
+        # 1. Reward for discharging during a power deficit
+        if power_surplus < 0 and self.battery_state == 2 and self.battery_soc_idx > 0:
+            return self.kappa * normalized_soc * abs(power_surplus)
+
+        # 2. Reward for charging during a power surplus
+        if power_surplus > 0 and self.battery_state == 1 and self.battery_soc_idx < self.max_soc_idx:
+            return self.nu * (1 - normalized_soc) * power_surplus
+
+        # --- Negative Incentives (Penalties) ---
+
+        # 3. Penalty for attempting an impossible action (e.g., discharging when empty)
+        if (self.battery_state == 2 and self.battery_soc_idx == 0) or \
+        (self.battery_state == 1 and self.battery_soc_idx == self.max_soc_idx):
+            return -100 # High, fixed penalty
+
+        # 4. Penalty for doing the opposite of what is needed
+        if power_surplus > 0 and (self.battery_state == 2 or self.battery_state == 0):
+            return -self.sigma * power_surplus
+
+        if power_surplus < 0 and (self.battery_state == 1 or self.battery_state == 0):
+            return -self.mu * abs(power_surplus)
+
+        # 5. Small penalty for degradation or operating without need
+        if self.battery_state != 0:
+            return -0.1 # Small fixed cost for cycling
+
+        # 6. Default reward (inactive state and balanced grid)
+        return 0
 
 class GridAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):

@@ -281,9 +281,9 @@ class SolarAgent(BaseAgent):
 
     def calculate_reward(self, P_H, P_L, S_PV):
         """
-        P_H: potencia generada por el panel solar
-        P_L: demanda 
-        S_PV: estado del panel solar
+        P_H: Potencia generada por las fuentes de energía renovables
+        P_L: Demanda 
+        S_PV: Estado del panel solar
         """
         
         if P_H <= P_L and S_PV == 1:
@@ -686,7 +686,7 @@ class Simulation:
 
         for ep in range(self.num_episodes):
             
-            # Guarda snapshot de Q-tables previas (solo si no es el primer episodio)
+            # Save snapshot of previous Q-tables (only if not the first episode)
             if ep > 0:
                 for agent in self.agents:
                     agent_key = type(agent).__name__
@@ -696,17 +696,18 @@ class Simulation:
                     agent_key = type(agent).__name__
                     self.prev_q_tables[agent_key] = {state: {a:0.0 for a in agent.actions} for state in agent.q_table}
             
-            # Inicializacion de la evaluacion por episodio
+            # Initialization of the evaluation by episode
             self.evolution = []
 
             for agent in self.agents:
+                # Stops the loop upon finding the battery agent
                 if isinstance(agent, BatteryAgent):
                     agent.soc = SOC_INITIAL
-                    break  # Detiene el bucle al encontrar el primer BatteryAgent
+                    break  
 
             for i in range(self.max_steps-1):
                 
-                # Para cada episodio se inicializa los valores de potencia
+                # For each episode the power values ​​are initialized
                 self.env.renewable_power = 0.0
                 self.env.total_power = 0
                 bat_power = 0.0
@@ -717,15 +718,14 @@ class Simulation:
                 renewable_power_real  = 0.0
                 renewable_power_real_idx = 0
 
-                # Reseteamos entorno y los agentes al inicio de cada episodio
+                # We reset the environment and agents at the start of each episode.
                 state = self.step(i)                
 
                 self.instant["time"] = self.env.time                
 
-                # Selecciona la acción 
+                # Select the action
                 for agent in self.agents:
                     if isinstance(agent, SolarAgent):
-                        # Escoger acción
                         agent.choose_action(state['SolarAgent'], self.epsilon)
 
                         agent.solar_state = agent.action
@@ -735,7 +735,6 @@ class Simulation:
                         self.instant["solar_state"] = agent.solar_state
                         self.instant["solar_discrete"] = agent.idx
                     elif isinstance(agent, WindAgent):
-                        # Escoger acción
                         agent.choose_action(state['WindAgent'], self.epsilon)
 
                         agent.wind_state = agent.action
@@ -746,15 +745,16 @@ class Simulation:
                         self.instant["wind_discrete"] = agent.idx
                     elif isinstance(agent, BatteryAgent):
                         agent.choose_action(state['BatteryAgent'], self.epsilon)
+                        agent.battery_state = agent.action
 
+                        # "charging" 
                         if agent.action == 1:
-                            agent.battery_state = 1 # "charging" 
                             agent.battery_power = -abs(self.env.demand_power - (solar_power + wind_power))
+                        # "discharging"
                         elif agent.action == 2:
-                            agent.battery_state = 2  # "discharging" 
                             agent.battery_power = abs(self.env.demand_power - (solar_power + wind_power))
-                        else:                        # "idle" 
-                            agent.battery_state = 0 
+                        # "idle"
+                        else:                        
                             agent.battery_power = 0.0
 
                         bat_power = agent.battery_power
@@ -780,28 +780,27 @@ class Simulation:
                         self.instant["grid_state"] = agent.grid_state
                         self.instant["grid_discrete"] = agent.idx
                     else:
-                        # LoadAgent
                         agent.choose_action(state['LoadAgent'], self.epsilon)
+                        agent.load_state = agent.action
 
-                        if agent.action == 1: # Encender
-                            agent.load_state = 1 
+                        # Turn ON
+                        if agent.action == 1: 
                             agent.controllable_demand = 0
-                        else:                 # Apagar
-                            agent.load_state = 0 
+                        # Turn OFF
+                        else:     
                             agent.controllable_demand = -15
                         
                         self.instant["load_state"] = agent.load_state
-
                         loadc_power = agent.controllable_demand
-
 
                 # Calcula el balance de energia
                 renewable_power_real = wind_power + solar_power
-                self.env.total_power = renewable_power_real + bat_power + grid_power + loadc_power
+                self.env.total_power = renewable_power_real + bat_power + grid_power
                 renewable_power_real_idx = self.env.digitize_clip(renewable_power_real, self.env.renewable_bins)
                 self.dif_power = self.env.total_power - (self.env.demand_power + loadc_power)
                 self.renewable_power_idx = self.env.digitize_clip(self.env.renewable_power, self.env.renewable_bins)
                 self.total_power_idx = self.env.digitize_clip(self.env.total_power, self.env.renewable_bins)
+                self.env.demand_power_idx = self.digitize_clip(self.env.demand_power + loadc_power, self.env.demand_bins)
 
                 self.instant["renewable"] = self.env.renewable_power
                 self.instant["renewable_discrete"] = self.renewable_power_idx
@@ -812,8 +811,7 @@ class Simulation:
                 self.instant["demand_discrete"] = self.env.demand_power_idx
                 self.instant["price"] = self.env.price
 
-                # Ahora calculamos la recompensa individual por agente
-                # y actualizamos la Q-table                
+                # Ahora calculamos la recompensa individual por agente y actualizamos la Q-table                
                 next_state = self.step(i + 1)  # Avanzamos el entorno un índice
                 
                 # Extrae el agente bateria

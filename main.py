@@ -800,7 +800,7 @@ class Simulation:
                 self.dif_power = self.env.total_power - (self.env.demand_power + loadc_power)
                 self.renewable_power_idx = self.env.digitize_clip(self.env.renewable_power, self.env.renewable_bins)
                 self.total_power_idx = self.env.digitize_clip(self.env.total_power, self.env.renewable_bins)
-                self.env.demand_power_idx = self.digitize_clip(self.env.demand_power + loadc_power, self.env.demand_bins)
+                self.env.demand_power_idx = self.env.digitize_clip(self.env.demand_power + loadc_power, self.env.demand_bins)
 
                 self.instant["renewable"] = self.env.renewable_power
                 self.instant["renewable_discrete"] = self.renewable_power_idx
@@ -1247,7 +1247,7 @@ if __name__ == "__main__":
     # Limpia los archivos contenidos en los directorios temporales
     clear_results_directories()
 
-    sim1 = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1.csv")
+    sim1 = Simulation(num_episodes=1000, epsilon=1, learning=True, filename="Case1.csv")
     sim1.run()
     sim1.show_performance_metrics()
 

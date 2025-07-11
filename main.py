@@ -12,25 +12,19 @@ from itertools import cycle
 from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination, clear_results_directories
 
 
-# Parámetros físicos y constantes
-ETA = 0.15        # Eficiencia de conversión solar
-SOLAR_AREA = 10   # Área de paneles solares en m^2
-T_AMBIENT = 25    # Temperatura ambiente en °C
-PHI = 1000        # Irradiancia solar en W/m^2
-RHO = 1.225       # Densidad del aire en kg/m^3
-BLADE_AREA = 5    # Área de los álabes de la turbina en m^2
-C_P = 0.4         # Coeficiente de potencia
-C_CONFORT = 0.5   # Umbral de confort para el costo del mercado
-BINS = 7          # Define cuántos intervalos se utilizan para discretizar las variables de potencia (renovables + demanda).
+# Global constants
+C_CONFORT = 0.5   # Comfort threshold for market cost
+BINS = 7          # Defines how many intervals are used to discretize the power variables (renewables, no-renewables and demand).
 SOC_INITIAL = 0.6
 
+# Creates files if they do not exist
 os.makedirs("results", exist_ok=True)
 os.makedirs("results/evolution", exist_ok=True)
 os.makedirs("results/q_tables", exist_ok=True)
 os.makedirs("results/plots", exist_ok=True)
 
 # -----------------------------------------------------
-# Definimos el entorno
+# Define the environment
 # -----------------------------------------------------
 class MultiAgentEnv:
     """
@@ -140,7 +134,7 @@ class MultiAgentEnv:
         return int(idx)
 
 # -----------------------------------------------------
-# Definimos la clase base de Agente con Q-Table
+# We define the Agent base class with Q-Table
 # -----------------------------------------------------
 class BaseAgent:
     """
@@ -201,8 +195,8 @@ class BaseAgent:
         return int(idx)
 
 # -----------------------------------------------------
-# Agentes Especializados (Solar, Wind, Battery, Grid, Load)
-#    Heredan de BaseAgent y añaden sus recompensas
+# Specialized Agents (Solar, Wind, Battery, Grid, Load)
+# Inherit from BaseAgent and add its rewards
 # -----------------------------------------------------
 class SolarAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv):
@@ -269,15 +263,6 @@ class SolarAgent(BaseAgent):
             state: {action: 0 for action in self.actions} 
             for state in states
         }
-
-    def calculate_power(self, row):
-
-        if self.isPower:
-            return row["solar_power"]
-        else:
-            return ETA * SOLAR_AREA * row["irradiance"] * (1 - 0.005*(T_AMBIENT + 25))
-
-        # Ejemplo muy simplificado
 
     def calculate_reward(self, P_H, P_L, S_PV):
         """
@@ -361,13 +346,6 @@ class WindAgent(BaseAgent):
             state: {action: 0 for action in self.actions} 
             for state in states
         }
-
-    def calculate_power(self, row):
-
-        if self.isPower:
-            return row["wind_power"]
-        else:
-            return 0.5 * RHO * BLADE_AREA * C_P * (row["wind speed"]**3)
 
     def calculate_reward(self, P_H, P_L, S_WD):
         """

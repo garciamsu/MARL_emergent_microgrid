@@ -16,6 +16,7 @@ from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, lo
 C_CONFORT = 0.5   # Comfort threshold for market cost
 BINS = 7          # Defines how many intervals are used to discretize the power variables (renewables, no-renewables and demand).
 SOC_INITIAL = 0.6
+EPSILON_MIN = 0
 
 # Creates files if they do not exist
 os.makedirs("results", exist_ok=True)
@@ -478,7 +479,7 @@ class BatteryAgent(BaseAgent):
         # 3. Penalty for attempting an impossible action (e.g., discharging when empty)
         if (self.battery_state == 2 and self.battery_soc_idx == 0) or \
         (self.battery_state == 1 and self.battery_soc_idx == self.max_soc_idx):
-            return -100 # High, fixed penalty
+            return -100*self.sigma # High, fixed penalty
 
         # 4. Penalty for doing the opposite of what is needed
         if power_surplus > 0 and (self.battery_state == 2 or self.battery_state == 0):
@@ -489,10 +490,10 @@ class BatteryAgent(BaseAgent):
 
         # 5. Small penalty for degradation or operating without need
         if self.battery_state != 0:
-            return -0.1 # Small fixed cost for cycling
+            return -0.01*self.sigma # Small fixed cost for cycling
 
         # 6. Default reward (inactive state and balanced grid)
-        return 0
+        return -self.sigma
 
 class GridAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
@@ -539,17 +540,37 @@ class GridAgent(BaseAgent):
         return (self.grid_state, battery_soc_idx, env.renewable_power_idx, env.demand_power_idx)
 
     def calculate_reward(self, P_H, P_L, SOC, C_mercado):
+        """
+        Calcula la recompensa basada en una lógica clara de costos y beneficios.
+        - Recompensa la autonomía.
+        - Penaliza los costos de importación de forma proporcional.
+        - Penaliza fuertemente los errores.
+        """
         
-        if SOC == 0 and P_H < P_L and self.grid_state == 1:
-            return self.kappa / C_mercado
-        elif SOC > 0 and P_H < P_L and self.grid_state == 1:
+        # ✅ Recompensa Única: Autonomía
+        # El único estado que recibe un premio positivo, usando 'kappa'.
+        if self.grid_state == 0 and P_H > P_L:
+            return self.kappa*10
+
+        # ❌ Penalización Máxima: Apagón evitable
+        # Castigo fijo y más severo, basado en 'mu' pero muy amplificado.
+        elif self.grid_state == 0 and P_H <= P_L:
+            return -self.mu * 100
+
+        # ⚠️ Penalización Débil: Importación necesaria
+        # Costo base por importar de la red, usando 'mu' directamente.
+        elif self.grid_state == 1 and P_H < P_L and SOC == 0:
             return -self.mu * C_mercado
-        elif (SOC > 0 or P_H > P_L) and self.grid_state == 1:
-            return -self.sigma * C_mercado
-        elif (SOC == 0 and P_H <= P_L) and self.grid_state == 0:
-            return -self.nu * C_mercado
+
+        # ⛔️ Penalización Fuerte: Importación innecesaria
+        # Error de gestión castigado con más fuerza, usando 'mu' amplificado.
+        elif self.grid_state == 1 and (P_H >= P_L or SOC > 0):
+            # Se multiplica por 10 para que sea claramente peor que la importación necesaria
+            return -(self.mu * 10) * C_mercado
+            
+        # Estado neutral
         else:
-            return 0.0
+            return -self.mu
 
 class LoadAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
@@ -856,7 +877,7 @@ class Simulation:
               
             # Cambia la relación de aprendizaje con cada episodio  
             if self.num_episodes > 1:
-                self.epsilon = max(0.05, 1 - (ep / (self.num_episodes - 1)))
+                self.epsilon = max(EPSILON_MIN, 1 - (ep / (self.num_episodes - 1)))
             else:
                 self.epsilon = self.epsilon                
             
@@ -1225,7 +1246,7 @@ if __name__ == "__main__":
     # Limpia los archivos contenidos en los directorios temporales
     clear_results_directories()
 
-    sim1 = Simulation(num_episodes=1000, epsilon=1, learning=True, filename="Case1.csv")
+    sim1 = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1.csv")
     sim1.run()
     sim1.show_performance_metrics()
 

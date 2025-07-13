@@ -1,6 +1,4 @@
 import os
-import sys
-import matplotlib
 import numpy as np
 import random
 import pandas as pd
@@ -10,7 +8,6 @@ import copy
 from tabulate import tabulate
 from itertools import cycle
 from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination, clear_results_directories
-
 
 # Global constants
 C_CONFORT = 0.5   # Comfort threshold for market cost
@@ -462,30 +459,28 @@ class BatteryAgent(BaseAgent):
         - 2: Discharging
         """
         power_surplus = P_T - P_L
-        normalized_soc = self.battery_soc_idx / self.max_soc_idx
 
         # --- Positive Incentives (Rewards) ---
 
         # 1. Reward for discharging during a power deficit
-        if power_surplus < 0 and self.battery_state == 2 and self.battery_soc_idx > 0:
-            return self.kappa * normalized_soc * abs(power_surplus)
+        if power_surplus <= 0 and self.battery_state == 2 and self.battery_soc_idx > 0:
+            return self.kappa * self.battery_soc_idx * abs(power_surplus)
 
         # 2. Reward for charging during a power surplus
-        if power_surplus > 0 and self.battery_state == 1 and self.battery_soc_idx < self.max_soc_idx:
-            return self.nu * (1 - normalized_soc) * power_surplus
+        if power_surplus > 0 and self.battery_state == 1 and self.battery_soc_idx > 0:
+            return self.nu * power_surplus
 
         # --- Negative Incentives (Penalties) ---
 
         # 3. Penalty for attempting an impossible action (e.g., discharging when empty)
-        if (self.battery_state == 2 and self.battery_soc_idx == 0) or \
-        (self.battery_state == 1 and self.battery_soc_idx == self.max_soc_idx):
+        if (self.battery_state == 2 and self.battery_soc_idx == 0):
             return -100*self.sigma # High, fixed penalty
 
         # 4. Penalty for doing the opposite of what is needed
         if power_surplus > 0 and (self.battery_state == 2 or self.battery_state == 0):
             return -self.sigma * power_surplus
 
-        if power_surplus < 0 and (self.battery_state == 1 or self.battery_state == 0):
+        if power_surplus <= 0 and (self.battery_state == 1 or self.battery_state == 0):
             return -self.mu * abs(power_surplus)
 
         # 5. Small penalty for degradation or operating without need
@@ -634,7 +629,7 @@ class LoadAgent(BaseAgent):
         return 0.0
 
 # -----------------------------------------------------
-# Simulación de entrenamiento
+# Training simulation
 # -----------------------------------------------------
 class Simulation:
     def __init__(self, num_episodes=10, epsilon=1, learning=True, filename="Case1.csv"):
@@ -645,15 +640,16 @@ class Simulation:
         self.df_episode_metrics = pd.DataFrame()
         self.prev_q_tables = {} # Diccionario para almacenar la Q-table previa de cada agente
         
-        # Creamos el entorno que carga el CSV y discretiza
+        # Create the environment that loads the CSV and discretizes
         self.env = MultiAgentEnv(csv_filename=filename, num_demand_bins=BINS, num_renewable_bins=BINS)
         
-        # Obtiene los puntos de manera automatica de la base de datos
+        # Obtains points automatically from the database
         self.max_steps = self.env.max_steps
         
+        # The storage agent is instantiated
         bat_ag = BatteryAgent(self.env)
 
-        # Definimos un conjunto de agentes
+        # The set of agents is defined
         self.agents = [
             SolarAgent(self.env),
             WindAgent(self.env),
@@ -662,10 +658,10 @@ class Simulation:
             LoadAgent(self.env, bat_ag)
         ]
         
-        # Parámetros de entrenamiento
+        # Training parameters
         self.epsilon = epsilon  # Exploración \epsilon (0=explotación, 1=exploración)
         
-        # Inicializamos Q-tables
+        # Initialize Q-tables
         if learning:
             for agent in self.agents:
                 agent.initialize_q_table(self.env)
@@ -675,7 +671,7 @@ class Simulation:
         agent_states = {}
         
         for agent in self.agents:
-            agent_type = type(agent).__name__  # Obtiene el nombre de la clase del agente
+            agent_type = type(agent).__name__  # Gets the name of the agent class
             agent_states[agent_type] = agent.get_discretized_state(self.env, index)
             agent.idx = agent_states[agent_type][0]        
        
@@ -764,13 +760,16 @@ class Simulation:
                         self.instant["bat_state"] = agent.battery_state
                         
                         agent.update_soc(power_w=agent.battery_power)
+
                     elif isinstance(agent, GridAgent):
                         agent.choose_action(state['GridAgent'], self.epsilon)
-                        if agent.action == 1: # "sell"
-                            agent.grid_state = 1 # "selling" 
+                        
+                        agent.grid_state = agent.action
+                        # "sell"
+                        if agent.action == 1: 
                             agent.grid_power = abs(self.env.demand_power - (solar_power + wind_power) - bat_power)
+                        # "selling" 
                         else: 
-                            agent.grid_state = 0 
                             agent.grid_power = 0
                         
                         grid_power = agent.grid_power
@@ -992,8 +991,7 @@ class Simulation:
                 field=field_q,
                 ylabel=f"Q Norm Difference ({agent_key})",
                 filename_svg=f"results/plots/Q_Norm_{agent_key}.svg"
-            )
-        
+            )        
         
         # Calcular umbral IAE como mediana de primeros 50 episodios ±10%
         iae_median = self.df_episode_metrics[self.df_episode_metrics['Episode'] < 50]['IAE'].median()
@@ -1083,7 +1081,7 @@ class Simulation:
     def compute_reward_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         summary = []
 
-        for agent in ['solar', 'bat', 'grid', 'wind', 'demand']:
+        for agent in ['solar', 'wind', 'bat', 'grid', 'demand']:
             rewards = df[f'reward_{agent}']
             metrics = {
                 'Agent': agent,
@@ -1239,18 +1237,19 @@ class Simulation:
         plt.show()
 
 # -----------------------------------------------------
-# Punto de entrada principal
+# Main program
 # -----------------------------------------------------
 if __name__ == "__main__":
     
-    # Limpia los archivos contenidos en los directorios temporales
+    # Cleans up files contained in temporary directories
     clear_results_directories()
 
-    sim1 = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1.csv")
-    sim1.run()
-    sim1.show_performance_metrics()
+    # Simulation setup
+    sim = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1_1.csv")
+    sim.run()
+    sim.show_performance_metrics()
 
-    # Graficas con los resultados de la interaccion cuando los agentes hayan completado el aprendizaje
+    # Graphs with the results of the interaction when the agents have completed the learning
     df_raw = load_latest_evolution_csv()
     df_clean = process_evolution_data(df_raw)
     plot_coordination(df_clean)

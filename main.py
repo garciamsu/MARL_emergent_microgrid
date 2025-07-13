@@ -269,16 +269,19 @@ class SolarAgent(BaseAgent):
         P_L: Demanda 
         S_PV: Estado del panel solar
         """
-        
+
+        power_surplus = P_H - P_L        
+
         if P_H <= P_L and S_PV == 1:
-            return - self.kappa * (P_L - P_H)
+            return  - self.kappa * abs(power_surplus or 1)
         elif P_H > P_L and S_PV == 1:
-            return self.sigma * (P_H - P_L)
+            return self.sigma * abs(power_surplus or 1)
         elif P_H > P_L and S_PV == 0:
-            return - self.sigma * (P_H - P_L)
+            return - self.sigma * abs(power_surplus or 1)
         elif P_H <= P_L and S_PV == 0:
-            return self.sigma * (P_L - P_H)
-        return -self.sigma
+            return self.sigma * abs(power_surplus or 1)
+        else:   
+            return -self.sigma
 
 class WindAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv):
@@ -352,16 +355,18 @@ class WindAgent(BaseAgent):
         P_L: demanda 
         S_WD: estado de la turbina eólica
         """
-        
+        power_surplus = P_H - P_L    
+                
         if P_H <= P_L and S_WD == 1:
-            return - self.kappa * (P_L - P_H)
+            return - self.kappa * abs(power_surplus or 1)
         elif P_H > P_L and S_WD == 1:
-            return self.sigma * (P_H - P_L)
+            return self.sigma * abs(power_surplus or 1)
         elif P_H > P_L and S_WD == 0:
-            return - self.sigma * (P_H - P_L)
-        if P_H <= P_L and S_WD == 0:
-            return self.kappa * (P_L - P_H)
-        return -self.kappa
+            return - self.sigma * abs(power_surplus or 1)
+        elif P_H <= P_L and S_WD == 0:
+            return self.kappa * abs(power_surplus or 1)
+        else:   
+            return -self.sigma
 
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=4):
@@ -451,7 +456,7 @@ class BatteryAgent(BaseAgent):
         # Retornamos la tupla de estado discretizado
         return (self.battery_soc_idx, self.battery_state, env.renewable_power_idx, env.demand_power_idx)
 
-    def calculate_reward(self, P_T, P_L):
+    def calculate_reward(self, P_H, P_L):
         """
         Calculates the reward based on grid and battery state.
         Battery states (battery_state):
@@ -459,17 +464,17 @@ class BatteryAgent(BaseAgent):
         - 1: Charging
         - 2: Discharging
         """
-        power_surplus = P_T - P_L
+        power_surplus = P_H - P_L
 
         # --- Positive Incentives (Rewards) ---
 
         # 1. Reward for discharging during a power deficit
         if power_surplus <= 0 and self.battery_state == 2 and self.battery_soc_idx > 0:
-            return self.kappa * self.battery_soc_idx * abs(power_surplus)
+            return self.kappa * self.battery_soc_idx * abs(power_surplus or 1)
 
         # 2. Reward for charging during a power surplus
         if power_surplus > 0 and self.battery_state == 1 and self.battery_soc_idx > 0:
-            return self.nu * power_surplus
+            return self.nu * (power_surplus or 1)
 
         # --- Negative Incentives (Penalties) ---
 
@@ -479,10 +484,10 @@ class BatteryAgent(BaseAgent):
 
         # 4. Penalty for doing the opposite of what is needed
         if power_surplus > 0 and (self.battery_state == 2 or self.battery_state == 0):
-            return -self.sigma * power_surplus
+            return -self.sigma * (power_surplus or 1)
 
         if power_surplus <= 0 and (self.battery_state == 1 or self.battery_state == 0):
-            return -self.mu * abs(power_surplus)
+            return -self.mu * abs(power_surplus or 1)
 
         # 5. Small penalty for degradation or operating without need
         if self.battery_state != 0:
@@ -857,7 +862,7 @@ class Simulation:
                     elif isinstance(agent, BatteryAgent):
                         
                         reward = agent.calculate_reward(
-                                P_T=self.renewable_power_idx, 
+                                P_H=self.renewable_power_idx, 
                                 P_L=self.env.demand_power_idx)
 
                         self.instant["bat_soc"] = agent.soc
@@ -978,7 +983,7 @@ class Simulation:
             static_filename="results/plots/actions_plot"
         ) 
 
-        self.plot_metric('Average Reward')  # Puedes usar 'Total Reward' u otra métrica
+        self.plot_metric('Total Reward')  # Puedes usar 'Total Reward' u otra métrica
         
         # Graficar IAE
         plot_metric(
@@ -1024,6 +1029,9 @@ class Simulation:
         else:
             print("SYSTEM NOT STABLE ⚠️")        
        
+        
+        self.show_performance_metrics()
+
         return self.agents
 
     def calculate_ise(self) -> float:
@@ -1125,7 +1133,7 @@ class Simulation:
         df_metrics['Episode'] = episode
         self.df_episode_metrics = pd.concat([self.df_episode_metrics, df_metrics], ignore_index=True)
 
-    def plot_metric(self, metric_field='Average Reward', output_format='svg', filename='results/plots/metric_plot'):
+    def plot_metric(self, metric_field='Total Reward', output_format='svg', filename='results/plots/metric_plot'):
         """
         Genera una gráfica de métricas por agente y la guarda como archivo vectorial o de alta resolución.
         
@@ -1259,9 +1267,8 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=1000, epsilon=1, learning=True, filename="Case1_1.csv")
+    sim = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1_1.csv")
     sim.run()
-    sim.show_performance_metrics()
 
     # Graphs with the results of the interaction when the agents have completed the learning
     df_raw = load_latest_evolution_csv()

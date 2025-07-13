@@ -50,6 +50,7 @@ class MultiAgentEnv:
         self.max_steps = 0
         self.num_demand_bins = num_demand_bins
         self.num_renewable_bins = num_renewable_bins
+        self.scale_demand = 1
         
         # Cargamos el DataFrame con offsets
         offsets_dict = {"demand": 0, "price": 0, "solar_power": 0, "wind_power": 0}
@@ -113,7 +114,7 @@ class MultiAgentEnv:
         """
         row = self.dataset.iloc[index]
         
-        self.demand_power = row["demand"]
+        self.demand_power = row["demand"]*self.scale_demand
         self.renewable_power = row["solar_power"] + row["wind_power"]
         self.price = row["price"]
         self.time = row["Datetime"]
@@ -597,7 +598,7 @@ class LoadAgent(BaseAgent):
         devolviendo (idx).
         """
         row = env.dataset.iloc[index]
-        self.current_power = row["demand"]
+        self.current_power = row["demand"]*env.scale_demand
 
         # Discretizamos
         battery_soc_idx = self.digitize_clip(self.ess.soc, self.ess.battery_soc_bins)
@@ -693,6 +694,8 @@ class Simulation:
     def run(self):
 
         for ep in range(self.num_episodes):
+
+            self.env.scale_demand = random.uniform(1, 6)
             
             # Save snapshot of previous Q-tables (only if not the first episode)
             if ep > 0:
@@ -1256,7 +1259,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1_1.csv")
+    sim = Simulation(num_episodes=1000, epsilon=1, learning=True, filename="Case1_1.csv")
     sim.run()
     sim.show_performance_metrics()
 

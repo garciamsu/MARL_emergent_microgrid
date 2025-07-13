@@ -12,7 +12,7 @@ from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, lo
 # Global constants
 C_CONFORT = 0.5   # Comfort threshold for market cost
 BINS = 7          # Defines how many intervals are used to discretize the power variables (renewables, no-renewables and demand).
-SOC_INITIAL = 0.6
+SOC_INITIAL = 0.9
 EPSILON_MIN = 0
 
 # Creates files if they do not exist
@@ -534,7 +534,7 @@ class GridAgent(BaseAgent):
         # Retornamos la tupla de estado discretizado
         return (self.grid_state, battery_soc_idx, env.renewable_power_idx, env.demand_power_idx)
 
-    def calculate_reward(self, P_H, P_L, SOC, C_mercado):
+    def calculate_reward2(self, P_T, P_L, SOC, C_mercado):
         """
         Calcula la recompensa basada en una lógica clara de costos y beneficios.
         - Recompensa la autonomía.
@@ -544,28 +544,41 @@ class GridAgent(BaseAgent):
         
         # ✅ Recompensa Única: Autonomía
         # El único estado que recibe un premio positivo, usando 'kappa'.
-        if self.grid_state == 0 and P_H > P_L:
+        if self.grid_state == 0 and P_T > P_L:
             return self.kappa*10
 
         # ❌ Penalización Máxima: Apagón evitable
         # Castigo fijo y más severo, basado en 'mu' pero muy amplificado.
-        elif self.grid_state == 0 and P_H <= P_L:
+        elif self.grid_state == 0 and P_T <= P_L:
             return -self.mu * 100
 
         # ⚠️ Penalización Débil: Importación necesaria
         # Costo base por importar de la red, usando 'mu' directamente.
-        elif self.grid_state == 1 and P_H < P_L and SOC == 0:
+        elif self.grid_state == 1 and P_T < P_L and SOC == 0:
             return -self.mu * C_mercado
 
         # ⛔️ Penalización Fuerte: Importación innecesaria
         # Error de gestión castigado con más fuerza, usando 'mu' amplificado.
-        elif self.grid_state == 1 and (P_H >= P_L or SOC > 0):
+        elif self.grid_state == 1 and (P_T >= P_L or SOC > 0):
             # Se multiplica por 10 para que sea claramente peor que la importación necesaria
             return -(self.mu * 10) * C_mercado
             
         # Estado neutral
         else:
             return -self.mu
+
+    def calculate_reward(self, P_T, P_L, SOC, C_mercado):
+        
+        if SOC == 0 and P_T < P_L and self.grid_state == 1:
+            return self.kappa / C_mercado
+        elif SOC > 0 and P_T < P_L and self.grid_state == 1:
+            return -self.mu * C_mercado
+        elif (SOC > 0 or P_T > P_L) and self.grid_state == 1:
+            return -self.sigma * C_mercado
+        elif SOC == 0 and P_T <= P_L and self.grid_state == 0:
+            return -self.nu * C_mercado
+        else:
+            return -self.nu
 
 class LoadAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
@@ -697,7 +710,7 @@ class Simulation:
             for agent in self.agents:
                 # Stops the loop upon finding the battery agent
                 if isinstance(agent, BatteryAgent):
-                    agent.soc = SOC_INITIAL
+                    agent.soc = random.uniform(0, 1)
                     break  
 
             for i in range(self.max_steps-1):
@@ -849,13 +862,13 @@ class Simulation:
                         battery_agent = agent
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
-                            P_H=renewable_power_real_idx,
+                            P_T=self.total_power_idx,
                             P_L=self.env.demand_power_idx, 
                             SOC=battery_agent.battery_soc_idx,
                             C_mercado=self.env.price)
                         self.instant["reward_grid"] = reward
                         
-                    elif isinstance(agent, LoadAgent):
+                    else:
                         reward = agent.calculate_reward(
                             action  =agent.action,
                             P_T=renewable_power_real_idx,
@@ -864,8 +877,6 @@ class Simulation:
                             C_mercado=self.env.price)
                         
                         self.instant["reward_demand"] = reward
-                    else:
-                        reward = 0.0
                     
                     # Actualizamos Q-table                    
                     agent.update_q_table(state[agent_type], agent.action, reward, next_state[agent_type])

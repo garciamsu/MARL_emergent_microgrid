@@ -464,53 +464,96 @@ class BatteryAgent(BaseAgent):
             self.soc, self.battery_soc_bins
         )
 
-    def initialize_q_table(self, env: MultiAgentEnv):
+    def initialize_q_table(self, env: MultiAgentEnv) -> None:
         """
-        Create the Q-table for all possible discretized states.
+        Initializes the Q-table for all possible combinations of discretized states:
+        (SOC_idx, renewable_potential_idx, total_power_idx, demand_power_idx)
         """
         states = []
-        for a in range(len(self.battery_soc_bins)):
-            for b in range(len(env.renewable_bins)):
-                for c in range(len(env.demand_bins)):
-                    states.append((a, b, c))
-        
-        # Para cada estado, creamos un diccionario de acción->Q
+        for soc_idx in range(len(self.battery_soc_bins)):
+            for renewable_idx in range(len(env.renewable_bins)):
+                for total_power_idx in range(len(env.renewable_bins)):
+                    for demand_idx in range(len(env.demand_bins)):
+                        states.append((soc_idx, renewable_idx, total_power_idx, demand_idx))
+
         self.q_table = {
-            state: {action: 0 for action in self.actions} 
+            state: {action: 0.0 for action in self.actions}
             for state in states
         }
 
-    def get_discretized_state(self, env: MultiAgentEnv, index):
+    def get_discretized_state(self, env: MultiAgentEnv, index: int) -> tuple:
         """
-        Toma valores reales y los discretiza en bins,
-        devolviendo (idx_solar).
+        Returns the discretized state of the battery agent:
+        (SOC_idx, renewable_potential_idx, total_power_idx, demand_power_idx)
+
+        Assumes env.total_power and env.demand_power_idx are already computed before calling this.
         """
-       
-        # Discretizamos
+        # Update and discretize SOC
         self.idx = self.digitize_clip(self.soc, self.battery_soc_bins)
-        self.idx = self.idx       
-        
-        # Retornamos la tupla de estado discretizado
-        return (self.idx, env.renewable_potential_idx, env.demand_power_idx)
 
-    def calculate_reward(self, P_H, P_L):
+        # Discretized state components from environment
+        renewable_potential_idx = env.renewable_potential_idx
+        total_power_idx = env.digitize_clip(env.total_power, env.renewable_bins)
+        demand_power_idx = env.demand_power_idx
 
-        power_surplus = P_H - P_L
+        return (self.idx, renewable_potential_idx, total_power_idx, demand_power_idx)
 
-        if self.idx > 0  and power_surplus <= 0 and self.battery_state == 2:
-            return self.kappa * self.idx * abs(power_surplus or 1)*10
-        elif self.idx == 0  and power_surplus <= 0 and self.battery_state == 2:
-            return - self.sigma * abs(power_surplus or 1)
-        elif power_surplus > 0 and self.battery_state == 2:
-            return - self.sigma * self.idx * abs(power_surplus or 1)
-        elif self.idx == 0 and power_surplus <= 0 and self.battery_state == 2:
-            return - self.sigma 
-        elif  power_surplus > 0 and self.battery_state == 1:
-            return self.kappa * abs(power_surplus or 1) *10
-        elif power_surplus <= 0 and self.battery_state == 1:
-            return - self.sigma 
-        else: 
-            return - self.sigma
+    def calculate_reward(
+        self,
+        renewable_potential_idx: int,
+        total_power_idx: int,
+        demand_power_idx: int
+    ) -> float:
+        """
+        Computes the reward for the battery agent based on its SOC, system balance,
+        and current action (self.action ∈ {0: idle, 1: charge, 2: discharge}).
+
+        Parameters:
+            renewable_potential_idx (int): Discretized index of available renewable generation.
+            total_power_idx (int): Discretized index of total system power output.
+            demand_power_idx (int): Discretized index of demand.
+
+        Returns:
+            float: Reward signal guiding the battery agent.
+        """
+        power_gap = total_power_idx - demand_power_idx  # surplus if > 0, shortage if < 0
+
+        # Action = discharge
+        if self.action == 2:
+            if self.idx == 0:
+                # Trying to discharge with empty battery → strong penalty
+                return -self.mu
+            elif power_gap <= 0:
+                # Discharging to help system under deficit → reward
+                return self.kappa * abs(power_gap or 1)
+            else:
+                # Discharging when system has excess → penalty
+                return -self.sigma * self.idx
+
+        # Action = charge
+        elif self.action == 1:
+            if self.idx == self.max_soc_idx:
+                # Trying to charge at full SOC → penalty
+                return -self.mu
+            elif renewable_potential_idx > demand_power_idx and power_gap > 0:
+                # Charging with renewable surplus → reward
+                return self.kappa
+            else:
+                # Charging when there's no surplus → mild penalty
+                return -self.sigma
+
+        # Action = idle
+        else:
+            if self.idx > 0 and power_gap < 0:
+                # Battery could discharge to help system but stays idle → penalty
+                return -self.beta
+            elif self.idx < self.max_soc_idx and power_gap > 0 and renewable_potential_idx > demand_power_idx:
+                # Battery could charge from renewable surplus but stays idle → penalty
+                return -self.beta
+            else:
+                # Acceptable inaction → neutral or small reward
+                return self.nu
+
 
 class GridAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):

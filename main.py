@@ -64,6 +64,7 @@ class MultiAgentEnv:
         self.total_power_idx = self.digitize_clip(self.total_power, self.renewable_bins)
         self.price = 0
         self.delta_power = 0
+        self.delta_power_idx = "surplus"
         self.scale_demand = 1
         
         # Initial state (discretized)
@@ -663,66 +664,102 @@ class GridAgent(BaseAgent):
                 # Idle during balance without wasted renewable potential → neutral to mild reward
                 return self.nu
 
-
 class LoadAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
+        """
+        Controllable Load Agent that learns when to consume energy based on battery level,
+        renewable potential, system-wide power balance, and market price comfort.
+
+        :param env: Reference to the simulation environment.
+        :param ess: Reference to the battery agent providing SoC index.
+        """
         super().__init__("load", [0, 1], alpha=0.1, gamma=0.9)
 
-        # Acciones: ["apagar", "encender"] -> [0, 1]
-        self.comfort = 5
-        self.ess =  ess
-        self.load_state_bins = [0, 1] # 0=no encender, 1=encender
-        self.load_state = 1
+        self.env = env
+        self.ess = ess
+        self.comfort = 5  # User-defined maximum acceptable market price
 
-    def get_discretized_state(self, env: MultiAgentEnv, index):
+    def get_discretized_state(self, index: int) -> tuple:
         """
-        Toma valores reales y los discretiza en bins,
-        devolviendo (idx).
-        """
-        row = env.dataset.iloc[index]
-        self.power = row["demand"]*env.scale_demand
+        Constructs the discretized state tuple using battery SoC, renewable index, 
+        power balance and market price acceptability.
 
-        # Discretizamos
-        idx = self.digitize_clip(self.ess.soc, self.ess.battery_soc_bins)
-        self.demand_power_idx = self.digitize_clip(self.power, env.demand_bins)
-        self.idx = self.demand_power_idx
-        
-        # Retornamos la tupla de estado discretizado
-        return (env.demand_power_idx, self.load_state, env.renewable_potential_idx, idx)
+        :param index: Index in the environment's dataset for the current timestep.
+        :return: Tuple representing the discrete state.
+        """
+        row = self.env.dataset.iloc[index]
+        market_price = row["price"]
 
-    def initialize_q_table(self, env: MultiAgentEnv):
+        # Get components from environment and battery agent
+        battery_soc_idx = self.ess.idx
+        renewable_potential_idx = self.env.renewable_potential_idx
+        delta_power_idx = self.env.delta_power_idx  # Should be set externally in env
+        comfort_idx = 'acceptable' if market_price <= self.comfort else 'expensive'
+
+        return (battery_soc_idx, renewable_potential_idx, delta_power_idx, comfort_idx)
+
+    def initialize_q_table(self):
         """
-        Create the Q-table for all possible discretized states.
+        Initializes the Q-table with all possible combinations of discrete state variables.
         """
+        battery_bins = self.ess.battery_soc_bins
+        renewable_bins = self.env.renewable_bins
+        delta_power_labels = ['deficit', 'surplus']
+        comfort_labels = ['acceptable', 'expensive']
+
         states = []
-        for a in range(len(env.demand_bins)):
-            for b in range(len(self.load_state_bins)):
-                for c in range(len(env.renewable_bins)):
-                    for d in range(len(self.ess.battery_soc_bins)):
-                        states.append((a, b, c, d))
-        
-        # Para cada estado, creamos un diccionario de acción->Q
+        for b in range(len(battery_bins)):
+            for r in range(len(renewable_bins)):
+                for d in delta_power_labels:
+                    for c in comfort_labels:
+                        states.append((b, r, d, c))
+
         self.q_table = {
-            state: {action: 0 for action in self.actions} 
+            state: {action: 0.0 for action in self.actions}
             for state in states
         }
 
-    def calculate_reward(self, action, P_T, P_L, SOC, C_mercado):
-        if action == 1: #Encender
-            if (P_T > P_L or SOC > 0):
-                return self.kappa
-            elif C_mercado < self.comfort:
-                return self.kappa
-            else:
-                return - self.kappa
-        elif action == 0: #Apagar
-            if (P_T > P_L or SOC > 0):
-                return - self.kappa
-            elif C_mercado < self.comfort:
-                return - self.kappa
-            else:
-                return self.kappa
+    def calculate_reward(self, battery_soc_idx: int, renewable_potential_idx: int, 
+                        delta_power_idx: str, comfort_idx: str) -> float:
+        """
+        Computes reward based on full state context and agent's action.
+        Penalizes consumption during grid surplus and encourages use of local/green energy.
+
+        :param battery_soc_idx: Discretized battery SoC index.
+        :param renewable_potential_idx: Discretized renewable generation index.
+        :param delta_power_idx: 'surplus' or 'deficit'.
+        :param comfort_idx: 'acceptable' or 'expensive'.
+        :return: Reward value based on symbolic context.
+        """
+        # Thresholds to define "low" and "high"
+        low_soc = battery_soc_idx <= 1
+        low_renewables = renewable_potential_idx <= 1
+
+        if self.action == 1:  # Turn ON
+            if delta_power_idx == 'surplus':
+                if low_soc and low_renewables:
+                    # Grid surplus: penalize unnecessary consumption
+                    return -self.kappa
+                else:
+                    # Surplus from battery or renewables: reward
+                    return self.kappa
+            elif delta_power_idx == 'deficit':
+                if comfort_idx == 'acceptable':
+                    return self.kappa / 2  # Small reward for affordable power
+                else:
+                    return -self.kappa  # Expensive + deficit → penalize
+
+        elif self.action == 0:  # Turn OFF
+            if delta_power_idx == 'deficit' and comfort_idx == 'expensive':
+                return self.kappa  # Wise decision to save cost and avoid overloading
+            elif delta_power_idx == 'surplus':
+                if low_soc and low_renewables:
+                    return self.kappa  # Grid surplus → good to avoid it
+                else:
+                    return -self.kappa / 2  # Missed opportunity to use green/local energy
+
         return 0.0
+
 
 # -----------------------------------------------------
 # Training simulation

@@ -39,8 +39,8 @@ class MultiAgentEnv:
           - num_*_bins: define cuántos intervalos se utilizan para discretizar cada variable.
         """
 
-        self.renewable_power = 0
-        self.renewable_power_idx = 0
+        self.renewable_potential = 0
+        self.renewable_potential_idx = 0
         self.total_power = 0
         self.demand_power = 0        
         self.demand_power_idx = 0
@@ -115,16 +115,16 @@ class MultiAgentEnv:
         row = self.dataset.iloc[index]
         
         self.demand_power = row["demand"]*self.scale_demand
-        self.renewable_power = row["solar_power"] + row["wind_power"]
+        self.renewable_potential = row["solar_power"] + row["wind_power"]
         self.price = row["price"]
         self.time = row["Datetime"]
 
         # Discretizamos
         self.demand_power_idx = self.digitize_clip(self.demand_power, self.demand_bins)
-        self.renewable_power_idx = self.digitize_clip(self.renewable_power, self.renewable_bins)
+        self.renewable_potential_idx = self.digitize_clip(self.renewable_potential, self.renewable_bins)
         
         # Retornamos la tupla de estado discretizado
-        return (self.demand_power_idx, self.renewable_power_idx)
+        return (self.demand_power_idx, self.renewable_potential_idx)
 
     def digitize_clip(self, value: float, bins: np.ndarray) -> int:
         #discretización robusta y reutilizable
@@ -202,34 +202,13 @@ class SolarAgent(BaseAgent):
         super().__init__("solar", [0, 1], alpha=0.1, gamma=0.9, isPower=True)
 
         # ["idle", "produce"] -> [0, 1]
-
-        # Discretizacion por cuantizacion uniforme
-        # Definimos los "bins" para discretizar cada variable de interés
-        # Ajusta los rangos según tu dataset real
+        # Uniform Quantization Discretization
+        # Define the bins to discretize each variable of interest
+        # Adjust the ranges according to your actual dataset
         self.solar_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
         self.solar_state_bins = [0, 1] # 0=idle, 1=producing
         self.solar_state = 0  
  
-    def to_dataframe(self):
-        """
-        Convierte la Q-table en un DataFrame de pandas.
-        """
-        registros = []
-        for estado, acciones in self.q_table.items():
-            a, b, c, d = estado
-            q0 = acciones.get(0, 0)
-            q1 = acciones.get(1, 0)
-            registros.append({
-                'a (solar)': a,
-                'b (panel)': b,
-                'c (renov)': c,
-                'd (dem)': d,
-                'Q[0] (no produce)': q0,
-                'Q[1] (produce)': q1,
-                'mejor acción': 0 if q0 >= q1 else 1
-            })
-        return pd.DataFrame(registros)
-
     def get_discretized_state(self, env: MultiAgentEnv, index):
         """
         Toma valores reales y los discretiza en bins,
@@ -244,11 +223,11 @@ class SolarAgent(BaseAgent):
         self.idx = solar_power_idx
         
         # Retornamos la tupla de estado discretizado
-        return (solar_power_idx, solar_state_idx, env.renewable_power_idx, env.demand_power_idx)
+        return (solar_power_idx, solar_state_idx, env.renewable_potential_idx, env.demand_power_idx)
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
-        Crea la Q-table para todos los posibles estados discretizados.
+        Create the Q-table for all possible discretized states.
         """
         states = []
         for a in range(len(self.solar_power_bins)):
@@ -257,7 +236,7 @@ class SolarAgent(BaseAgent):
                     for d in range(len(env.demand_bins)):
                         states.append((a, b, c, d))
         
-        # Para cada estado, creamos un diccionario de acción -> Q
+        # For each state, we create an action dictionary -> Q
         self.q_table = {
             state: {action: 0 for action in self.actions} 
             for state in states
@@ -289,33 +268,13 @@ class WindAgent(BaseAgent):
 
         # ["idle", "produce"] -> [0, 1]
 
-        # Discretizacion por cuantizacion uniforme
-        # Definimos los "bins" para discretizar cada variable de interés
-        # Ajusta los rangos según tu dataset real
+        # Uniform Quantization Discretization
+        # Define the bins to discretize each variable of interest
+        # Adjust the ranges according to your actual dataset
         self.wind_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
         self.wind_state_bins = [0, 1] # 0=idle, 1=producing
         self.wind_state = 0  
  
-    def to_dataframe(self):
-        """
-        Convierte la Q-table en un DataFrame de pandas.
-        """
-        registros = []
-        for estado, acciones in self.q_table.items():
-            a, b, c, d = estado
-            q0 = acciones.get(0, 0)
-            q1 = acciones.get(1, 0)
-            registros.append({
-                'a (solar)': a,
-                'b (panel)': b,
-                'c (renov)': c,
-                'd (dem)': d,
-                'Q[0] (no produce)': q0,
-                'Q[1] (produce)': q1,
-                'mejor acción': 0 if q0 >= q1 else 1
-            })
-        return pd.DataFrame(registros)
-
     def get_discretized_state(self, env: MultiAgentEnv, index):
         """
         Toma valores reales y los discretiza en bins,
@@ -330,11 +289,11 @@ class WindAgent(BaseAgent):
         self.idx = wind_power_idx
         
         # Retornamos la tupla de estado discretizado
-        return (wind_power_idx, wind_state_idx, env.renewable_power_idx, env.demand_power_idx)
+        return (wind_power_idx, wind_state_idx, env.renewable_potential_idx, env.demand_power_idx)
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
-        Crea la Q-table para todos los posibles estados discretizados.
+        Create the Q-table for all possible discretized states.
         """
         states = []
         for a in range(len(self.wind_power_bins)):
@@ -343,7 +302,7 @@ class WindAgent(BaseAgent):
                     for d in range(len(env.demand_bins)):
                         states.append((a, b, c, d))
         
-        # Para cada estado, creamos un diccionario de acción -> Q
+        # For each state, we create an action dictionary -> Q
         self.q_table = {
             state: {action: 0 for action in self.actions} 
             for state in states
@@ -369,7 +328,7 @@ class WindAgent(BaseAgent):
             return -self.sigma
 
 class BatteryAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=4):
+    def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=3):
         super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9)
         
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
@@ -428,14 +387,13 @@ class BatteryAgent(BaseAgent):
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
-        Crea la Q-table para todos los posibles estados discretizados.
+        Create the Q-table for all possible discretized states.
         """
         states = []
         for a in range(len(self.battery_soc_bins)):
-            for b in range(3):
-                for c in range(len(env.renewable_bins)):
-                    for d in range(len(env.demand_bins)):
-                        states.append((a, b, c, d))
+            for b in range(len(env.renewable_bins)):
+                for c in range(len(env.demand_bins)):
+                    states.append((a, b, c))
         
         # Para cada estado, creamos un diccionario de acción->Q
         self.q_table = {
@@ -454,72 +412,51 @@ class BatteryAgent(BaseAgent):
         self.idx = self.battery_soc_idx       
         
         # Retornamos la tupla de estado discretizado
-        return (self.battery_soc_idx, self.battery_state, env.renewable_power_idx, env.demand_power_idx)
+        return (self.battery_soc_idx, env.renewable_potential_idx, env.demand_power_idx)
 
     def calculate_reward(self, P_H, P_L):
-        """
-        Calculates the reward based on grid and battery state.
-        Battery states (battery_state):
-        - 0: Standby
-        - 1: Charging
-        - 2: Discharging
-        """
+
         power_surplus = P_H - P_L
 
-        # --- Positive Incentives (Rewards) ---
-
-        # 1. Reward for discharging during a power deficit
-        if power_surplus <= 0 and self.battery_state == 2 and self.battery_soc_idx > 0:
+        if self.battery_soc_idx > 0  and power_surplus <= 0 and self.battery_state == 2:
             return self.kappa * self.battery_soc_idx * abs(power_surplus or 1)
-
-        # 2. Reward for charging during a power surplus
-        if power_surplus > 0 and self.battery_state == 1 and self.battery_soc_idx > 0:
-            return self.nu * (power_surplus or 1)
-
-        # --- Negative Incentives (Penalties) ---
-
-        # 3. Penalty for attempting an impossible action (e.g., discharging when empty)
-        if (self.battery_state == 2 and self.battery_soc_idx == 0):
-            return -100*self.sigma # High, fixed penalty
-
-        # 4. Penalty for doing the opposite of what is needed
-        if power_surplus > 0 and (self.battery_state == 2 or self.battery_state == 0):
-            return -self.sigma * (power_surplus or 1)
-
-        if power_surplus <= 0 and (self.battery_state == 1 or self.battery_state == 0):
-            return -self.mu * abs(power_surplus or 1)
-
-        # 5. Small penalty for degradation or operating without need
-        if self.battery_state != 0:
-            return -0.01*self.sigma # Small fixed cost for cycling
-
-        # 6. Default reward (inactive state and balanced grid)
-        return -self.sigma
+        elif self.battery_soc_idx >= 0  and power_surplus > 0 and self.battery_state == 2:
+            return - self.sigma * self.battery_soc_idx * abs(power_surplus or 1)
+        elif self.battery_soc_idx == 0 and power_surplus <= 0 and self.battery_state == 2:
+            return - self.sigma * 100
+        elif  power_surplus > 0 and self.battery_state == 1:
+            return self.kappa * abs(power_surplus or 1) * 1000
+        elif power_surplus <= 0 and self.battery_state == 1:
+            return - self.sigma * 1000
+        else: 
+            return - self.sigma
 
 class GridAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
         super().__init__("grid", [0, 1], alpha=0.1, gamma=0.9)
 
         # ["idle", "produce"] -> [0, 1]
-        self.grid_power = 0.0  # Potencia en W
-        self.grid_state = 0  # Estado inicial de operación
+        self.current_power = 0.0  # Power in  Watt
 
-        # Discretizacion por cuantizacion uniforme
-        # Definimos los "bins" para discretizar cada variable de interés
-        #self.battery_soc_bins = np.linspace(0, 100, num_battery_soc_bins)
+        # Uniform Quantization Discretization
+        # Define the bins to discretize each variable of interest
+        # Adjust the ranges according to your actual dataset
+        self.grid_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
+        self.grid_state_bins = [0, 1] # 0=idle, 1=producing
+        self.grid_state = 0  # Initial operating state
+        self.grid_power_idx = 0
 
         self.ess =  ess
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
-        Crea la Q-table para todos los posibles estados discretizados.
+        Create the Q-table for all possible discretized states.
         """
         states = []
-        for a in range(2):
-            for b in range(len(self.ess.battery_soc_bins)):
-                for c in range(len(env.renewable_bins)):
-                    for d in range(len(env.demand_bins)):
-                        states.append((a, b, c, d))
+        for a in range(len(self.ess.battery_soc_bins)):
+            for b in range(len(env.renewable_bins)):
+                for c in range(len(env.demand_bins)):
+                    states.append((a, b, c))
         
         # Para cada estado, creamos un diccionario de acción->Q
         self.q_table = {
@@ -534,55 +471,23 @@ class GridAgent(BaseAgent):
         """
        
         # Discretizamos
-        battery_soc_idx = self.digitize_clip(self.ess.soc, self.ess.battery_soc_bins)
-        self.idx = self.grid_state
+        #self.grid_power_idx = self.digitize_clip(self.current_power, self.grid_power_bins)
         
         # Retornamos la tupla de estado discretizado
-        return (self.grid_state, battery_soc_idx, env.renewable_power_idx, env.demand_power_idx)
-
-    def calculate_reward2(self, P_T, P_L, SOC, C_mercado):
-        """
-        Calcula la recompensa basada en una lógica clara de costos y beneficios.
-        - Recompensa la autonomía.
-        - Penaliza los costos de importación de forma proporcional.
-        - Penaliza fuertemente los errores.
-        """
-        
-        # ✅ Recompensa Única: Autonomía
-        # El único estado que recibe un premio positivo, usando 'kappa'.
-        if self.grid_state == 0 and P_T > P_L:
-            return self.kappa*10
-
-        # ❌ Penalización Máxima: Apagón evitable
-        # Castigo fijo y más severo, basado en 'mu' pero muy amplificado.
-        elif self.grid_state == 0 and P_T <= P_L:
-            return -self.mu * 100
-
-        # ⚠️ Penalización Débil: Importación necesaria
-        # Costo base por importar de la red, usando 'mu' directamente.
-        elif self.grid_state == 1 and P_T < P_L and SOC == 0:
-            return -self.mu * C_mercado
-
-        # ⛔️ Penalización Fuerte: Importación innecesaria
-        # Error de gestión castigado con más fuerza, usando 'mu' amplificado.
-        elif self.grid_state == 1 and (P_T >= P_L or SOC > 0):
-            # Se multiplica por 10 para que sea claramente peor que la importación necesaria
-            return -(self.mu * 10) * C_mercado
-            
-        # Estado neutral
-        else:
-            return -self.mu
+        return (self.ess.battery_soc_idx, env.renewable_potential_idx, env.demand_power_idx)
 
     def calculate_reward(self, P_T, P_L, SOC, C_mercado):
         
-        if SOC == 0 and P_T < P_L and self.grid_state == 1:
+        if SOC == 0 and P_T <= P_L and self.grid_state == 1:
             return self.kappa / C_mercado
-        elif SOC > 0 and P_T < P_L and self.grid_state == 1:
+        elif SOC > 0 and P_T <= P_L and self.grid_state == 1:
             return -self.mu * C_mercado
         elif (SOC > 0 or P_T > P_L) and self.grid_state == 1:
             return -self.sigma * C_mercado
         elif SOC == 0 and P_T <= P_L and self.grid_state == 0:
             return -self.nu * C_mercado
+        elif (SOC > 0 or P_T > P_L) and self.grid_state == 0:
+            return self.kappa / C_mercado
         else:
             return -self.nu
 
@@ -611,11 +516,11 @@ class LoadAgent(BaseAgent):
         self.idx = self.demand_power_idx
         
         # Retornamos la tupla de estado discretizado
-        return (env.demand_power_idx, self.load_state, env.renewable_power_idx, battery_soc_idx)
+        return (env.demand_power_idx, self.load_state, env.renewable_potential_idx, battery_soc_idx)
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
-        Crea la Q-table para todos los posibles estados discretizados.
+        Create the Q-table for all possible discretized states.
         """
         states = []
         for a in range(len(env.demand_bins)):
@@ -701,6 +606,7 @@ class Simulation:
         for ep in range(self.num_episodes):
 
             self.env.scale_demand = random.uniform(1, 6)
+            #self.env.scale_demand = 1
             
             # Save snapshot of previous Q-tables (only if not the first episode)
             if ep > 0:
@@ -724,15 +630,15 @@ class Simulation:
             for i in range(self.max_steps-1):
                 
                 # For each episode the power values ​​are initialized
-                self.env.renewable_power = 0.0
                 self.env.total_power = 0
+                self.env.renewable_potential = 0.0
+                renewable_power  = 0.0
+                renewable_power_idx = 0                
                 bat_power = 0.0
                 grid_power = 0.0
                 solar_power = 0.0
                 wind_power = 0.0
                 loadc_power = 0.0
-                renewable_power_real  = 0.0
-                renewable_power_real_idx = 0
 
                 # We reset the environment and agents at the start of each episode.
                 state = self.step(i)                
@@ -788,16 +694,16 @@ class Simulation:
                         agent.grid_state = agent.action
                         # "sell"
                         if agent.action == 1: 
-                            agent.grid_power = abs(self.env.demand_power - (solar_power + wind_power) - bat_power)
+                            agent.current_power = abs(self.env.demand_power - (solar_power + wind_power) - bat_power)
                         # "selling" 
                         else: 
-                            agent.grid_power = 0
+                            agent.current_power = 0
                         
-                        grid_power = agent.grid_power
+                        grid_power = agent.current_power
 
-                        self.instant["grid"] = agent.grid_power
+                        self.instant["grid"] = agent.current_power
                         self.instant["grid_state"] = agent.grid_state
-                        self.instant["grid_discrete"] = agent.idx
+                        self.instant["grid_discrete"] = agent.grid_power_idx
                     else:
                         agent.choose_action(state['LoadAgent'], self.epsilon)
                         agent.load_state = agent.action
@@ -813,16 +719,22 @@ class Simulation:
                         loadc_power = agent.controllable_demand
 
                 # Calcula el balance de energia
-                renewable_power_real = wind_power + solar_power
-                self.env.total_power = renewable_power_real + bat_power + grid_power
-                renewable_power_real_idx = self.env.digitize_clip(renewable_power_real, self.env.renewable_bins)
-                self.dif_power = self.env.total_power - (self.env.demand_power + loadc_power)
-                self.renewable_power_idx = self.env.digitize_clip(self.env.renewable_power, self.env.renewable_bins)
+                renewable_power = wind_power + solar_power
+                renewable_power_idx = self.env.digitize_clip(renewable_power, self.env.renewable_bins)
+
+                self.env.total_power = renewable_power + bat_power + grid_power
                 self.total_power_idx = self.env.digitize_clip(self.env.total_power, self.env.renewable_bins)
+                
+                self.dif_power = self.env.total_power - (self.env.demand_power + loadc_power)
+
+                #self.renewable_potential_idx = self.env.digitize_clip(self.env.renewable_potential, self.env.renewable_bins)
+                
                 self.env.demand_power_idx = self.env.digitize_clip(self.env.demand_power + loadc_power, self.env.demand_bins)
 
-                self.instant["renewable"] = self.env.renewable_power
-                self.instant["renewable_discrete"] = self.renewable_power_idx
+                self.instant["renewable_potential"] = self.env.renewable_potential
+                self.instant["renewable_potential_discrete"] = self.env.renewable_potential_idx
+                self.instant["renewable_power"] = renewable_power
+                self.instant["renewable_power_discrete"] = renewable_power_idx
                 self.instant["total"] = self.env.total_power
                 self.instant["demand"] = self.env.demand_power + loadc_power
                 self.instant["dif"] = self.dif_power
@@ -847,14 +759,16 @@ class Simulation:
                     # Calculamos la recompensa según el tipo de agente
                     if isinstance(agent, SolarAgent):
                         reward = agent.calculate_reward(
-                            P_H=agent.get_discretized_state(self.env, i)[0],
+                            #P_H=agent.get_discretized_state(self.env, i)[0],
+                            P_H=renewable_power_idx,
                             P_L=self.env.demand_power_idx,
                             S_PV=agent.action
                         )
                         self.instant["reward_solar"] = reward
                     elif isinstance(agent, WindAgent):
                         reward = agent.calculate_reward(
-                            P_H=agent.get_discretized_state(self.env, i)[0],
+                            #P_H=agent.get_discretized_state(self.env, i)[0],
+                            P_H=renewable_power_idx,
                             P_L=self.env.demand_power_idx,
                             S_WD=agent.action
                         )
@@ -862,7 +776,7 @@ class Simulation:
                     elif isinstance(agent, BatteryAgent):
                         
                         reward = agent.calculate_reward(
-                                P_H=self.renewable_power_idx, 
+                                P_H=renewable_power_idx, 
                                 P_L=self.env.demand_power_idx)
 
                         self.instant["bat_soc"] = agent.soc
@@ -879,7 +793,7 @@ class Simulation:
                     else:
                         reward = agent.calculate_reward(
                             action  =agent.action,
-                            P_T=renewable_power_real_idx,
+                            P_T=renewable_power_idx,
                             P_L=self.env.demand_power_idx,
                             SOC=battery_agent.battery_soc_idx,
                             C_mercado=self.env.price)

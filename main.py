@@ -419,15 +419,17 @@ class BatteryAgent(BaseAgent):
         power_surplus = P_H - P_L
 
         if self.battery_soc_idx > 0  and power_surplus <= 0 and self.battery_state == 2:
-            return self.kappa * self.battery_soc_idx * abs(power_surplus or 1)
-        elif self.battery_soc_idx >= 0  and power_surplus > 0 and self.battery_state == 2:
+            return self.kappa * self.battery_soc_idx * abs(power_surplus or 1)*10
+        elif self.battery_soc_idx == 0  and power_surplus <= 0 and self.battery_state == 2:
+            return - self.sigma * abs(power_surplus or 1)
+        elif power_surplus > 0 and self.battery_state == 2:
             return - self.sigma * self.battery_soc_idx * abs(power_surplus or 1)
         elif self.battery_soc_idx == 0 and power_surplus <= 0 and self.battery_state == 2:
-            return - self.sigma * 100
+            return - self.sigma 
         elif  power_surplus > 0 and self.battery_state == 1:
-            return self.kappa * abs(power_surplus or 1) * 1000
+            return self.kappa * abs(power_surplus or 1) *10
         elif power_surplus <= 0 and self.battery_state == 1:
-            return - self.sigma * 1000
+            return - self.sigma 
         else: 
             return - self.sigma
 
@@ -605,7 +607,7 @@ class Simulation:
 
         for ep in range(self.num_episodes):
 
-            self.env.scale_demand = random.uniform(1, 6)
+            self.env.scale_demand = random.uniform(0.1, 7)
             #self.env.scale_demand = 1
             
             # Save snapshot of previous Q-tables (only if not the first episode)
@@ -1181,7 +1183,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1_1.csv")
+    sim = Simulation(num_episodes=400, epsilon=1, learning=True, filename="Case1_1.csv")
     sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning

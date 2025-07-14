@@ -836,14 +836,16 @@ class Simulation:
                     # We calculate the reward according to the type of agent
                     if isinstance(agent, SolarAgent):
                         reward = agent.calculate_reward(
-                            P_H=self.env.renewable_power_idx,
-                            P_L=self.env.demand_power_idx
+                            solar_potential_idx=agent.potential,
+                            total_power_idx=self.env.total_power_idx,
+                            demand_power_idx=self.env.demand_power_idx
                         )
                         self.instant["reward_solar"] = reward
                     elif isinstance(agent, WindAgent):
                         reward = agent.calculate_reward(
-                            P_H=self.env.renewable_power_idx,
-                            P_L=self.env.demand_power_idx
+                            wind_potential_idx=agent.potential,
+                            total_power_idx=self.env.total_power_idx,
+                            demand_power_idx=self.env.demand_power_idx
                         )
                         self.instant["reward_wind"] = reward
                     elif isinstance(agent, BatteryAgent):

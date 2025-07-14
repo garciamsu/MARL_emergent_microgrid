@@ -554,65 +554,115 @@ class BatteryAgent(BaseAgent):
                 # Acceptable inaction → neutral or small reward
                 return self.nu
 
-
 class GridAgent(BaseAgent):
+    """
+    GridAgent represents the utility grid in the microgrid system.
+    It decides whether to supply energy based on the system's battery SOC,
+    renewable potential, total delivered power, and current demand.
+    """
+
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
-        super().__init__("grid", [0, 1], alpha=0.1, gamma=0.9)
+        """
+        Initialize the GridAgent.
 
-        # ["idle", "produce"] -> [0, 1]
-        self.power = 0.0  # Power in  Watt
-
-        # Uniform Quantization Discretization
-        # Define the bins to discretize each variable of interest
-        # Adjust the ranges according to your actual dataset
-        self.grid_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
-        self.grid_state_bins = [0, 1] # 0=idle, 1=producing
-        self.grid_state = 0  # Initial operating state
-
-        self.ess =  ess
+        Args:
+            env (MultiAgentEnv): The environment instance.
+            ess (BatteryAgent): Reference to the battery agent for SOC access.
+        """
+        super().__init__("grid", [0, 1], alpha=0.1, gamma=0.9)  # 0=idle, 1=produce
+        self.ess = ess  # Battery agent reference
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
-        Create the Q-table for all possible discretized states.
+        Initializes the Q-table using the discretized state space:
+        (battery_soc_idx, renewable_potential_idx, total_power_idx, demand_power_idx).
         """
         states = []
-        for a in range(len(self.ess.battery_soc_bins)):
-            for b in range(len(env.renewable_bins)):
-                for c in range(len(env.demand_bins)):
-                    states.append((a, b, c))
-        
-        # Para cada estado, creamos un diccionario de acción->Q
+        for soc_idx in range(len(self.ess.battery_soc_bins)):           # battery SOC index
+            for renewable_idx in range(len(env.renewable_bins)):        # renewable potential index
+                for total_power_idx in range(len(env.renewable_bins)):  # total power output index
+                    for demand_idx in range(len(env.demand_bins)):      # demand index
+                        states.append((soc_idx, renewable_idx, total_power_idx, demand_idx))
+
         self.q_table = {
-            state: {action: 0 for action in self.actions} 
+            state: {action: 0.0 for action in self.actions}
             for state in states
         }
 
-    def get_discretized_state(self, env: MultiAgentEnv, index):
+    def get_discretized_state(self, env: MultiAgentEnv, index=None):
         """
-        Toma valores reales y los discretiza en bins,
-        devolviendo (idx_solar).
-        """
-       
-        # Discretizamos
-        #self.idx = self.digitize_clip(self.power, self.grid_power_bins)
-        
-        # Retornamos la tupla de estado discretizado
-        return (self.ess.idx, env.renewable_potential_idx, env.demand_power_idx)
+        Returns the current discretized state tuple.
 
-    def calculate_reward(self, P_T, P_L, SOC, C_mercado):
-        
-        if SOC == 0 and P_T <= P_L and self.grid_state == 1:
-            return self.kappa / C_mercado
-        elif SOC > 0 and P_T <= P_L and self.grid_state == 1:
-            return -self.mu * C_mercado
-        elif (SOC > 0 or P_T > P_L) and self.grid_state == 1:
-            return -self.sigma * C_mercado
-        elif SOC == 0 and P_T <= P_L and self.grid_state == 0:
-            return -self.nu * C_mercado
-        elif (SOC > 0 or P_T > P_L) and self.grid_state == 0:
-            return self.kappa / C_mercado
-        else:
-            return -self.nu
+        Args:
+            env (MultiAgentEnv): The environment instance.
+            index (optional): Ignored, present for compatibility.
+
+        Returns:
+            tuple: (battery_soc_idx, renewable_potential_idx, total_power_idx, demand_power_idx)
+        """
+        return (
+            self.ess.idx,
+            env.renewable_potential_idx,
+            env.total_power_idx,
+            env.demand_power_idx
+        )
+
+    def calculate_reward(
+        self,
+        battery_soc_idx: int,
+        renewable_potential_idx: int,
+        total_power_idx: int,
+        demand_power_idx: int
+    ) -> float:
+        """
+        Computes the reward for the GridAgent based on the current system state
+        and the selected action stored in self.action (0: idle, 1: produce).
+        The reward encourages the grid to support the microgrid only when strictly
+        necessary, considering battery availability, demand, renewable potential,
+        and total system output.
+
+        Parameters:
+            battery_soc_idx (int): Discretized index of the battery's state of charge (SOC).
+            renewable_potential_idx (int): Discretized index of available renewable generation.
+            total_power_idx (int): Discretized index of the total power delivered by all agents.
+            demand_power_idx (int): Discretized index of the total system demand.
+
+        Returns:
+            float: Reward signal guiding the grid agent.
+        """
+        power_gap = total_power_idx - demand_power_idx  # >0 = surplus, <0 = shortage
+        renewable_surplus = renewable_potential_idx - demand_power_idx  # >0 means renewable energy exceeds demand
+
+        # Action = produce
+        if self.action == 1:
+            if power_gap <= 0 and battery_soc_idx == 0:
+                # Grid is supplying during shortage and battery is empty → necessary → strong reward
+                return self.kappa
+            elif power_gap <= 0 and battery_soc_idx > 0:
+                # Grid is helping, but battery could have helped → mild penalty
+                return -self.mu
+            elif power_gap > 0 and renewable_surplus > 0:
+                # Grid produces despite surplus renewable energy → redundant → strong penalty
+                return -self.sigma * 2
+            elif power_gap > 0:
+                # Grid produces despite sufficient system power → wasteful → strong penalty
+                return -self.sigma
+
+        # Action = idle
+        elif self.action == 0:
+            if power_gap <= 0 and battery_soc_idx == 0:
+                # Grid is idle during shortage and battery is empty → critical inaction → strong penalty
+                return -self.nu
+            elif power_gap <= 0 and battery_soc_idx > 0:
+                # Grid is idle during shortage but battery could help → acceptable → small penalty
+                return -self.beta
+            elif power_gap > 0 and renewable_surplus > 0:
+                # Grid remains idle when renewables are sufficient → optimal → reward
+                return self.kappa / 2
+            else:
+                # Idle during balance without wasted renewable potential → neutral to mild reward
+                return self.nu
+
 
 class LoadAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):

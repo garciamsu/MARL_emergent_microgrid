@@ -436,19 +436,18 @@ class BatteryAgent(BaseAgent):
             nominal_voltage: float = 48.0  #default value in volts
         ) -> None:
         """
-        Actualiza el estado de carga (SOC) de la batería.
+        Updates the battery's state of charge (SOC).
 
         Parameters
         ----------
         power_w : float
-            Potencia instantánea (W).  
-            +  descarga  → SOC ↓  
-            –  carga     → SOC ↑
+        Instantaneous power (W).
+        + discharge → SOC ↓
+        – charge → SOC ↑
         dt_h : float, default 1.0
-            Duración del paso de simulación en horas.
+        Simulation step duration in hours.
         nominal_voltage : float, default 48.0
-            Tensión nominal de la batería (V).  Se puede sobreescribir si
-            se desea usar otro valor en alguna llamada concreta.
+        Nominal battery voltage (V). This can be overridden if you want to use a different value for a specific call.
         """
         # Capacity in Wh using nominal voltage
         capacity_wh = self.capacity_ah * nominal_voltage

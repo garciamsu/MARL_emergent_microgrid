@@ -630,8 +630,8 @@ class GridAgent(BaseAgent):
                 # Grid is not supplying during shortage and battery is empty → necessary → strong penalty
                 return -self.sigma * 100
             elif power_gap >= 0 and battery_soc_idx == 0:
-                # The battery has no energy but the demand is satisfied → penalty
-                return -self.sigma 
+                # The battery has no energy but the demand is satisfied → reward
+                return self.kappa 
             elif power_gap < 0 and battery_soc_idx > 0:
                 # Grid is not helping, but battery could have helped → reward
                 return self.kappa

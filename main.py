@@ -678,8 +678,9 @@ class LoadAgent(BaseAgent):
         self.env = env
         self.ess = ess
         self.comfort = 5  # User-defined maximum acceptable market price
+        self.comfort_idx = "acceptable"
 
-    def get_discretized_state(self, index: int) -> tuple:
+    def get_discretized_state(self, env: MultiAgentEnv, index: int) -> tuple:
         """
         Constructs the discretized state tuple using battery SoC, renewable index, 
         power balance and market price acceptability.
@@ -692,13 +693,13 @@ class LoadAgent(BaseAgent):
 
         # Get components from environment and battery agent
         battery_soc_idx = self.ess.idx
-        renewable_potential_idx = self.env.renewable_potential_idx
-        delta_power_idx = self.env.delta_power_idx  # Should be set externally in env
-        comfort_idx = 'acceptable' if market_price <= self.comfort else 'expensive'
+        renewable_potential_idx = env.renewable_potential_idx
+        delta_power_idx = env.delta_power_idx  # Should be set externally in env
+        self.comfort_idx = 'acceptable' if market_price <= self.comfort else 'expensive'
 
-        return (battery_soc_idx, renewable_potential_idx, delta_power_idx, comfort_idx)
+        return (battery_soc_idx, renewable_potential_idx, delta_power_idx, self.comfort_idx)
 
-    def initialize_q_table(self):
+    def initialize_q_table(self, env: MultiAgentEnv):
         """
         Initializes the Q-table with all possible combinations of discrete state variables.
         """
@@ -720,7 +721,7 @@ class LoadAgent(BaseAgent):
         }
 
     def calculate_reward(self, battery_soc_idx: int, renewable_potential_idx: int, 
-                        delta_power_idx: str, comfort_idx: str) -> float:
+                        delta_power_idx: str) -> float:
         """
         Computes reward based on full state context and agent's action.
         Penalizes consumption during grid surplus and encourages use of local/green energy.
@@ -744,13 +745,13 @@ class LoadAgent(BaseAgent):
                     # Surplus from battery or renewables: reward
                     return self.kappa
             elif delta_power_idx == 'deficit':
-                if comfort_idx == 'acceptable':
+                if self.comfort_idx == 'acceptable':
                     return self.kappa / 2  # Small reward for affordable power
                 else:
                     return -self.kappa  # Expensive + deficit → penalize
 
         elif self.action == 0:  # Turn OFF
-            if delta_power_idx == 'deficit' and comfort_idx == 'expensive':
+            if delta_power_idx == 'deficit' and self.comfort_idx == 'expensive':
                 return self.kappa  # Wise decision to save cost and avoid overloading
             elif delta_power_idx == 'surplus':
                 if low_soc and low_renewables:
@@ -945,6 +946,7 @@ class Simulation:
                 self.env.demand_power_idx = self.env.digitize_clip(self.env.demand_power, self.env.demand_bins)
 
                 self.delta_power = self.env.total_power - self.env.demand_power
+                self.delta_power_idx = 'deficit' if self.delta_power <= 0 else 'surplus'
 
                 self.instant["renewable_potential"] = self.env.renewable_potential
                 self.instant["renewable_potential_discrete"] = self.env.renewable_potential_idx
@@ -981,28 +983,27 @@ class Simulation:
                     elif isinstance(agent, BatteryAgent):
                         
                         reward = agent.calculate_reward(
-                                P_H=self.env.renewable_power_idx, 
-                                P_L=self.env.demand_power_idx)
+                                renewable_potential_idx=self.env.renewable_potential_idx,
+                                total_power_idx=self.env.total_power_idx,
+                                demand_power_idx=self.env.demand_power_idx
+                                )       
 
                         self.instant["bat_soc"] = agent.soc
                         self.instant["reward_bat"] = reward
                         battery_agent = agent
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
-                            P_T=self.env.total_power_idx,
-                            P_L=self.env.demand_power_idx, 
-                            SOC=battery_agent.idx,
-                            C_mercado=self.env.price)
-                        self.instant["reward_grid"] = reward
-                        
+                            battery_soc_idx=battery_agent.idx,
+                            renewable_potential_idx=self.env.renewable_potential_idx,
+                            total_power_idx=self.env.total_power_idx,
+                            demand_power_idx=self.env.demand_power_idx)
+                        self.instant["reward_grid"] = reward                        
                     else:
                         reward = agent.calculate_reward(
-                            action  =agent.action,
-                            P_T=self.env.renewable_power_idx,
-                            P_L=self.env.demand_power_idx,
-                            SOC=battery_agent.idx,
-                            C_mercado=self.env.price)
-                        
+                            battery_soc_idx=battery_agent.idx,
+                            renewable_potential_idx=self.env.renewable_potential_idx,
+                            delta_power_idx= self.delta_power_idx)
+
                         self.instant["reward_demand"] = reward
                     
                     # We updated Q-table

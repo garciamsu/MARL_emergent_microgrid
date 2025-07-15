@@ -761,7 +761,6 @@ class LoadAgent(BaseAgent):
 
         return 0.0
 
-
 # -----------------------------------------------------
 # Training simulation
 # -----------------------------------------------------
@@ -867,6 +866,7 @@ class Simulation:
                         agent.power = agent.potential*agent.action
                         solar_power = agent.power
 
+                        self.instant["solar_potential"] = agent.potential
                         self.instant["solar"] = agent.power
                         self.instant["solar_state"] = agent.solar_state
                         self.instant["solar_discrete"] = agent.idx
@@ -877,6 +877,7 @@ class Simulation:
                         agent.power = agent.potential*agent.action
                         wind_power = agent.power
 
+                        self.instant["wind_potential"] = agent.potential
                         self.instant["wind"] = agent.power
                         self.instant["wind_state"] = agent.wind_state
                         self.instant["wind_discrete"] = agent.idx
@@ -916,6 +917,7 @@ class Simulation:
                             agent.power = 0
                         
                         grid_power = agent.power
+                        agent.idx = self.env.digitize_clip(agent.power, self.env.renewable_bins)
 
                         self.instant["grid"] = agent.power
                         self.instant["grid_state"] = agent.grid_state
@@ -933,6 +935,7 @@ class Simulation:
                             agent.power = -15
                         
                         self.instant["load_state"] = agent.load_state
+                        self.instant["load_comfort_idx"] = agent.comfort_idx
                         loadc_power = agent.power
 
                 # Updates variables in environment
@@ -955,6 +958,7 @@ class Simulation:
                 self.instant["total"] = self.env.total_power
                 self.instant["demand"] = self.env.demand_power
                 self.instant["dif"] = self.delta_power
+                self.instant["dif_idx"] = self.delta_power_idx
                 self.instant["total_discrete"] = self.env.total_power_idx
                 self.instant["demand_discrete"] = self.env.demand_power_idx
                 self.instant["price"] = self.env.price

@@ -333,3 +333,9 @@ def clear_results_directories():
                 print(f"Ignored (not a file): {file_path}")
 
     print("Cleanup completed.")
+
+def digitize_clip(value: float, bins: np.ndarray) -> int:
+    # Robust and reusable discretization
+    idx = np.digitize([value], bins)[0] - 1
+    idx = np.clip(idx, 0, len(bins)-2)        # avoid -1 and last overflow
+    return int(idx)

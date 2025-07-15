@@ -7,7 +7,7 @@ from matplotlib.widgets import CheckButtons
 import copy
 from tabulate import tabulate
 from itertools import cycle
-from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination, clear_results_directories
+from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination, clear_results_directories, digitize_clip
 
 # Global constants
 C_CONFORT = 0.5   # Comfort threshold for market cost
@@ -55,13 +55,13 @@ class MultiAgentEnv:
         self.num_renewable_bins = num_renewable_bins
         
         self.renewable_potential = 0
-        self.renewable_potential_idx = self.digitize_clip(self.renewable_potential, self.renewable_bins)
+        self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.renewable_bins)
         self.renewable_power = 0
-        self.renewable_power_idx = self.digitize_clip(self.renewable_power, self.renewable_bins)
+        self.renewable_power_idx = digitize_clip(self.renewable_power, self.renewable_bins)
         self.demand_power = 0        
-        self.demand_power_idx = self.digitize_clip(self.demand_power, self.renewable_bins)
+        self.demand_power_idx = digitize_clip(self.demand_power, self.renewable_bins)
         self.total_power = 0
-        self.total_power_idx = self.digitize_clip(self.total_power, self.renewable_bins)
+        self.total_power_idx = digitize_clip(self.total_power, self.renewable_bins)
         self.price = 0
         self.delta_power = 0
         self.delta_power_idx = "surplus"
@@ -119,17 +119,11 @@ class MultiAgentEnv:
         self.price = row["price"]
         self.time = row["Datetime"]
 
-        self.demand_power_idx = self.digitize_clip(self.demand_power, self.demand_bins)
-        self.renewable_potential_idx = self.digitize_clip(self.renewable_potential, self.renewable_bins)
+        self.demand_power_idx = digitize_clip(self.demand_power, self.demand_bins)
+        self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.renewable_bins)
         
         # The discretized state tuple is returned
         return (self.demand_power_idx, self.renewable_potential_idx)
-
-    def digitize_clip(self, value: float, bins: np.ndarray) -> int:
-        # Robust and reusable discretization
-        idx = np.digitize([value], bins)[0] - 1
-        idx = np.clip(idx, 0, len(bins)-2)        # avoid -1 and last overflow
-        return int(idx)
 
 # -----------------------------------------------------
 # We define the Agent base class with Q-Table
@@ -184,13 +178,6 @@ class BaseAgent:
         new_q = current_q + self.alpha * (reward + self.gamma * max_next_q - current_q)
         self.q_table[state][action] = new_q
 
-    def digitize_clip(self, value: float, bins: np.ndarray) -> int:
-        # robust and reusable discretization
-        idx = np.digitize([value], bins)[0] - 1
-        idx = np.clip(idx, 0, len(bins)-2)        # avoid -1 and last overflow
-
-        return int(idx)
-
 # -----------------------------------------------------
 # Specialized Agents (Solar, Wind, Battery, Grid, Load)
 # Inherit from BaseAgent and add its rewards
@@ -233,9 +220,9 @@ class SolarAgent(BaseAgent):
         wind_potential = row["wind_power"]
         self.potential = solar_potential
 
-        solar_potential_idx = self.digitize_clip(solar_potential, self.solar_power_bins)
-        wind_potential_idx = self.digitize_clip(wind_potential, self.wind_power_bins)
-        total_power_idx = env.digitize_clip(env.total_power, env.renewable_bins)
+        solar_potential_idx = digitize_clip(solar_potential, self.solar_power_bins)
+        wind_potential_idx = digitize_clip(wind_potential, self.wind_power_bins)
+        total_power_idx = digitize_clip(env.total_power, env.renewable_bins)
         demand_power_idx = env.demand_power_idx
 
         self.idx = solar_potential_idx
@@ -340,9 +327,9 @@ class WindAgent(BaseAgent):
         solar_potential = row["solar_power"]
         self.potential = wind_potential
 
-        wind_potential_idx = self.digitize_clip(wind_potential, self.wind_power_bins)
-        solar_potential_idx = self.digitize_clip(solar_potential, self.solar_power_bins)
-        total_power_idx = env.digitize_clip(env.total_power, env.renewable_bins)
+        wind_potential_idx = digitize_clip(wind_potential, self.wind_power_bins)
+        solar_potential_idx = digitize_clip(solar_potential, self.solar_power_bins)
+        total_power_idx = digitize_clip(env.total_power, env.renewable_bins)
         demand_power_idx = env.demand_power_idx
 
         self.idx = wind_potential_idx
@@ -463,7 +450,7 @@ class BatteryAgent(BaseAgent):
 
         # Discrete index (optional, for your agent)
 
-        self.idx = self.digitize_clip(
+        self.idx = digitize_clip(
             self.soc, self.battery_soc_bins
         )
 
@@ -492,11 +479,11 @@ class BatteryAgent(BaseAgent):
         Assumes env.total_power and env.demand_power_idx are already computed before calling this.
         """
         # Update and discretize SOC
-        self.idx = self.digitize_clip(self.soc, self.battery_soc_bins)
+        self.idx = digitize_clip(self.soc, self.battery_soc_bins)
 
         # Discretized state components from environment
         renewable_potential_idx = env.renewable_potential_idx
-        total_power_idx = env.digitize_clip(env.total_power, env.renewable_bins)
+        total_power_idx = digitize_clip(env.total_power, env.renewable_bins)
         demand_power_idx = env.demand_power_idx
 
         return (self.idx, renewable_potential_idx, total_power_idx, demand_power_idx)
@@ -921,7 +908,7 @@ class Simulation:
                             agent.power = 0
                         
                         grid_power = agent.power
-                        agent.idx = self.env.digitize_clip(agent.power, self.env.renewable_bins)
+                        agent.idx = digitize_clip(agent.power, self.env.renewable_bins)
 
                         self.instant["grid"] = agent.power
                         self.instant["grid_state"] = agent.grid_state
@@ -944,13 +931,13 @@ class Simulation:
 
                 # Updates variables in environment
                 self.env.renewable_power = wind_power + solar_power
-                self.env.renewable_power_idx = self.env.digitize_clip(self.env.renewable_power, self.env.renewable_bins)
+                self.env.renewable_power_idx = digitize_clip(self.env.renewable_power, self.env.renewable_bins)
 
                 self.env.total_power = self.env.renewable_power + bat_power + grid_power
-                self.env.total_power_idx = self.env.digitize_clip(self.env.total_power, self.env.renewable_bins)
+                self.env.total_power_idx = digitize_clip(self.env.total_power, self.env.renewable_bins)
 
                 self.env.demand_power = self.env.demand_power + loadc_power
-                self.env.demand_power_idx = self.env.digitize_clip(self.env.demand_power, self.env.demand_bins)
+                self.env.demand_power_idx = digitize_clip(self.env.demand_power, self.env.demand_bins)
 
                 self.delta_power = self.env.total_power - self.env.demand_power
                 self.delta_power_idx = 'deficit' if self.delta_power <= 0 else 'surplus'

@@ -416,23 +416,24 @@ class BatteryAgent(BaseAgent):
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
         
         """
-        Inicializa la batería con una capacidad fija en Ah y un SOC inicial del 50%.
+        Initializes the battery with a fixed capacity in Ah and an initial SOC of 50%.
         :param capacity_ah: Capacidad de la batería en Amperios-hora (Ah).
         """
-        self.capacity_ah = capacity_ah  # Capacidad fija en Ah
-        self.soc = SOC_INITIAL  # Estado de carga inicial en %
-        self.battery_state = 0  # Estado inicial de operación
+        self.capacity_ah = capacity_ah  # Fixed capacity in Ah
+
+        self.soc = SOC_INITIAL  # Initial state of charge in %
+        self.battery_state = 0  # Initial operation state
         self.max_soc_idx = 2
 
-        # Discretizacion por cuantizacion uniforme
-        # Definimos los "bins" para discretizar cada variable de interés
+        # Discretization by uniform quantization
+        # Define the bins to discretize each variable of interest
         self.battery_soc_bins = np.linspace(0, 1, num_battery_soc_bins)
 
     def update_soc(
             self,
             power_w: float,
             dt_h: float = 1.0,
-            nominal_voltage: float = 48.0  # ← valor por defecto en voltios
+            nominal_voltage: float = 48.0  #default value in volts
         ) -> None:
         """
         Actualiza el estado de carga (SOC) de la batería.
@@ -449,18 +450,20 @@ class BatteryAgent(BaseAgent):
             Tensión nominal de la batería (V).  Se puede sobreescribir si
             se desea usar otro valor en alguna llamada concreta.
         """
-        # Capacidad en Wh usando el voltaje nominal
+        # Capacity in Wh using nominal voltage
         capacity_wh = self.capacity_ah * nominal_voltage
 
-        # Energía transferida en el paso de tiempo
+        # Energy transferred during the time step
+
         energy_wh = power_w * dt_h
         capacity_wh_new = self.soc*capacity_wh - energy_wh
 
-        # Integrar y saturar en [0, 1]
+        # Integrate and saturate in [0, 1]
         new_soc = capacity_wh_new/capacity_wh
         self.soc = max(0.0, min(1.0, new_soc))
 
-        # Índice discreto (opcional, para tu agente)
+        # Discrete index (optional, for your agent)
+
         self.idx = self.digitize_clip(
             self.soc, self.battery_soc_bins
         )
@@ -771,7 +774,8 @@ class Simulation:
         self.evolution = []
         self.df = pd.DataFrame()
         self.df_episode_metrics = pd.DataFrame()
-        self.prev_q_tables = {} # Diccionario para almacenar la Q-table previa de cada agente
+        self.prev_q_tables = {} # Dictionary to store the previous Q-table of each agent
+
         
         # Create the environment that loads the CSV and discretizes
         self.env = MultiAgentEnv(csv_filename=filename, num_demand_bins=BINS, num_renewable_bins=BINS)
@@ -792,7 +796,8 @@ class Simulation:
         ]
         
         # Training parameters
-        self.epsilon = epsilon  # Exploración \epsilon (0=explotación, 1=exploración)
+        self.epsilon = epsilon  # Exploration \epsilon (0=exploitation, 1=exploration)
+
         
         # Initialize Q-tables
         if learning:
@@ -1160,7 +1165,9 @@ class Simulation:
 
     def calculate_ise(self) -> float:
         """
-        Calcula el ISE (Integral Square Error) sobre la columna 'dif'.
+        Calculates the ISE (Integral Square Error) over the 'dif' column
+
+.
 
         :return: Valor de ISE.
         """
@@ -1169,7 +1176,9 @@ class Simulation:
 
     def calculate_mean(self) -> float:
         """
-        Calcula el ISE (Integral Square Error) sobre la columna 'dif'.
+        Calculates the ISE (Integral Square Error) over the 'dif' column
+
+.
 
         :return: Valor de ISE.
         """
@@ -1178,7 +1187,7 @@ class Simulation:
 
     def calculate_iae(self) -> float:
         """
-        Calcula el IAE (Integral Absolute Error) sobre la columna 'dif'.
+        Calculates the IAE (Integral Absolute Error) over the 'dif' column.
 
         :return: Valor de IAE.
         """
@@ -1187,33 +1196,35 @@ class Simulation:
 
     def calculate_rep(self) -> float:
         """
-        Calcula el REP (Renewable Energy Penetration), porcentaje de energía renovable sobre la total.
+        Calculates the REP (Renewable Energy Penetration), percentage of renewable energy over the total.
 
         :return: Valor de REP como porcentaje.
         """
         total_renewable_energy = self.df['solar_state'].sum()
         total_energy = self.df.shape[0]
         if total_energy == 0:
-            return 0.0  # evitar división por cero
+            return 0.0  # avoid division by zero
+
         rep = (total_renewable_energy / total_energy) * 100
         return rep
 
     def calculate_grid(self) -> float:
         """
-        Calcula el REP (Renewable Energy Penetration), porcentaje de energía renovable sobre la total.
+        Calculates the REP (Renewable Energy Penetration), percentage of renewable energy over the total.
 
         :return: Valor de REP como porcentaje.
         """
         total_grid_energy = self.df['grid_state'].sum()
         total_energy = self.df.shape[0]
         if total_energy == 0:
-            return 0.0  # evitar división por cero
+            return 0.0  # avoid division by zero
+
         rep = (total_grid_energy / total_energy) * 100
         return rep
 
     def show_performance_metrics(self):
         """
-        Muestra una tabla con las métricas de rendimiento calculadas: ISE, IAE y REP.
+        Displays a table with the calculated performance metrics: ISE, IAE and REP.
         """
         results = [
             ["MEAN (Mean)", f"{self.calculate_mean():.3f}"],
@@ -1259,11 +1270,11 @@ class Simulation:
 
     def plot_metric(self, metric_field='Total Reward', output_format='svg', filename='results/plots/metric_plot'):
         """
-        Genera una gráfica de métricas por agente y la guarda como archivo vectorial o de alta resolución.
+        Genera una gráfica de métricas por agente y la guarda como archivo vectorial o de High resolution.
         
         Parámetros:
             metric_field (str): Nombre del campo de métrica a graficar.
-            output_format (str): 'svg' para vectorial, 'png' para imagen de alta resolución.
+            output_format (str): 'svg' para vectorial, 'png' para imagen de High resolution.
             filename (str): Nombre base del archivo sin extensión.
         """
         plt.figure(figsize=(10, 6))
@@ -1278,27 +1289,34 @@ class Simulation:
         plt.grid(True)
         plt.tight_layout()
 
-        # Guardar con alta calidad
+        # Save in high quality
+
+
         if output_format == 'svg':
             plt.savefig(f"{filename}.svg", format='svg')
         elif output_format == 'png':
-            plt.savefig(f"{filename}.png", format='png', dpi=300)  # Alta resolución
+            plt.savefig(f"{filename}.png", format='png', dpi=300)  # High resolution
         else:
             raise ValueError("output_format debe ser 'svg' o 'png'")
 
-        plt.close()  # Cierra la figura para liberar memoria
+        plt.close()  # Closes the figure to free memory
+
+
+
 
         return self.df_episode_metrics     
 
     def plot_data_interactive(
             self,
-            df: pd.DataFrame,                     # ahora entra un DataFrame
+            df: pd.DataFrame,                     # now receives a DataFrame
+
             columns_to_plot: list[str] | None = None,
             title: str = "Environment variables",
             save_static_plot: bool = False,
             static_format: str = "svg",
             static_filename: str = "interactive_plot_export",
-            soc_keyword: str = "soc",             # patrón que detecta columnas SOC
+            soc_keyword: str = "soc",             # pattern that detects SOC columns
+
             soc_scale: float = 100.0              # 0-1  → 0-100 %
         ):
         # ---------- 1. Validaciones -------------------------------
@@ -1322,7 +1340,8 @@ class Simulation:
         fig, ax1 = plt.subplots(figsize=(10, 6))
         ax2 = ax1.twinx() if soc_cols else None
         if ax2:
-            ax2.patch.set_visible(False)          # fondo transparente
+            ax2.patch.set_visible(False)          # transparent background
+
 
         base_colors  = plt.rcParams['axes.prop_cycle'].by_key()['color']
         color_cycle1 = cycle(base_colors)
@@ -1371,13 +1390,14 @@ class Simulation:
             if static_format.lower() not in valid_formats:
                 raise ValueError(f"Formato '{static_format}' no soportado ({valid_formats})")
 
-            # Ocultamos temporalmente el eje de los check-boxes
+            # Temporarily hide the checkbox axis
+
             rax.set_visible(False)
             dpi = 300 if static_format.lower() == "png" else None
             fig.savefig(f"{static_filename}.{static_format}",
                         format=static_format, dpi=dpi)
             print(f"Gráfico guardado como {static_filename}.{static_format}")
-            # Volvemos a mostrarlo para la vista interactiva
+            # Show it again for the interactive view
             rax.set_visible(True)
 
         plt.show()

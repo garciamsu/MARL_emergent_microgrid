@@ -147,8 +147,8 @@ def plot_coordination(df):
     """
     # Fixed color mapping
     colors = {
-        "solar": "orange",
-        "wind": "blue",
+        "solar_potential": "orange",
+        "wind_potential": "blue",
         "bat_state": "green",
         "bat_soc": "green",
         "grid": "purple",
@@ -169,12 +169,12 @@ def plot_coordination(df):
     # Subplot (A): Solar
     ax = axes[0]
     ax2 = ax.twinx()
-    ax.bar(time, df["solar_state"], color=colors["solar"], label="Solar State")
+    ax.bar(time, df["solar_state"], color=colors["solar_potential"], label="Solar State")
     ax2.plot(
         time,
-        df["solar"],
+        df["solar_potential"],
         linestyle="--",
-        color=colors["solar"],
+        color=colors["solar_potential"],
         linewidth=2.5,
         label="Solar Power"
     )
@@ -189,12 +189,12 @@ def plot_coordination(df):
     # Subplot (B): Wind
     ax = axes[1]
     ax2 = ax.twinx()
-    ax.bar(time, df["wind_state"], color=colors["wind"], label="Wind State")
+    ax.bar(time, df["wind_state"], color=colors["wind_potential"], label="Wind State")
     ax2.plot(
         time,
-        df["wind"],
+        df["wind_potential"],
         linestyle="--",
-        color=colors["wind"],
+        color=colors["wind_potential"],
         linewidth=2.5,
         label="Wind Power"
     )
@@ -218,7 +218,7 @@ def plot_coordination(df):
         linewidth=2.5,
         label="Battery SOC"
     )
-    ax.set_ylabel("State (-1/0/1)")
+    ax.set_ylabel("State")
     ax2.set_ylabel("SOC [0-1]")
     ax.set_title("(C)", loc="center", pad=10)
     ax.grid(True, which='both')

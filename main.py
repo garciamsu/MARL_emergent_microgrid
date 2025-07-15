@@ -189,15 +189,14 @@ class SolarAgent(BaseAgent):
     environmental conditions and system-level signals.
     
     State space: 
-        (solar_potential_idx, total_power_idx, wind_potential_idx, demand_power_idx)
+        (solar_potential_idx, total_power_idx, renewable_power_idx, demand_power_idx)
     """
 
     def __init__(self, env: MultiAgentEnv):
         super().__init__(name="solar", actions=[0, 1], alpha=0.1, gamma=0.9)
 
-        # Discretization bins for potential generation (same for solar and wind)
+        # Discretization bins for potential generation (same for solar)
         self.solar_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
-        self.wind_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
 
         self.solar_state = 0
         self.potential = 0.0
@@ -205,7 +204,7 @@ class SolarAgent(BaseAgent):
     def get_discretized_state(self, env: MultiAgentEnv, index: int) -> tuple:
         """
         Returns the discretized state tuple for the solar agent:
-        (solar_potential_idx, total_power_idx, wind_potential_idx, demand_power_idx)
+        (solar_potential_idx, total_power_idx, demand_power_idx)
 
         Args:
             env (MultiAgentEnv): the shared environment.
@@ -217,17 +216,15 @@ class SolarAgent(BaseAgent):
         row = env.dataset.iloc[index]
 
         solar_potential = row["solar_power"]
-        wind_potential = row["wind_power"]
         self.potential = solar_potential
 
         solar_potential_idx = digitize_clip(solar_potential, self.solar_power_bins)
-        wind_potential_idx = digitize_clip(wind_potential, self.wind_power_bins)
         total_power_idx = digitize_clip(env.total_power, env.renewable_bins)
         demand_power_idx = env.demand_power_idx
 
         self.idx = solar_potential_idx
 
-        return (solar_potential_idx, total_power_idx, wind_potential_idx, demand_power_idx)
+        return (solar_potential_idx, total_power_idx, demand_power_idx)
 
     def initialize_q_table(self, env: MultiAgentEnv) -> None:
         """
@@ -236,9 +233,8 @@ class SolarAgent(BaseAgent):
         states = []
         for solar_idx in range(len(self.solar_power_bins)):
             for total_idx in range(len(env.renewable_bins)):
-                for wind_idx in range(len(self.wind_power_bins)):
-                    for demand_idx in range(len(env.demand_bins)):
-                        states.append((solar_idx, total_idx, wind_idx, demand_idx))
+                for demand_idx in range(len(env.demand_bins)):
+                    states.append((solar_idx, total_idx, demand_idx))
 
         self.q_table = {
             state: {action: 0.0 for action in self.actions}
@@ -268,27 +264,27 @@ class SolarAgent(BaseAgent):
         # Case 1: Action = produce (self.action == 1)
         if self.action == 1:
             if solar_potential_idx == 0:
-                # Trying to produce with no sun → penalize
-                return -self.mu
-            elif power_gap <= 0:
-                # Helpful contribution to unmet demand → reward
-                return self.kappa
+                # Trying to produce without sun  → penalty
+                return -self.mu * 100
+            elif solar_potential_idx > 0 and power_gap >= 0:
+                # With potential available and demand met → reward
+                return self.kappa * 10
             else:
-                # Overproduction → mild penalty
-                return -self.sigma
+                # With available potential and energy deficit → reward
+                return self.kappa
 
         # Case 2: Action = idle (self.action == 0)
         else:
-            if solar_potential_idx > 0 and power_gap <= 0:
-                # Agent had solar potential and the system needed it → penalty
-                return -self.beta
-            elif power_gap > 0:
-                # System already satisfied → acceptable to stay idle
-                return self.nu
+            if solar_potential_idx == 0:
+                # No produce without sun  → reward
+                return self.kappa * 10
+            elif solar_potential_idx > 0 and power_gap >= 0:
+                # With available potential and satisfied demand → penalize
+                return -self.mu * 10
             else:
-                # Staying idle during a shortage → penalty
-                return -self.mu
-
+                # With available potential and energy deficit → penalize
+                return -self.mu * 100
+            
 class WindAgent(BaseAgent):
     """
     Agent representing a wind energy source.
@@ -296,7 +292,7 @@ class WindAgent(BaseAgent):
     local wind conditions and global system signals.
 
     State space:
-        (wind_potential_idx, total_power_idx, solar_potential_idx, demand_power_idx)
+        (wind_potential_idx, total_power_idx, demand_power_idx)
     """
 
     def __init__(self, env: MultiAgentEnv):
@@ -304,7 +300,6 @@ class WindAgent(BaseAgent):
 
         # Discretization bins for wind and solar potential (same scale)
         self.wind_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
-        self.solar_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
 
         self.wind_state = 0
         self.potential = 0.0
@@ -312,7 +307,7 @@ class WindAgent(BaseAgent):
     def get_discretized_state(self, env: MultiAgentEnv, index: int) -> tuple:
         """
         Returns the discretized state tuple for the wind agent:
-        (wind_potential_idx, total_power_idx, solar_potential_idx, demand_power_idx)
+        (wind_potential_idx, total_power_idx, demand_power_idx)
 
         Args:
             env (MultiAgentEnv): the shared environment.
@@ -324,17 +319,15 @@ class WindAgent(BaseAgent):
         row = env.dataset.iloc[index]
 
         wind_potential = row["wind_power"]
-        solar_potential = row["solar_power"]
         self.potential = wind_potential
 
         wind_potential_idx = digitize_clip(wind_potential, self.wind_power_bins)
-        solar_potential_idx = digitize_clip(solar_potential, self.solar_power_bins)
         total_power_idx = digitize_clip(env.total_power, env.renewable_bins)
         demand_power_idx = env.demand_power_idx
 
         self.idx = wind_potential_idx
 
-        return (wind_potential_idx, total_power_idx, solar_potential_idx, demand_power_idx)
+        return (wind_potential_idx, total_power_idx, demand_power_idx)
 
     def initialize_q_table(self, env: MultiAgentEnv) -> None:
         """
@@ -343,9 +336,8 @@ class WindAgent(BaseAgent):
         states = []
         for wind_idx in range(len(self.wind_power_bins)):
             for total_idx in range(len(env.renewable_bins)):
-                for solar_idx in range(len(self.solar_power_bins)):
-                    for demand_idx in range(len(env.demand_bins)):
-                        states.append((wind_idx, total_idx, solar_idx, demand_idx))
+                for demand_idx in range(len(env.demand_bins)):
+                    states.append((wind_idx, total_idx, demand_idx))
 
         self.q_table = {
             state: {action: 0.0 for action in self.actions}
@@ -375,26 +367,26 @@ class WindAgent(BaseAgent):
         # Case 1: Action = produce (self.action == 1)
         if self.action == 1:
             if wind_potential_idx == 0:
-                # Attempt to produce with no wind → penalize
-                return -self.mu
-            elif power_gap <= 0:
-                # Contributing usefully to demand → reward
-                return self.kappa
+                # Trying to produce without sun  → penalty
+                return -self.mu * 100
+            elif wind_potential_idx > 0 and power_gap >= 0:
+                # With potential available and demand met → reward
+                return self.kappa * 10
             else:
-                # Overproduction when not needed → mild penalty
-                return -self.sigma
+                # With available potential and energy deficit → reward
+                return self.kappa
 
         # Case 2: Action = idle (self.action == 0)
         else:
-            if wind_potential_idx > 0 and power_gap <= 0:
-                # Missed opportunity to contribute → penalize
-                return -self.beta
-            elif power_gap > 0:
-                # System already satisfied → idle is acceptable
-                return self.nu
+            if wind_potential_idx == 0:
+                # No produce without sun  → reward
+                return self.kappa * 10
+            elif wind_potential_idx > 0 and power_gap >= 0:
+                # With available potential and satisfied demand → penalize
+                return -self.mu * 10
             else:
-                # Inaction when power is still needed → penalize
-                return -self.mu
+                # With available potential and energy deficit → penalize
+                return -self.mu * 100
 
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=3):
@@ -858,9 +850,9 @@ class Simulation:
                         solar_power = agent.power
 
                         self.instant["solar_potential"] = agent.potential
+                        self.instant["solar_discrete"] = agent.idx
                         self.instant["solar"] = agent.power
                         self.instant["solar_state"] = agent.solar_state
-                        self.instant["solar_discrete"] = agent.idx
                     elif isinstance(agent, WindAgent):
                         agent.choose_action(state['WindAgent'], self.epsilon)
 
@@ -869,9 +861,9 @@ class Simulation:
                         wind_power = agent.power
 
                         self.instant["wind_potential"] = agent.potential
+                        self.instant["wind_discrete"] = agent.idx
                         self.instant["wind"] = agent.power
                         self.instant["wind_state"] = agent.wind_state
-                        self.instant["wind_discrete"] = agent.idx
                     elif isinstance(agent, BatteryAgent):
                         agent.choose_action(state['BatteryAgent'], self.epsilon)
                         agent.battery_state = agent.action
@@ -933,7 +925,7 @@ class Simulation:
                 self.env.renewable_power = wind_power + solar_power
                 self.env.renewable_power_idx = digitize_clip(self.env.renewable_power, self.env.renewable_bins)
 
-                self.env.total_power = self.env.renewable_power + bat_power + grid_power
+                self.env.total_power = self.env.renewable_power + bat_power + (grid_power + loadc_power)
                 self.env.total_power_idx = digitize_clip(self.env.total_power, self.env.renewable_bins)
 
                 self.env.demand_power = self.env.demand_power + loadc_power
@@ -1076,12 +1068,12 @@ class Simulation:
                 engine="openpyxl"
             )
             
-            print(f"Fin episodio {ep+1}/{self.num_episodes} con epsilon {self.epsilon}")
+            print(f"End of episode  {ep+1}/{self.num_episodes} with epsilon {self.epsilon}")
 
         # Interactive power charts
         self.plot_data_interactive(
             df=self.df,
-            columns_to_plot=["solar", "demand", "bat_soc", "grid", "wind", "price"],
+            columns_to_plot=["solar_potential", "demand", "bat_soc", "grid", "wind_potential", "price"],
             title="Environment variables",
             save_static_plot=True,
             static_format="svg",  # o "png", "pdf"

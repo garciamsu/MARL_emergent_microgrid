@@ -5,21 +5,20 @@ import pandas as pd
 import glob
 import os
 
-
 def load_latest_evolution_csv():
     """
-    Busca el archivo learning_XXX.csv más reciente en /results/evolution/,
-    lee su contenido con manejo robusto de separador y encoding,
-    y devuelve un DataFrame listo para procesar.
+    Searches for the most recent learning_XXX.csv file in /results/evolution/,
+    reads its content with robust handling of separator and encoding,
+    and returns a ready-to-process DataFrame.
     """
     import glob
 
-    # 1. Buscar todos los archivos que coincidan
+    # 1. Search for all matching files
     files = glob.glob("results/evolution/learning_*.csv")
     if not files:
-        raise FileNotFoundError("No se encontraron archivos learning_XXX.csv en /results/evolution/")
+        raise FileNotFoundError("No learning_XXX.csv files found in /results/evolution/")
 
-    # 2. Extraer los números y encontrar el máximo
+    # 2. Extract numbers and find the highest
     numbers = []
     for f in files:
         match = re.search(r"learning_(\d+)\.csv", f)
@@ -27,29 +26,29 @@ def load_latest_evolution_csv():
             numbers.append(int(match.group(1)))
 
     if not numbers:
-        raise ValueError("No se encontraron números de episodio en los nombres de archivos.")
+        raise ValueError("No episode numbers found in file names.")
 
     max_number = max(numbers)
     latest_file = f"results/evolution/learning_{max_number}.csv"
-    print(f"Archivo seleccionado: {latest_file}")
+    print(f"Selected file: {latest_file}")
 
-    # 3. Intentar lectura robusta
+    # 3. Try robust reading
     try:
         df = pd.read_csv(latest_file, sep=",", encoding="utf-8")
     except Exception as e1:
-        print("Primera lectura falló, reintentando con ';' y latin-1...")
+        print("First read failed, retrying with ';' and latin-1...")
         try:
             df = pd.read_csv(latest_file, sep=";", encoding="latin-1")
         except Exception as e2:
             raise RuntimeError(
-                f"No se pudo leer el archivo.\nPrimer error: {e1}\nSegundo error: {e2}"
+                f"Could not read the file.\nFirst error: {e1}\nSecond error: {e2}"
             )
 
     return df
 
 def plot_metric(df, field, ylabel, filename_svg):
     """
-    Grafica la evolución de una métrica a lo largo de los episodios.
+    Plots the evolution of a metric over episodes.
     """
     plt.figure(figsize=(10,6))
     plt.plot(df['Episode'], df[field], marker='o')
@@ -63,12 +62,12 @@ def plot_metric(df, field, ylabel, filename_svg):
 
 def compute_q_diff_norm(current_q, prev_q):
     """
-    Calcula la norma L2 de la diferencia entre dos Q-tables.
+    Computes the L2 norm of the difference between two Q-tables.
     
-    current_q: dict de dicts, Q-table actual.
-    prev_q: dict de dicts, Q-table anterior.
+    current_q: dict of dicts, current Q-table.
+    prev_q: dict of dicts, previous Q-table.
     
-    Devuelve: float
+    Returns: float
     """
     diffs = []
     for state in current_q:
@@ -80,15 +79,15 @@ def compute_q_diff_norm(current_q, prev_q):
 
 def check_stability(df, iae_threshold, var_threshold=1.0):
     """
-    Verifica si la IAE y la varianza se mantienen estables en los últimos episodios.
+    Checks whether IAE and variance remain stable in the last episodes.
     
-    df: DataFrame con las métricas.
-    iae_threshold: Umbral de IAE aceptable.
-    var_threshold: Umbral de varianza aceptable.
+    df: DataFrame with metrics.
+    iae_threshold: Acceptable IAE threshold.
+    var_threshold: Acceptable variance threshold.
     
-    Devuelve: dict con resultados.
+    Returns: dict with results.
     """
-    # Filtrar últimos 200 episodios
+    # Filter last 200 episodes
     df_recent = df[df['Episode'] >= df['Episode'].max() - 200]
     
     iae_mean = df_recent["IAE"].mean()
@@ -104,8 +103,8 @@ def check_stability(df, iae_threshold, var_threshold=1.0):
 
 def process_evolution_data(df):
     """
-    Aplica la transformación de bat_state y valida columnas necesarias.
-    Devuelve el DataFrame listo para graficar.
+    Applies bat_state transformation and validates required columns.
+    Returns the DataFrame ready for plotting.
     """
     required_columns = [
         "solar_state",
@@ -117,15 +116,15 @@ def process_evolution_data(df):
         "demand"
     ]
 
-    # Verificar columnas
+    # Check columns
     for col in required_columns:
         if col not in df.columns:
-            raise ValueError(f"La columna '{col}' no está en el DataFrame.")
+            raise ValueError(f"The column '{col}' is not in the DataFrame.")
 
-    # Copiar para no modificar el original
+    # Copy to avoid modifying the original
     df_plot = df.copy()
 
-    # Transformar bat_state según reglas
+    # Transform bat_state according to rules
     def transform_bat_state(x):
         if x == 0:
             return 0
@@ -134,7 +133,7 @@ def process_evolution_data(df):
         elif x == 2:
             return 1
         else:
-            return 0  # Por seguridad
+            return 0  # Safety default
 
     df_plot["bat_state_transformed"] = df_plot["bat_state"].apply(transform_bat_state)
 
@@ -142,11 +141,11 @@ def process_evolution_data(df):
 
 def plot_coordination(df):
     """
-    Genera una gráfica SVG con 6 subgráficas alineadas verticalmente:
+    Generates an SVG plot with 6 vertically aligned subplots:
     Solar, Wind, Battery (State + SOC), Grid, Demand, Dif.
-    Usa barras y líneas según corresponda.
+    Uses bars and lines as appropriate.
     """
-    # Mapeo de colores fijos
+    # Fixed color mapping
     colors = {
         "solar": "orange",
         "wind": "blue",
@@ -164,10 +163,10 @@ def plot_coordination(df):
         constrained_layout=True
     )
 
-    # Eje X dinámico basado en el número de filas
+    # Dynamic X-axis based on number of rows
     time = list(range(1, len(df)+1))
 
-    # Subgráfica (A): Solar
+    # Subplot (A): Solar
     ax = axes[0]
     ax2 = ax.twinx()
     ax.bar(time, df["solar_state"], color=colors["solar"], label="Solar State")
@@ -187,7 +186,7 @@ def plot_coordination(df):
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
-    # Subgráfica (B): Wind
+    # Subplot (B): Wind
     ax = axes[1]
     ax2 = ax.twinx()
     ax.bar(time, df["wind_state"], color=colors["wind"], label="Wind State")
@@ -207,7 +206,7 @@ def plot_coordination(df):
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
-    # Subgráfica (C): Battery State + SOC
+    # Subplot (C): Battery State + SOC
     ax = axes[2]
     ax2 = ax.twinx()
     ax.bar(time, df["bat_state_transformed"], color=colors["bat_state"], label="Battery State")
@@ -227,7 +226,7 @@ def plot_coordination(df):
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
-    # Subgráfica (D): Grid
+    # Subplot (D): Grid
     ax = axes[3]
     ax2 = ax.twinx()
     ax.bar(time, df["grid_state"], color=colors["grid"], label="Grid State")
@@ -247,7 +246,7 @@ def plot_coordination(df):
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
-    # Subgráfica (E): Demand + Load State
+    # Subplot (E): Demand + Load State
     ax = axes[4]
     ax2 = ax.twinx()
     ax.bar(
@@ -273,7 +272,7 @@ def plot_coordination(df):
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
-    # Subgráfica (F): Dif (área)
+    # Subplot (F): Dif (area)
     ax = axes[5]
     ax.fill_between(
         time,
@@ -289,22 +288,22 @@ def plot_coordination(df):
     ax.grid(True, which='both')
     ax.legend(loc="upper right")
 
-    # Eje X con ticks enumerados
+    # X-axis ticks
     for ax in axes:
         ax.set_xticks(time)
 
-    # Guardar SVG
+    # Save SVG
     output_path = "results/plots/plot_coordination_last.svg"
     fig.savefig(output_path, format="svg")
-    print(f"Gráfico guardado en {output_path}")
+    print(f"Plot saved at {output_path}")
 
     plt.show()
 
 def clear_results_directories():
     """
-    Elimina todos los archivos dentro de los directorios:
+    Deletes all files inside the directories:
     results/, results/evolution/, results/plots/, results/q_tables/.
-    No elimina los directorios en sí, solo los contenidos.
+    Does not delete the directories themselves, only their contents.
     """
     directories = [
         "results/",
@@ -315,22 +314,22 @@ def clear_results_directories():
 
     for dir_path in directories:
         if not os.path.exists(dir_path):
-            print(f"Directorio no existe: {dir_path}")
+            print(f"Directory does not exist: {dir_path}")
             continue
 
         files = glob.glob(os.path.join(dir_path, "*"))
         if not files:
-            print(f"No hay archivos en {dir_path}")
+            print(f"No files in {dir_path}")
             continue
 
         for file_path in files:
             if os.path.isfile(file_path):
                 try:
                     os.remove(file_path)
-                    print(f"Eliminado: {file_path}")
+                    print(f"Deleted: {file_path}")
                 except Exception as e:
-                    print(f"No se pudo eliminar {file_path}: {e}")
+                    print(f"Could not delete {file_path}: {e}")
             else:
-                print(f"Ignorado (no es un archivo): {file_path}")
+                print(f"Ignored (not a file): {file_path}")
 
-    print("Limpieza completada.")
+    print("Cleanup completed.")

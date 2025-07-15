@@ -540,7 +540,7 @@ class GridAgent(BaseAgent):
     """
     GridAgent represents the utility grid in the microgrid system.
     It decides whether to supply energy based on the system's battery SOC,
-    renewable potential, total delivered power, and current demand.
+    total delivered power, and current demand.
     """
 
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
@@ -557,14 +557,13 @@ class GridAgent(BaseAgent):
     def initialize_q_table(self, env: MultiAgentEnv):
         """
         Initializes the Q-table using the discretized state space:
-        (battery_soc_idx, renewable_potential_idx, total_power_idx, demand_power_idx).
+        (battery_soc_idx, total_power_idx, demand_power_idx).
         """
         states = []
         for soc_idx in range(len(self.ess.battery_soc_bins)):           # battery SOC index
-            for renewable_idx in range(len(env.renewable_bins)):        # renewable potential index
-                for total_power_idx in range(len(env.renewable_bins)):  # total power output index
-                    for demand_idx in range(len(env.demand_bins)):      # demand index
-                        states.append((soc_idx, renewable_idx, total_power_idx, demand_idx))
+            for total_power_idx in range(len(env.renewable_bins)):  # total power output index
+                for demand_idx in range(len(env.demand_bins)):      # demand index
+                    states.append((soc_idx, total_power_idx, demand_idx))
 
         self.q_table = {
             state: {action: 0.0 for action in self.actions}
@@ -580,11 +579,10 @@ class GridAgent(BaseAgent):
             index (optional): Ignored, present for compatibility.
 
         Returns:
-            tuple: (battery_soc_idx, renewable_potential_idx, total_power_idx, demand_power_idx)
+            tuple: (battery_soc_idx, total_power_idx, demand_power_idx)
         """
         return (
             self.ess.idx,
-            env.renewable_potential_idx,
             env.total_power_idx,
             env.demand_power_idx
         )
@@ -592,7 +590,6 @@ class GridAgent(BaseAgent):
     def calculate_reward(
         self,
         battery_soc_idx: int,
-        renewable_potential_idx: int,
         total_power_idx: int,
         demand_power_idx: int
     ) -> float:
@@ -600,12 +597,10 @@ class GridAgent(BaseAgent):
         Computes the reward for the GridAgent based on the current system state
         and the selected action stored in self.action (0: idle, 1: produce).
         The reward encourages the grid to support the microgrid only when strictly
-        necessary, considering battery availability, demand, renewable potential,
-        and total system output.
+        necessary, considering battery availability, demand and total system output.
 
         Parameters:
             battery_soc_idx (int): Discretized index of the battery's state of charge (SOC).
-            renewable_potential_idx (int): Discretized index of available renewable generation.
             total_power_idx (int): Discretized index of the total power delivered by all agents.
             demand_power_idx (int): Discretized index of the total system demand.
 
@@ -613,37 +608,36 @@ class GridAgent(BaseAgent):
             float: Reward signal guiding the grid agent.
         """
         power_gap = total_power_idx - demand_power_idx  # >0 = surplus, <0 = shortage
-        renewable_surplus = renewable_potential_idx - demand_power_idx  # >0 means renewable energy exceeds demand
 
         # Action = produce
         if self.action == 1:
-            if power_gap <= 0 and battery_soc_idx == 0:
+            if power_gap < 0 and battery_soc_idx == 0:
                 # Grid is supplying during shortage and battery is empty → necessary → strong reward
-                return self.kappa
-            elif power_gap <= 0 and battery_soc_idx > 0:
+                return self.kappa * 100
+            elif power_gap >= 0 and battery_soc_idx == 0:
+                # The battery has no energy but the demand is satisfied → penalize
+                return -self.sigma 
+            elif power_gap < 0 and battery_soc_idx > 0:
                 # Grid is helping, but battery could have helped → mild penalty
-                return -self.mu
-            elif power_gap > 0 and renewable_surplus > 0:
-                # Grid produces despite surplus renewable energy → redundant → strong penalty
-                return -self.sigma * 2
-            elif power_gap > 0:
-                # Grid produces despite sufficient system power → wasteful → strong penalty
                 return -self.sigma
+            else:
+                # Grid produces despite sufficient system power → wasteful → strong penalty
+                return -self.sigma*100
 
         # Action = idle
         elif self.action == 0:
-            if power_gap <= 0 and battery_soc_idx == 0:
-                # Grid is idle during shortage and battery is empty → critical inaction → strong penalty
-                return -self.nu
-            elif power_gap <= 0 and battery_soc_idx > 0:
-                # Grid is idle during shortage but battery could help → acceptable → small penalty
-                return -self.beta
-            elif power_gap > 0 and renewable_surplus > 0:
-                # Grid remains idle when renewables are sufficient → optimal → reward
-                return self.kappa / 2
+            if power_gap < 0 and battery_soc_idx == 0:
+                # Grid is not supplying during shortage and battery is empty → necessary → strong penalty
+                return -self.sigma * 100
+            elif power_gap >= 0 and battery_soc_idx == 0:
+                # The battery has no energy but the demand is satisfied → penalty
+                return -self.sigma 
+            elif power_gap < 0 and battery_soc_idx > 0:
+                # Grid is not helping, but battery could have helped → reward
+                return self.kappa
             else:
-                # Idle during balance without wasted renewable potential → neutral to mild reward
-                return self.nu
+                # The grid does not produce despite having sufficient system power and energy in the batteries → excess → strong reward
+                return self.kappa*100
 
 class LoadAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
@@ -981,7 +975,6 @@ class Simulation:
                     elif isinstance(agent, GridAgent):
                         reward = agent.calculate_reward(
                             battery_soc_idx=battery_agent.idx,
-                            renewable_potential_idx=self.env.renewable_potential_idx,
                             total_power_idx=self.env.total_power_idx,
                             demand_power_idx=self.env.demand_power_idx)
                         self.instant["reward_grid"] = reward                        

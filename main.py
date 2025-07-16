@@ -44,7 +44,7 @@ class MultiAgentEnv:
         offsets_dict = {"demand": 0, "price": 0, "solar_power": 0, "wind_power": 0}
         self.dataset = self._load_data(csv_filename, offsets_dict)
         self.max_steps = len(self.dataset)
-        self.max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max() * MAX_SCALE * 10
+        self.max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
         
         # Uniform Quantization Discretization
         # Define the bins to discretize each variable of interest
@@ -265,14 +265,13 @@ class SolarAgent(BaseAgent):
         if self.action == 1:
             if solar_potential_idx == 0:
                 # Trying to produce without sun  → penalty
-                return -self.mu * 100
+                return -self.sigma * 100
             elif solar_potential_idx > 0 and power_gap >= 0:
                 # With potential available and demand met → reward
                 return self.kappa * 10
             else:
                 # With available potential and energy deficit → reward
                 return self.kappa
-
         # Case 2: Action = idle (self.action == 0)
         else:
             if solar_potential_idx == 0:
@@ -280,10 +279,10 @@ class SolarAgent(BaseAgent):
                 return self.kappa * 10
             elif solar_potential_idx > 0 and power_gap >= 0:
                 # With available potential and satisfied demand → penalize
-                return -self.mu * 10
+                return -self.sigma * 100
             else:
                 # With available potential and energy deficit → penalize
-                return -self.mu * 100
+                return -self.sigma * 100
             
 class WindAgent(BaseAgent):
     """
@@ -368,7 +367,7 @@ class WindAgent(BaseAgent):
         if self.action == 1:
             if wind_potential_idx == 0:
                 # Trying to produce without sun  → penalty
-                return -self.mu * 100
+                return -self.sigma * 100
             elif wind_potential_idx > 0 and power_gap >= 0:
                 # With potential available and demand met → reward
                 return self.kappa * 10
@@ -383,10 +382,10 @@ class WindAgent(BaseAgent):
                 return self.kappa * 10
             elif wind_potential_idx > 0 and power_gap >= 0:
                 # With available potential and satisfied demand → penalize
-                return -self.mu * 10
+                return -self.sigma * 100
             else:
                 # With available potential and energy deficit → penalize
-                return -self.mu * 100
+                return -self.sigma * 100
 
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=5):
@@ -402,7 +401,7 @@ class BatteryAgent(BaseAgent):
 
         self.soc = SOC_INITIAL  # Initial state of charge in %
         self.battery_state = 0  # Initial operation state
-        self.max_soc_idx = 2
+        self.max_soc_idx = num_battery_soc_bins - 1
 
         # Discretization by uniform quantization
         # Define the bins to discretize each variable of interest
@@ -514,11 +513,8 @@ class BatteryAgent(BaseAgent):
 
         # Action = charge
         elif self.action == 1:
-            if self.idx == self.max_soc_idx:
-                # Trying to charge at full SOC → penalty
-                return -self.sigma
-            elif renewable_potential_idx > demand_power_idx:
-                # Charging with renewable surplus → reward
+            if renewable_potential_idx > demand_power_idx:
+                # Charges the battery if there is excess renewable energy → reward
                 return self.kappa * 100
             else:
                 # Charging when there's no surplus → mild penalty
@@ -526,13 +522,9 @@ class BatteryAgent(BaseAgent):
 
         # Action = idle
         else:
-            if power_gap >= 0:
-                # If the demand is satisfied → reward
-                return self.kappa
-            else:
-                # Acceptable inaction → neutral or small penalty
-                return -self.sigma * 10
-
+            # It is not an option to stay idle → strong penalty
+            return -self.sigma * 1000
+                
 class GridAgent(BaseAgent):
     """
     GridAgent represents the utility grid in the microgrid system.
@@ -620,9 +612,8 @@ class GridAgent(BaseAgent):
             else:
                 # Grid produces despite sufficient system power → wasteful → strong penalty
                 return -self.sigma*100
-
         # Action = idle
-        elif self.action == 0:
+        else:
             if power_gap < 0 and battery_soc_idx == 0:
                 # Grid is not supplying during shortage and battery is empty → necessary → strong penalty
                 return -self.sigma * 100

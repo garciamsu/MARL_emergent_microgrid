@@ -389,7 +389,7 @@ class WindAgent(BaseAgent):
                 return -self.mu * 100
 
 class BatteryAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=3):
+    def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=5):
         super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9)
         
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
@@ -504,10 +504,10 @@ class BatteryAgent(BaseAgent):
         if self.action == 2:
             if self.idx == 0:
                 # Trying to discharge with empty battery → strong penalty
-                return -self.mu
-            elif power_gap <= 0:
+                return -self.sigma * 100
+            elif power_gap < 0:
                 # Discharging to help system under deficit → reward
-                return self.kappa * abs(power_gap or 1)
+                return self.kappa * abs(power_gap or 1) * 10
             else:
                 # Discharging when system has excess → penalty
                 return -self.sigma * self.idx
@@ -516,25 +516,22 @@ class BatteryAgent(BaseAgent):
         elif self.action == 1:
             if self.idx == self.max_soc_idx:
                 # Trying to charge at full SOC → penalty
-                return -self.mu
-            elif renewable_potential_idx > demand_power_idx and power_gap > 0:
+                return -self.sigma
+            elif renewable_potential_idx > demand_power_idx:
                 # Charging with renewable surplus → reward
-                return self.kappa
+                return self.kappa * 100
             else:
                 # Charging when there's no surplus → mild penalty
-                return -self.sigma
+                return -self.sigma * 100
 
         # Action = idle
         else:
-            if self.idx > 0 and power_gap < 0:
-                # Battery could discharge to help system but stays idle → penalty
-                return -self.beta
-            elif self.idx < self.max_soc_idx and power_gap > 0 and renewable_potential_idx > demand_power_idx:
-                # Battery could charge from renewable surplus but stays idle → penalty
-                return -self.beta
+            if power_gap >= 0:
+                # If the demand is satisfied → reward
+                return self.kappa
             else:
-                # Acceptable inaction → neutral or small reward
-                return self.nu
+                # Acceptable inaction → neutral or small penalty
+                return -self.sigma * 10
 
 class GridAgent(BaseAgent):
     """

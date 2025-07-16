@@ -14,6 +14,7 @@ C_CONFORT = 0.5   # Comfort threshold for market cost
 BINS = 7          # Defines how many intervals are used to discretize the power variables (renewables, no-renewables and demand).
 SOC_INITIAL = 0.9
 EPSILON_MIN = 0
+MAX_SCALE = 7
 
 # Creates files if they do not exist
 os.makedirs("results", exist_ok=True)
@@ -33,7 +34,7 @@ class MultiAgentEnv:
     - Can be managed in an episode loop.
     """
 
-    def __init__(self, csv_filename, num_demand_bins=7, num_renewable_bins=7):
+    def __init__(self, csv_filename, num_power_bins=7):
         """
         Parameters:
         - num_*_bins: Defines how many bins are used to discretize each variable.
@@ -43,16 +44,15 @@ class MultiAgentEnv:
         offsets_dict = {"demand": 0, "price": 0, "solar_power": 0, "wind_power": 0}
         self.dataset = self._load_data(csv_filename, offsets_dict)
         self.max_steps = len(self.dataset)
-        self.max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
+        self.max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max() * MAX_SCALE * 10
         
         # Uniform Quantization Discretization
         # Define the bins to discretize each variable of interest
         # Adjust the ranges according to your actual dataset
-        self.demand_bins = np.linspace(0, self.max_value, num_demand_bins)
-        self.renewable_bins = np.linspace(0, self.max_value, num_renewable_bins)
+        self.demand_bins = np.linspace(0, self.max_value, num_power_bins)
+        self.renewable_bins = np.linspace(0, self.max_value, num_power_bins)
 
-        self.num_demand_bins = num_demand_bins
-        self.num_renewable_bins = num_renewable_bins
+        self.num_power_bins = num_power_bins
         
         self.renewable_potential = 0
         self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.renewable_bins)
@@ -196,7 +196,7 @@ class SolarAgent(BaseAgent):
         super().__init__(name="solar", actions=[0, 1], alpha=0.1, gamma=0.9)
 
         # Discretization bins for potential generation (same for solar)
-        self.solar_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
+        self.solar_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
 
         self.solar_state = 0
         self.potential = 0.0
@@ -299,7 +299,7 @@ class WindAgent(BaseAgent):
         super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9)
 
         # Discretization bins for wind and solar potential (same scale)
-        self.wind_power_bins = np.linspace(0, env.max_value, env.num_renewable_bins)
+        self.wind_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
 
         self.wind_state = 0
         self.potential = 0.0
@@ -747,7 +747,7 @@ class Simulation:
 
         
         # Create the environment that loads the CSV and discretizes
-        self.env = MultiAgentEnv(csv_filename=filename, num_demand_bins=BINS, num_renewable_bins=BINS)
+        self.env = MultiAgentEnv(csv_filename=filename, num_power_bins=BINS)
         
         # Obtains points automatically from the database
         self.max_steps = self.env.max_steps
@@ -801,7 +801,7 @@ class Simulation:
             battery_agent = None
 
             # Incorporates randomness in the demand so that the training
-            self.env.scale_demand = random.uniform(0.1, 7)
+            self.env.scale_demand = random.uniform(0.1, MAX_SCALE)
             
             # Save snapshot of previous Q-tables (only if not the first episode)
             if ep > 0:

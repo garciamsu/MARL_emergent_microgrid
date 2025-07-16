@@ -1370,7 +1370,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1_1.csv")
+    sim = Simulation(num_episodes=1500, epsilon=1, learning=True, filename="Case1_1.csv")
     sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning

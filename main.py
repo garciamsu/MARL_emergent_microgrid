@@ -398,7 +398,7 @@ class WindAgent(BaseAgent):
         if self.action == 1:
             if wind_potential_idx == 0:
                 # ⚠️ Trying to produce without wind → strong penalty
-                return -sigma * (demand_power_idx or 1)
+                return -sigma 
             elif wind_potential_idx > 0 and power_gap >= 0:
                 # ✅ Producing when demand is already covered → moderate reward
                 return kappa * wind_potential_idx
@@ -410,7 +410,7 @@ class WindAgent(BaseAgent):
         else:
             if wind_potential_idx == 0:
                 # ✅ No wind, no action → small positive reinforcement
-                return nu
+                return nu * (demand_power_idx or 1)
             elif wind_potential_idx > 0 and power_gap >= 0:
                 # ⚠️ Wasting available wind when demand is covered → small penalty
                 return -beta * wind_potential_idx
@@ -528,33 +528,42 @@ class BatteryAgent(BaseAgent):
         Returns:
             float: Reward signal guiding the battery agent.
         """
+        
+        # Reward adjustment parameters
+        sigma = 6
+        kappa = 10
+        mu = 5
+        nu = 10
+        beta = 3
+        xi = 5
+        
         power_gap = total_power_idx - demand_power_idx  # surplus if > 0, shortage if < 0
 
         # Action = discharge
         if self.action == 2:
             if self.idx == 0:
                 # Trying to discharge with empty battery → strong penalty
-                return -self.sigma * 100
+                return -sigma * (demand_power_idx or 1)
             elif power_gap < 0:
                 # Discharging to help system under deficit → reward
-                return self.kappa * abs(power_gap or 1) * 10
+                return kappa * abs(power_gap or 1) * self.idx
             else:
                 # Discharging when system has excess → penalty
-                return -self.sigma * self.idx
+                return -mu * abs(power_gap or 1)
 
         # Action = charge
         elif self.action == 1:
             if renewable_potential_idx > demand_power_idx:
                 # Charges the battery if there is excess renewable energy → reward
-                return self.kappa * 100
+                return nu * renewable_potential_idx
             else:
                 # Charging when there's no surplus → mild penalty
-                return -self.sigma * 100
+                return -beta * (demand_power_idx or 1)
 
         # Action = idle
         else:
             # It is not an option to stay idle → strong penalty
-            return -self.sigma * 1000
+            return -xi
                 
 class GridAgent(BaseAgent):
     """

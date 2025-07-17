@@ -265,31 +265,40 @@ class SolarAgent(BaseAgent):
         total system power, and demand. Reward magnitudes have been adjusted to balance 
         learning and penalization more progressively.
         """
+        
+        # Reward adjustment parameters
+        sigma = 15
+        kappa = 3
+        mu = 12
+        nu = 1
+        beta = 5
+        xi = 8
+        
         power_gap = total_power_idx - demand_power_idx
 
         # Action = produce
         if self.action == 1:
             if solar_potential_idx == 0:
                 # ⚠️ Trying to produce without sun → strong penalty
-                return -self.sigma * 15
+                return -sigma * (demand_power_idx or 1)
             elif solar_potential_idx > 0 and power_gap >= 0:
                 # ✅ Producing when demand is already covered → moderate reward
-                return self.kappa * 3
+                return kappa * solar_potential_idx
             else:
                 # ✅ Producing when there's energy deficit → higher reward
-                return self.kappa * 12
+                return mu * abs(power_gap or 1)
 
         # Action = idle
         else:
             if solar_potential_idx == 0:
                 # ✅ No sun, no action → small positive reinforcement
-                return self.kappa * 5
+                return nu
             elif solar_potential_idx > 0 and power_gap >= 0:
                 # ⚠️ Wasting available sun when demand is covered → small penalty
-                return -self.sigma
+                return -beta * solar_potential_idx
             else:
                 # ⚠️ Not helping in a deficit despite available sun → strong penalty
-                return -self.sigma * 8
+                return -xi * abs(power_gap or 1)
             
 class WindAgent(BaseAgent):
     """

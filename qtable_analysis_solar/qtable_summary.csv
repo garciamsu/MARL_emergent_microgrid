@@ -1,13 +1,13 @@
 Metric,Value
 Total states,343
-Trained states (Q ≠ 0),166
-Untrained states (Q = 0),177
-Trained states (%),48.40%
-Untrained states (%),51.60%
-States with action 0 preferred,84
-States with action 1 preferred,259
-Mean Q_no_produce,-2.702838858099388
-Mean Q_produce,-2.163005999848129
+Trained states (Q ≠ 0),164
+Untrained states (Q = 0),179
+Trained states (%),47.81%
+Untrained states (%),52.19%
+States with action 0 preferred,43
+States with action 1 preferred,300
+Mean Q_no_produce,-10.156276035048078
+Mean Q_produce,52.737483266787066
 Mean entropy,-inf
 Median entropy,0.0
-States with high ambiguity (q_diff < 0.01),178
+States with high ambiguity (q_diff < 0.01),179

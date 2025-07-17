@@ -4,6 +4,7 @@ import re
 import pandas as pd
 import glob
 import os
+import csv
 
 def load_latest_evolution_csv():
     """
@@ -339,3 +340,54 @@ def digitize_clip(value: float, bins: np.ndarray) -> int:
     idx = np.digitize([value], bins)[0] - 1
     idx = np.clip(idx, 0, len(bins)-2)        # avoid -1 and last overflow
     return int(idx)
+
+def log_q_update(
+    agent_type: str,
+    episode: int,
+    step: int,
+    state,
+    action,
+    reward,
+    next_state,
+    current_q,
+    max_next_q,
+    updated_q,
+    epsilon: float
+):
+    """
+    Logs Q-table update information for each agent per time step.
+
+    Parameters:
+        agent_type (str): Agent type name (e.g., 'SolarAgent').
+        episode (int): Episode number.
+        step (int): Step within episode.
+        state (tuple): Current state.
+        action (int): Action taken.
+        reward (float): Reward received.
+        next_state (tuple): Resulting state.
+        current_q (float): Q(s,a) before update.
+        max_next_q (float): max_a' Q(s', a') used in update.
+        updated_q (float): Q(s,a) after update.
+        epsilon (float): Current exploration rate.
+    """
+    log_dir = f"results/logs/{agent_type.lower()}/"
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, f"{agent_type.lower()}_log.csv")
+    
+    header = [
+        "episode", "step", "state", "action", "reward", "next_state",
+        "current_q", "max_next_q", "updated_q", "epsilon"
+    ]
+
+    row = [
+        episode, step, str(state), action, reward, str(next_state),
+        current_q, max_next_q, updated_q, epsilon
+    ]
+
+    file_exists = os.path.isfile(log_file)
+    
+    with open(log_file, mode='a', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(header)
+        writer.writerow(row)

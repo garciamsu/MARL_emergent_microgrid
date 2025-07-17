@@ -2,10 +2,11 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def analyze_solaragent_log():
+
+def analyze_windagent_log():
     # Input and output paths
-    input_path = "results/logs/solaragent/solaragent_log.csv"
-    output_dir = "results/logs/solaragent/"
+    input_path = "results/logs/windagent/windagent_log.csv"
+    output_dir = "results/logs/windagent/"
 
     # Check if the log file exists
     if not os.path.isfile(input_path):
@@ -15,7 +16,7 @@ def analyze_solaragent_log():
     os.makedirs(output_dir, exist_ok=True)
 
     # Load the log file
-    print("📥 Loading log file...")
+    print("📥 Loading wind agent log file...")
     df = pd.read_csv(input_path)
 
     # ------------------------------
@@ -35,7 +36,7 @@ def analyze_solaragent_log():
     plt.figure(figsize=(8, 5))
     data = [df[df["action"] == a]["reward"].values for a in sorted(df["action"].unique())]
     plt.boxplot(data, labels=[f"Action {int(a)}" for a in sorted(df["action"].unique())], showfliers=False)
-    plt.title("Reward Distribution by Action")
+    plt.title("Reward Distribution by Action - Wind Agent")
     plt.ylabel("Reward")
     plt.grid(True, linestyle="--", alpha=0.5)
     plt.tight_layout()
@@ -53,7 +54,7 @@ def analyze_solaragent_log():
 
     plt.figure(figsize=(10, 4))
     plt.plot(df["step"], df["rolling_mean"])
-    plt.title(f"Rolling Mean of Reward (window = {window} steps)")
+    plt.title(f"Rolling Mean of Reward (window = {window} steps) - Wind Agent")
     plt.xlabel("Step")
     plt.ylabel("Mean Reward")
     plt.grid(True, linestyle="--", alpha=0.5)
@@ -73,7 +74,7 @@ def analyze_solaragent_log():
 
     plt.figure(figsize=(6, 4))
     plt.bar(freq_abs.index.astype(str), freq_abs.values)
-    plt.title("Action Frequency of Solar Agent")
+    plt.title("Action Frequency of Wind Agent")
     plt.xlabel("Action")
     plt.ylabel("Count")
     plt.grid(True, axis="y", linestyle="--", alpha=0.5)
@@ -82,8 +83,8 @@ def analyze_solaragent_log():
     plt.close()
     print("✅ Saved 'action_frequency.csv' and 'action_frequency.svg'.")
 
-    print("\n✅ Log analysis completed.")
+    print("\n✅ Wind agent log analysis completed.")
 
 
 if __name__ == "__main__":
-    analyze_solaragent_log()
+    analyze_windagent_log()

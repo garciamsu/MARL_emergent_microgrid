@@ -310,7 +310,8 @@ def clear_results_directories():
         "results/",
         "results/evolution/",
         "results/plots/",
-        "results/q_tables/"
+        "results/q_tables/",
+        "results/logs/"
     ]
 
     for dir_path in directories:

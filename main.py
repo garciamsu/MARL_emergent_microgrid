@@ -261,9 +261,16 @@ class SolarAgent(BaseAgent):
         demand_power_idx: int
     ) -> float:
         """
-        Computes the reward for the solar agent based on its current action, solar potential,
-        total system power, and demand. Reward magnitudes have been adjusted to balance 
-        learning and penalization more progressively.
+        Computes the reward for the solar agent based on its action, solar potential,
+        total system power output, and current demand.
+
+        Parameters:
+            solar_potential_idx (int): Discretized index of available solar resource.
+            total_power_idx (int): Discretized index of total system power (all agents).
+            demand_power_idx (int): Discretized index of system demand.
+
+        Returns:
+            float: Reward signal guiding the solar agent's learning.
         """
         
         # Reward adjustment parameters
@@ -377,31 +384,39 @@ class WindAgent(BaseAgent):
         Returns:
             float: Reward signal guiding the wind agent's learning.
         """
+        # Reward adjustment parameters
+        sigma = 6
+        kappa = 0.2
+        mu = 6
+        nu = 32
+        beta = 1.5
+        xi = 5
+        
         power_gap = total_power_idx - demand_power_idx
 
         # Action = produce
         if self.action == 1:
             if wind_potential_idx == 0:
                 # ⚠️ Trying to produce without wind → strong penalty
-                return -self.sigma * 10
+                return -sigma * (demand_power_idx or 1)
             elif wind_potential_idx > 0 and power_gap >= 0:
                 # ✅ Producing when demand is already covered → moderate reward
-                return self.kappa * 2
+                return kappa * wind_potential_idx
             else:
                 # ✅ Producing when there's energy deficit → higher reward
-                return self.kappa * 5
+                return mu * abs(power_gap or 1)
 
         # Action = idle
         else:
             if wind_potential_idx == 0:
-                # ✅ No sun, no action → small positive reinforcement
-                return self.kappa
+                # ✅ No wind, no action → small positive reinforcement
+                return nu
             elif wind_potential_idx > 0 and power_gap >= 0:
-                # ⚠️ Wasting available sun when demand is covered → small penalty
-                return -self.sigma
+                # ⚠️ Wasting available wind when demand is covered → small penalty
+                return -beta * wind_potential_idx
             else:
                 # ⚠️ Not helping in a deficit despite available wind → strong penalty
-                return -self.sigma * 5
+                return -xi * abs(power_gap or 1)
 
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=5):

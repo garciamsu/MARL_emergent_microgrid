@@ -1122,7 +1122,7 @@ class Simulation:
             static_filename="results/plots/actions_plot"
         ) 
 
-        self.plot_metric('Total Reward')  # Puedes usar 'Total Reward' u otra métrica
+        self.plot_metric('Average Reward')  # Puedes usar 'Total Reward' u otra métrica
         
         # Graph IAE
         plot_metric(

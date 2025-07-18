@@ -14,12 +14,11 @@ C_CONFORT = 0.5   # Comfort threshold for market cost
 BINS = 7          # Defines how many intervals are used to discretize the power variables (renewables, no-renewables and demand).
 SOC_INITIAL = 0.9
 EPSILON_MIN = 0
-MAX_SCALE = 7
+MAX_SCALE = 6
 
 # Creates files if they do not exist
 os.makedirs("results", exist_ok=True)
 os.makedirs("results/evolution", exist_ok=True)
-os.makedirs("results/q_tables", exist_ok=True)
 os.makedirs("results/plots", exist_ok=True)
 
 # -----------------------------------------------------
@@ -843,7 +842,10 @@ class Simulation:
             battery_agent = None
 
             # Incorporates randomness in the demand so that the training
-            self.env.scale_demand = random.uniform(0.1, MAX_SCALE)
+            if ep != self.num_episodes - 1:
+                self.env.scale_demand = random.uniform(0.1, MAX_SCALE)
+            else:
+                self.env.scale_demand = 1
             
             # Save snapshot of previous Q-tables (only if not the first episode)
             if ep > 0:
@@ -862,7 +864,10 @@ class Simulation:
             for agent in self.agents:
                 if isinstance(agent, BatteryAgent):
                     # Incorporates randomness in the demand so that the training
-                    agent.soc = random.uniform(0, 1)
+                    if ep != self.num_episodes - 1:
+                        agent.soc = random.uniform(0, 1)                        
+                    else:
+                        agent.soc = 0.1
                     # Stops the loop upon finding the battery agent
                     break  
 
@@ -1045,23 +1050,6 @@ class Simulation:
             
             self.update_episode_metrics(ep, self.df)      
                         
-            # Save current Q-table to Excel
-            for agent in self.agents:
-                df_q = pd.DataFrame([
-                    {
-                        "State": str(state),
-                        "Action": action,
-                        "Q_value": q_value
-                    }
-                    for state, actions in agent.q_table.items()
-                    for action, q_value in actions.items()
-                ])
-
-                # Filename
-                filename_q = f"results/q_tables/qtable_{agent.name}_ep{ep}.xlsx"
-
-                df_q.to_excel(filename_q, index=False, engine="openpyxl")
-
             # Calculate episode metrics
             iae = self.calculate_iae()
             var_dif = self.df['dif'].var()

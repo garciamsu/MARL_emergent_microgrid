@@ -84,8 +84,6 @@ After a simulation run, your project will look like this:
 results/
 ├── evolution/
 │   └── learning_<episode>.csv          # Detailed logs per episode
-├── q_tables/
-│   └── qtable_<agent>_ep<episode>.xlsx # Q-table snapshots
 ├── plots/
 │   ├── IAE_over_episodes.svg
 │   ├── Var_dif_over_episodes.svg

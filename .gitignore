@@ -5,9 +5,7 @@ results/*
 !results/
 !results/evolution/
 !results/plots/
-!results/q_tables/
 
 # Ignorar todo dentro de cada subdirectorio
 results/evolution/*
 results/plots/*
-results/q_tables/*

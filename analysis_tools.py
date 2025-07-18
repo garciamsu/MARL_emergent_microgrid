@@ -303,14 +303,13 @@ def plot_coordination(df):
 def clear_results_directories():
     """
     Deletes all files inside the directories:
-    results/, results/evolution/, results/plots/, results/q_tables/.
+    results/, results/evolution/, results/plots/.
     Does not delete the directories themselves, only their contents.
     """
     directories = [
         "results/",
         "results/evolution/",
         "results/plots/",
-        "results/q_tables/",
         "results/logs/batteryagent",
         "results/logs/gridagent",
         "results/logs/loadagent",

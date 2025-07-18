@@ -737,7 +737,8 @@ class LoadAgent(BaseAgent):
                         delta_power_idx: str) -> float:
         """
         Computes reward based on full state context and agent's action.
-        Penalizes consumption during grid surplus and encourages use of local/green energy.
+        Encourages smart load usage: consume when local energy is available or market is cheap.
+        Avoids usage when grid is under deficit or electricity is expensive.
 
         :param battery_soc_idx: Discretized battery SoC index.
         :param renewable_potential_idx: Discretized renewable generation index.
@@ -745,43 +746,44 @@ class LoadAgent(BaseAgent):
         :param comfort_idx: 'acceptable' or 'expensive'.
         :return: Reward value based on symbolic context.
         """
-        
-        # Reward adjustment parameters
-        sigma = 5
-        kappa = 18
-        mu = 2
-        nu = 16
-        beta = 16
-        xi = 5
-        pho = 3
-        
-        # Thresholds to define "low" and "high"
+
+        # Updated reward parameters
+        sigma = 8     # Stronger penalty for turning ON in expensive surplus
+        kappa = 12    # Moderate reward for using local (renewable or battery) energy
+        mu = 5        # Increased reward when energy is affordable
+        nu = 14       # Maintain penalty in expensive & deficit scenario
+        beta = 10     # Reward for turning OFF when energy is expensive
+        xi = 6        # Reward for turning OFF when there's no renewable or battery
+        pho = 1.5     # Mild penalty for turning OFF despite green energy available
+
+        # Define thresholds
         low_soc = battery_soc_idx <= 1
         low_renewables = renewable_potential_idx < 1
 
         if self.action == 1:  # Turn ON
-            if delta_power_idx == 1:
+            if delta_power_idx == 1:  # 'surplus'
                 if low_soc and low_renewables:
-                    # Grid surplus: penalize unnecessary consumption
-                    return -sigma 
+                    # Surplus likely from grid, but no local energy — cost matters
+                    if self.comfort_idx == 'expensive':
+                        return -sigma
+                    else:
+                        return mu
                 else:
-                    # Surplus from battery or renewables: reward
+                    # Use of battery or renewables
                     return kappa * (battery_soc_idx or 1) * (renewable_potential_idx or 1)
-            else:
+            else:  # 'deficit'
                 if self.comfort_idx == 'acceptable':
-                    return mu  # Small reward for affordable power
+                    return mu
                 else:
-                    return -nu  # Expensive + deficit → penalize
+                    return -nu
 
         else:  # Turn OFF
             if delta_power_idx == 0 and self.comfort_idx == 'expensive':
-                return beta  # Wise decision to save cost and avoid overloading
+                return beta
+            elif low_soc and low_renewables:
+                return xi
             else:
-                if low_soc and low_renewables:
-                    return xi  # Grid surplus → good to avoid it
-                else:
-                    return -pho * renewable_potential_idx # Missed opportunity to use green/local energy
-
+                return -pho * max(renewable_potential_idx, 1)  # Mild regret for not using green/local
 # -----------------------------------------------------
 # Training simulation
 # -----------------------------------------------------

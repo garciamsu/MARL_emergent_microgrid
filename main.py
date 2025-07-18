@@ -745,34 +745,42 @@ class LoadAgent(BaseAgent):
         :param comfort_idx: 'acceptable' or 'expensive'.
         :return: Reward value based on symbolic context.
         """
+        
+        # Reward adjustment parameters
+        sigma = 5
+        kappa = 18
+        mu = 2
+        nu = 16
+        beta = 16
+        xi = 5
+        pho = 3
+        
         # Thresholds to define "low" and "high"
         low_soc = battery_soc_idx <= 1
-        low_renewables = renewable_potential_idx <= 1
+        low_renewables = renewable_potential_idx < 1
 
         if self.action == 1:  # Turn ON
-            if delta_power_idx == 'surplus':
+            if delta_power_idx == 1:
                 if low_soc and low_renewables:
                     # Grid surplus: penalize unnecessary consumption
-                    return -self.kappa
+                    return -sigma 
                 else:
                     # Surplus from battery or renewables: reward
-                    return self.kappa
-            elif delta_power_idx == 'deficit':
+                    return kappa * (battery_soc_idx or 1) * (renewable_potential_idx or 1)
+            else:
                 if self.comfort_idx == 'acceptable':
-                    return self.kappa / 2  # Small reward for affordable power
+                    return mu  # Small reward for affordable power
                 else:
-                    return -self.kappa  # Expensive + deficit → penalize
+                    return -nu  # Expensive + deficit → penalize
 
-        elif self.action == 0:  # Turn OFF
-            if delta_power_idx == 'deficit' and self.comfort_idx == 'expensive':
-                return self.kappa  # Wise decision to save cost and avoid overloading
-            elif delta_power_idx == 'surplus':
+        else:  # Turn OFF
+            if delta_power_idx == 0 and self.comfort_idx == 'expensive':
+                return beta  # Wise decision to save cost and avoid overloading
+            else:
                 if low_soc and low_renewables:
-                    return self.kappa  # Grid surplus → good to avoid it
+                    return xi  # Grid surplus → good to avoid it
                 else:
-                    return -self.kappa / 2  # Missed opportunity to use green/local energy
-
-        return 0.0
+                    return -pho * renewable_potential_idx # Missed opportunity to use green/local energy
 
 # -----------------------------------------------------
 # Training simulation
@@ -971,7 +979,7 @@ class Simulation:
                 self.env.demand_power_idx = digitize_clip(self.env.demand_power, self.env.demand_bins)
 
                 self.delta_power = self.env.total_power - self.env.demand_power
-                self.delta_power_idx = 'deficit' if self.delta_power <= 0 else 'surplus'
+                self.delta_power_idx = 1 if self.delta_power >= 0 else 0
 
                 self.instant["renewable_potential"] = self.env.renewable_potential
                 self.instant["renewable_potential_discrete"] = self.env.renewable_potential_idx

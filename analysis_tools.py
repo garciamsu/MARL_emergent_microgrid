@@ -311,7 +311,11 @@ def clear_results_directories():
         "results/evolution/",
         "results/plots/",
         "results/q_tables/",
-        "results/logs/"
+        "results/logs/batteryagent",
+        "results/logs/gridagent",
+        "results/logs/loadagent",
+        "results/logs/solaragent",
+        "results/logs/windagent",
     ]
 
     for dir_path in directories:

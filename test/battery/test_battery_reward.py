@@ -42,12 +42,12 @@ class BatteryAgent:
         """
 
         # Reward adjustment parameters
-        sigma = 8   # Heavy penalty for invalid discharge
-        kappa = 12  # Strong reward for helping during deficit
-        mu = 6      # Moderate penalty for discharging in surplus
-        nu = 10     # Reward for charging with excess renewables
+        sigma = 10   # Heavy penalty for invalid discharge
+        kappa = 14  # Strong reward for helping during deficit
+        mu = 7      # Moderate penalty for discharging in surplus
+        nu = 12     # Reward for charging with excess renewables
         beta = 5    # Light penalty for charging without surplus
-        xi = 6      # Strong penalty for idling
+        xi = 8      # Strong penalty for idling
         psi = 8     # Penalize discharging to avoid wasting renewable surplus
 
         # Calculate power gap: positive → surplus, negative → deficit
@@ -93,10 +93,20 @@ class BatteryAgent:
         # Action: idle
         else:
             unmet_demand = demand_power_idx - renewable_potential_idx
+
+            # 1. Penalize idling during excess renewable energy if battery is not full
+            if renewable_potential_idx > demand_power_idx and self.idx < 4:
+                # Should have charged instead of idling
+                incentive = (renewable_potential_idx - demand_power_idx + 1)
+                soc_factor = 1.2 - (self.idx * 0.2)  # more penalty if battery is empty
+                return -xi * incentive * soc_factor
+
+            # 2. Penalize idling during energy deficit
             if unmet_demand > 0 and self.idx > 0:
-                # Battery should assist renewable sources to meet demand
-                severity = 1.0 + 0.1 * self.idx  # more severe if battery is more charged
+                severity = 1.0 + 0.1 * self.idx
                 return -xi * severity * unmet_demand
+
+            # 3. Default idle penalty
             return -xi
         
 def run_test(input_path, output_path):

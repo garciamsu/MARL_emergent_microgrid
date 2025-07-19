@@ -581,12 +581,12 @@ class BatteryAgent(BaseAgent):
         """
 
         # Reward adjustment parameters
-        sigma = 8   # Heavy penalty for invalid discharge
-        kappa = 12  # Strong reward for helping during deficit
-        mu = 6      # Moderate penalty for discharging in surplus
-        nu = 10     # Reward for charging with excess renewables
+        sigma = 10   # Heavy penalty for invalid discharge
+        kappa = 14  # Strong reward for helping during deficit
+        mu = 7      # Moderate penalty for discharging in surplus
+        nu = 12     # Reward for charging with excess renewables
         beta = 5    # Light penalty for charging without surplus
-        xi = 6      # Strong penalty for idling
+        xi = 8      # Strong penalty for idling
         psi = 8     # Penalize discharging to avoid wasting renewable surplus
 
         # Calculate power gap: positive → surplus, negative → deficit
@@ -631,18 +631,21 @@ class BatteryAgent(BaseAgent):
 
         # Action: idle
         else:
-            if power_gap < 0 and self.idx > 0:
+            unmet_demand = demand_power_idx - renewable_potential_idx
 
-                # Penalize idling during deficit if battery could help
-                severity = 1.0
-                if renewable_potential_idx > 0:
-                    # There is renewable energy available: battery should cooperate
-                    severity = 1.2
-                if renewable_potential_idx == 0:
-                    # Critical case: battery is the only available source
-                    severity = 1.5
+            # 1. Penalize idling during excess renewable energy if battery is not full
+            if renewable_potential_idx > demand_power_idx and self.idx < 4:
+                # Should have charged instead of idling
+                incentive = (renewable_potential_idx - demand_power_idx + 1)
+                soc_factor = 1.2 - (self.idx * 0.2)  # more penalty if battery is empty
+                return -xi * incentive * soc_factor
 
-                return -xi * severity * abs(power_gap) * self.idx
+            # 2. Penalize idling during energy deficit
+            if unmet_demand > 0 and self.idx > 0:
+                severity = 1.0 + 0.1 * self.idx
+                return -xi * severity * unmet_demand
+
+            # 3. Default idle penalty
             return -xi
 
 class GridAgent(BaseAgent):
@@ -933,7 +936,7 @@ class Simulation:
             if ep != self.num_episodes - 1:
                 self.env.scale_demand = random.uniform(0.1, MAX_SCALE)
             else:
-                self.env.scale_demand = 5
+                self.env.scale_demand = 2
             
             # Save snapshot of previous Q-tables (only if not the first episode)
             if ep > 0:

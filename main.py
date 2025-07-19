@@ -1,3 +1,4 @@
+import math
 import os
 import numpy as np
 import random
@@ -7,6 +8,8 @@ from matplotlib.widgets import CheckButtons
 import copy
 from tabulate import tabulate
 from itertools import cycle
+import json
+from pathlib import Path
 from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination, clear_results_directories, digitize_clip, log_q_update
 
 # Global constants
@@ -131,24 +134,54 @@ class BaseAgent:
     """
     Base class for agents with Q-table.
     """
-    def __init__(self, name, actions, alpha=0.1, gamma=0.9, kappa=2, sigma=1, mu=5, nu=5):
+    def __init__(self, name, actions, alpha=0.1, gamma=0.9, load_json: bool = False, qtable_path: str | None = None):
         self.name = name
         self.actions = actions
         self.action = 0
         self.alpha = alpha
         self.gamma = gamma
-        self.kappa = kappa
-        self.sigma = sigma
-        self.mu = mu
-        self.nu = nu
         self.q_table = {}   
         self.power = 0.0
         self.idx = 0
+        self.load_qtable_json = load_json
+        self.path_qtable = qtable_path
+
+    def _load_qtable_from_json(self) -> None:
+        """
+        Populate self.q_table from a JSON file whose keys are
+        'i,j,k' strings and action dictionaries. Works for any
+        discrete state dimensionality.
+        """
+        if not self.path_qtable:
+            raise ValueError(f"{self.name}: path_qtable not set")
+
+        with open(self.path_qtable, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+
+        def str_state_to_tuple(s: str) -> tuple[int, ...]:
+            return tuple(map(int, s.split(",")))
+
+        self.q_table = {
+            str_state_to_tuple(state_str): {int(a): v for a, v in acts.items()}
+            for state_str, acts in raw.items()
+        }
     
+    def prepare_q_table(self, env) -> None:
+        """
+        Decide whether to build a fresh table or load it from a file.
+        """
+        if self.load_qtable_json:
+            self._load_qtable_from_json()
+        else:
+            self.initialize_q_table(env)
+
     def choose_action(self, state, epsilon=0.1):
         """
         Select action with epsilon-greedy policy.
         """
+
+        if self.load_qtable_json:
+            epsilon = 0.0     # strictly exploit learned policy
 
         if random.random() < epsilon:
             self.action = random.choice(self.actions)
@@ -165,6 +198,10 @@ class BaseAgent:
         Update the Q-table according to Q-Learning:
           Q(s, a) <- Q(s, a) + alpha * [r + gamma * max_a' Q(s', a') - Q(s, a)]
         """
+
+        if self.load_qtable_json:
+            return
+
         # Choose the action with maximum Q
         q_values = self.q_table[state]
         current_q = q_values[action]
@@ -205,13 +242,16 @@ class SolarAgent(BaseAgent):
     """
 
     def __init__(self, env: MultiAgentEnv):
-        super().__init__(name="solar", actions=[0, 1], alpha=0.1, gamma=0.9)
+        super().__init__(name="solar", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="assets/test/solar_q_table.json")
 
         # Discretization bins for potential generation (same for solar)
         self.solar_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
 
         self.solar_state = 0
         self.potential = 0.0
+        self.load_qtable_json = True
+        self.path_qtable = "assets/test/solar_q_table.json"
+        
         
     def get_discretized_state(self, env: MultiAgentEnv, index: int) -> tuple:
         """
@@ -286,13 +326,13 @@ class SolarAgent(BaseAgent):
         if self.action == 1:
             if solar_potential_idx == 0:
                 # ⚠️ Trying to produce without sun → strong penalty
-                return -sigma * (demand_power_idx or 1)
+                return -sigma * math.log(demand_power_idx + 1)
             elif solar_potential_idx > 0 and power_gap >= 0:
                 # ✅ Producing when demand is already covered → moderate reward
                 return kappa * solar_potential_idx
             else:
                 # ✅ Producing when there's energy deficit → higher reward
-                return mu * abs(power_gap or 1)
+                return mu * np.tanh(abs(power_gap))
 
         # Action = idle
         else:
@@ -304,7 +344,7 @@ class SolarAgent(BaseAgent):
                 return -beta * solar_potential_idx
             else:
                 # ⚠️ Not helping in a deficit despite available sun → strong penalty
-                return -xi * abs(power_gap or 1)
+                return max(-xi * abs(power_gap), -50)
             
 class WindAgent(BaseAgent):
     """
@@ -317,7 +357,7 @@ class WindAgent(BaseAgent):
     """
 
     def __init__(self, env: MultiAgentEnv):
-        super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9)
+        super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="assets/test/wind_q_table.json")
 
         # Discretization bins for wind and solar potential (same scale)
         self.wind_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
@@ -419,7 +459,7 @@ class WindAgent(BaseAgent):
 
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=5):
-        super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9)
+        super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9, load_json=False, qtable_path="assets/test/battery_q_table.json")
         
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
         
@@ -571,7 +611,7 @@ class GridAgent(BaseAgent):
     total delivered power, and current demand.
     """
 
-    def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
+    def __init__(self, env: MultiAgentEnv, ess: BatteryAgent, load_json=False, qtable_path="assets/test/grid_q_table.json"):
         """
         Initialize the GridAgent.
 
@@ -686,7 +726,7 @@ class LoadAgent(BaseAgent):
         :param env: Reference to the simulation environment.
         :param ess: Reference to the battery agent providing SoC index.
         """
-        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9)
+        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="assets/test/load_q_table.json")
 
         self.env = env
         self.ess = ess
@@ -788,14 +828,13 @@ class LoadAgent(BaseAgent):
 # Training simulation
 # -----------------------------------------------------
 class Simulation:
-    def __init__(self, num_episodes=10, epsilon=1, learning=True, filename="Case1.csv"):
+    def __init__(self, num_episodes=10, epsilon=1, filename="Case1.csv"):
         self.num_episodes = num_episodes
         self.instant = {} 
         self.evolution = []
         self.df = pd.DataFrame()
         self.df_episode_metrics = pd.DataFrame()
         self.prev_q_tables = {} # Dictionary to store the previous Q-table of each agent
-
         
         # Create the environment that loads the CSV and discretizes
         self.env = MultiAgentEnv(csv_filename=filename, num_power_bins=BINS)
@@ -818,11 +857,9 @@ class Simulation:
         # Training parameters
         self.epsilon = epsilon  # Exploration \epsilon (0=exploitation, 1=exploration)
 
-        
         # Initialize Q-tables
-        if learning:
-            for agent in self.agents:
-                agent.initialize_q_table(self.env)
+        for agent in self.agents:
+            agent.prepare_q_table(self.env)
 
     def step(self, index):
         self.env.get_discretized_state(index)
@@ -1421,7 +1458,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=300, epsilon=1, learning=True, filename="Case1_1.csv")
+    sim = Simulation(num_episodes=300, epsilon=1, filename="Case1_1.csv")
     sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning

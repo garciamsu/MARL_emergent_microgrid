@@ -62,7 +62,7 @@ class SolarAgent:
                 return max(-xi * abs(power_gap), -50)
 
 def run_test(input_path, output_path):
-    df = pd.read_csv(input_path)
+    df = pd.read_csv(input_path, delimiter=';')
 
     rewards = []
     for _, row in df.iterrows():

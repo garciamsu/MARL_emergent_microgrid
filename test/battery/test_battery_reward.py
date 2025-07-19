@@ -1,6 +1,7 @@
 from pathlib import Path
 import pandas as pd
 import os
+import numpy as np
 
 class BatteryAgent:
     def __init__(self, idx: int, action: int):
@@ -45,7 +46,7 @@ class BatteryAgent:
         kappa = 12  # Strong reward for helping during deficit
         mu = 5      # Moderate penalty for discharging in surplus
         nu = 10     # Reward for charging with excess renewables
-        beta = 3    # Light penalty for charging without surplus
+        beta = 5    # Light penalty for charging without surplus
         xi = 5      # Strong penalty for idling
 
         # Calculate power gap: positive → surplus, negative → deficit
@@ -58,19 +59,29 @@ class BatteryAgent:
                 return -sigma * max(demand_power_idx, 1)
             elif power_gap < 0:
                 # Discharging during deficit → reward scales with deficit and SoC
-                return kappa * abs(power_gap) * self.idx
+                critical_deficit = abs(power_gap) >= 4 and self.idx >= 3
+                factor = 1.3 if critical_deficit else 1.0
+                return kappa * np.tanh(abs(power_gap)) * self.idx * factor
+
             else:
-                # Discharging during surplus or equilibrium → penalty
-                return -mu * max(power_gap, 1)
+                if power_gap == 0:
+                    return -mu  # small fixed penalty
+                else:
+                    # Discharging during surplus or equilibrium → penalty
+                    return -mu * max(power_gap, 1)  # keep original for surplus
 
         # Action: charge
         elif self.action == 1:
             if renewable_potential_idx > demand_power_idx:
                 # Charging when renewables exceed demand → reward
-                return nu * renewable_potential_idx
+                soc_penalty = 0.5 if self.idx == 4 else 1
+                return nu * renewable_potential_idx * soc_penalty
+            
             else:
                 # Charging without surplus → light penalty
-                return -beta * max(demand_power_idx, 1)
+                soc_load_penalty = 1 + 0.3 * self.idx 
+                return -beta * max(demand_power_idx, 1) * soc_load_penalty
+
 
         # Action: idle
         else:
@@ -78,7 +89,7 @@ class BatteryAgent:
             return -xi
 
 def run_test(input_path, output_path):
-    df = pd.read_csv(input_path)
+    df = pd.read_csv(input_path, delimiter=';')
 
     rewards = []
     for _, row in df.iterrows():

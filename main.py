@@ -457,7 +457,6 @@ class WindAgent(BaseAgent):
                 # ⚠️ Not helping in a deficit despite available wind → strong penalty
                 return max(-xi * abs(power_gap), -50)
             
-
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=5):
         super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9, load_json=False, qtable_path="assets/test/battery_q_table.json")
@@ -602,7 +601,7 @@ class BatteryAgent(BaseAgent):
 
         # Action = idle
         else:
-            # It is not an option to stay idle → strong penalty
+            # It is not an option to stay idle → penalty
             return -xi
                 
 class GridAgent(BaseAgent):
@@ -872,7 +871,7 @@ class Simulation:
             agent.idx = agent_states[agent_type][0]        
        
         return agent_states
-        
+
     def run(self):
 
         # Create the loop for the episodes
@@ -1223,8 +1222,6 @@ class Simulation:
     def calculate_mean(self) -> float:
         """
         Calculates the ISE (Integral Square Error) over the 'dif' column
-
-.
 
         :return: Valor de ISE.
         """

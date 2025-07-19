@@ -1,4 +1,4 @@
-
+from pathlib import Path
 import math
 import pandas as pd
 import numpy as np
@@ -79,8 +79,9 @@ def run_test(input_path, output_path):
     print(f"Test completed. Results saved to: {output_path}")
 
 if __name__ == "__main__":
-    input_file = "assets/test/Solar_Agent_Reward_Table.csv"  # <- You can change this name
-    output_file = "results/reward/solar.csv"
+
+    input_file = Path(__file__).parent / 'data' / 'Solar_Agent_Reward_Table.csv'
+    output_file = Path(__file__).parent / 'reports' / 'reward_solar.csv'
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 

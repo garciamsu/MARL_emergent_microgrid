@@ -583,10 +583,11 @@ class BatteryAgent(BaseAgent):
         # Reward adjustment parameters
         sigma = 8   # Heavy penalty for invalid discharge
         kappa = 12  # Strong reward for helping during deficit
-        mu = 5      # Moderate penalty for discharging in surplus
+        mu = 6      # Moderate penalty for discharging in surplus
         nu = 10     # Reward for charging with excess renewables
         beta = 5    # Light penalty for charging without surplus
         xi = 6      # Strong penalty for idling
+        psi = 8     # Penalize discharging to avoid wasting renewable surplus
 
         # Calculate power gap: positive → surplus, negative → deficit
         power_gap = total_power_idx - demand_power_idx
@@ -596,8 +597,15 @@ class BatteryAgent(BaseAgent):
             if self.idx == 0:
                 # Discharge not possible at 0% SoC → heavy penalty
                 return -sigma * max(demand_power_idx, 1)
+
+            # Prevent unnecessary discharge when renewables can meet the demand
+            elif self.idx > 0 and renewable_potential_idx > demand_power_idx:
+                # Battery is fully charged and all demand can be covered by renewables
+                # Penalize discharging to avoid wasting renewable surplus
+                return - psi * max(renewable_potential_idx - demand_power_idx , 1) * self.idx   
+        
+            # Discharging during deficit → reward scales with deficit and SoC
             elif power_gap < 0:
-                # Discharging during deficit → reward scales with deficit and SoC
                 critical_deficit = abs(power_gap) >= 4 and self.idx >= 3
                 factor = 1.3 if critical_deficit else 1.0
                 return kappa * np.tanh(abs(power_gap)) * self.idx * factor
@@ -623,11 +631,19 @@ class BatteryAgent(BaseAgent):
 
         # Action: idle
         else:
-            # Idling is discouraged in all scenarios
-            if renewable_potential_idx == 0 and power_gap < 0 and self.idx > 0:
-                # Critical cases: there is a deficit, the battery is charged, and there are no renewable sources
-                return -xi * max(power_gap, 1) * self.idx 
-            return -xi  
+            if power_gap < 0 and self.idx > 0:
+
+                # Penalize idling during deficit if battery could help
+                severity = 1.0
+                if renewable_potential_idx > 0:
+                    # There is renewable energy available: battery should cooperate
+                    severity = 1.2
+                if renewable_potential_idx == 0:
+                    # Critical case: battery is the only available source
+                    severity = 1.5
+
+                return -xi * severity * abs(power_gap) * self.idx
+            return -xi
 
 class GridAgent(BaseAgent):
     """

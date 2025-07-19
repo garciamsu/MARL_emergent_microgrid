@@ -47,7 +47,7 @@ class BatteryAgent:
         mu = 5      # Moderate penalty for discharging in surplus
         nu = 10     # Reward for charging with excess renewables
         beta = 5    # Light penalty for charging without surplus
-        xi = 5      # Strong penalty for idling
+        xi = 6      # Strong penalty for idling
 
         # Calculate power gap: positive → surplus, negative → deficit
         power_gap = total_power_idx - demand_power_idx
@@ -72,21 +72,23 @@ class BatteryAgent:
 
         # Action: charge
         elif self.action == 1:
-            if renewable_potential_idx > demand_power_idx:
-                # Charging when renewables exceed demand → reward
+            if self.idx == 0 and renewable_potential_idx == 0:
+                # Trying to charge from grid with empty battery and no renewables
+                return -2 * beta * max(demand_power_idx, 1)  # force stronger penalty
+            elif renewable_potential_idx > demand_power_idx:
                 soc_penalty = 0.5 if self.idx == 4 else 1
                 return nu * renewable_potential_idx * soc_penalty
-            
             else:
-                # Charging without surplus → light penalty
                 soc_load_penalty = 1 + 0.3 * self.idx 
                 return -beta * max(demand_power_idx, 1) * soc_load_penalty
-
 
         # Action: idle
         else:
             # Idling is discouraged in all scenarios
-            return -xi
+            if renewable_potential_idx == 0 and power_gap < 0 and self.idx > 0:
+                # Critical cases: there is a deficit, the battery is charged, and there are no renewable sources
+                return -xi * max(power_gap, 1) * self.idx 
+            return -xi  
 
 def run_test(input_path, output_path):
     df = pd.read_csv(input_path, delimiter=';')

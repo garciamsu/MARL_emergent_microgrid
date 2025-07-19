@@ -144,7 +144,11 @@ class BaseAgent:
         self.power = 0.0
         self.idx = 0
         self.load_qtable_json = load_json
-        self.path_qtable = qtable_path
+
+        print(Path(__file__).parent)
+        print(qtable_path)
+
+        self.path_qtable = Path(__file__).parent / qtable_path
 
     def _load_qtable_from_json(self) -> None:
         """
@@ -158,8 +162,10 @@ class BaseAgent:
         with open(self.path_qtable, "r", encoding="utf-8") as f:
             raw = json.load(f)
 
-        def str_state_to_tuple(s: str) -> tuple[int, ...]:
+        def str_state_to_tuple(s: str) -> tuple:
+            s = s.strip("() ").replace(" ", "")
             return tuple(map(int, s.split(",")))
+
 
         self.q_table = {
             str_state_to_tuple(state_str): {int(a): v for a, v in acts.items()}
@@ -242,7 +248,7 @@ class SolarAgent(BaseAgent):
     """
 
     def __init__(self, env: MultiAgentEnv):
-        super().__init__(name="solar", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="assets/test/solar_q_table.json")
+        super().__init__(name="solar", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/solar/reports/solar_q_table.json")
 
         # Discretization bins for potential generation (same for solar)
         self.solar_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
@@ -250,7 +256,6 @@ class SolarAgent(BaseAgent):
         self.solar_state = 0
         self.potential = 0.0
         self.load_qtable_json = True
-        self.path_qtable = "assets/test/solar_q_table.json"
         
     def get_discretized_state(self, env: MultiAgentEnv, index: int) -> tuple:
         """
@@ -344,7 +349,7 @@ class SolarAgent(BaseAgent):
             else:
                 # ⚠️ Not helping in a deficit despite available sun → strong penalty
                 return max(-xi * abs(power_gap), -50)
-            
+
 class WindAgent(BaseAgent):
     """
     Agent representing a wind energy source.
@@ -356,7 +361,7 @@ class WindAgent(BaseAgent):
     """
 
     def __init__(self, env: MultiAgentEnv):
-        super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="assets/test/wind_q_table.json")
+        super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/solar/reports/wind_q_table.json")
 
         # Discretization bins for wind and solar potential (same scale)
         self.wind_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
@@ -456,10 +461,10 @@ class WindAgent(BaseAgent):
             else:
                 # ⚠️ Not helping in a deficit despite available wind → strong penalty
                 return max(-xi * abs(power_gap), -50)
-            
+
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=5):
-        super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9, load_json=False, qtable_path="assets/test/battery_q_table.json")
+        super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/battery/reports/battery_q_table.json")
         
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
         
@@ -556,54 +561,74 @@ class BatteryAgent(BaseAgent):
         demand_power_idx: int
     ) -> float:
         """
-        Computes the reward for the battery agent based on its SOC, system balance,
-        and current action (self.action ∈ {0: idle, 1: charge, 2: discharge}).
+        Computes the reward for the battery agent based on the system's renewable availability,
+        power balance, and the agent's current action.
+
+        Reward is assigned according to the following logic:
+        - Discharging is rewarded when there is a power deficit and SoC > 0.
+        - Charging is rewarded when there is excess renewable energy.
+        - Idle is strongly penalized as it is not a valid behavior in this system.
+        - Discharging with SoC = 0 is heavily penalized.
+        - Charging without renewable surplus is slightly penalized.
 
         Parameters:
-            renewable_potential_idx (int): Discretized index of available renewable generation.
-            total_power_idx (int): Discretized index of total system power output.
-            demand_power_idx (int): Discretized index of demand.
+            renewable_potential_idx (int): Discretized index of renewable power available (0 to 6).
+            total_power_idx (int): Discretized index of total power generated (0 to 6).
+            demand_power_idx (int): Discretized index of system demand (0 to 6).
 
         Returns:
-            float: Reward signal guiding the battery agent.
+            float: A scalar reward guiding the learning of the agent.
         """
-        
-        # Reward adjustment parameters
-        sigma = 6
-        kappa = 10
-        mu = 5
-        nu = 10
-        beta = 3
-        xi = 5
-        
-        power_gap = total_power_idx - demand_power_idx  # surplus if > 0, shortage if < 0
 
-        # Action = discharge
+        # Reward adjustment parameters
+        sigma = 8   # Heavy penalty for invalid discharge
+        kappa = 12  # Strong reward for helping during deficit
+        mu = 5      # Moderate penalty for discharging in surplus
+        nu = 10     # Reward for charging with excess renewables
+        beta = 5    # Light penalty for charging without surplus
+        xi = 6      # Strong penalty for idling
+
+        # Calculate power gap: positive → surplus, negative → deficit
+        power_gap = total_power_idx - demand_power_idx
+
+        # Action: discharge
         if self.action == 2:
             if self.idx == 0:
-                # Trying to discharge with empty battery → strong penalty
-                return -sigma * (demand_power_idx or 1)
+                # Discharge not possible at 0% SoC → heavy penalty
+                return -sigma * max(demand_power_idx, 1)
             elif power_gap < 0:
-                # Discharging to help system under deficit → reward
-                return kappa * abs(power_gap or 1) * self.idx
-            else:
-                # Discharging when system has excess → penalty
-                return -mu * abs(power_gap or 1)
+                # Discharging during deficit → reward scales with deficit and SoC
+                critical_deficit = abs(power_gap) >= 4 and self.idx >= 3
+                factor = 1.3 if critical_deficit else 1.0
+                return kappa * np.tanh(abs(power_gap)) * self.idx * factor
 
-        # Action = charge
+            else:
+                if power_gap == 0:
+                    return -mu  # small fixed penalty
+                else:
+                    # Discharging during surplus or equilibrium → penalty
+                    return -mu * max(power_gap, 1)  # keep original for surplus
+
+        # Action: charge
         elif self.action == 1:
-            if renewable_potential_idx > demand_power_idx:
-                # Charges the battery if there is excess renewable energy → reward
-                return nu * renewable_potential_idx
+            if self.idx == 0 and renewable_potential_idx == 0:
+                # Trying to charge from grid with empty battery and no renewables
+                return -2 * beta * max(demand_power_idx, 1)  # force stronger penalty
+            elif renewable_potential_idx > demand_power_idx:
+                soc_penalty = 0.5 if self.idx == 4 else 1
+                return nu * renewable_potential_idx * soc_penalty
             else:
-                # Charging when there's no surplus → mild penalty
-                return -beta * (demand_power_idx or 1)
+                soc_load_penalty = 1 + 0.3 * self.idx 
+                return -beta * max(demand_power_idx, 1) * soc_load_penalty
 
-        # Action = idle
+        # Action: idle
         else:
-            # It is not an option to stay idle → penalty
-            return -xi
-                
+            # Idling is discouraged in all scenarios
+            if renewable_potential_idx == 0 and power_gap < 0 and self.idx > 0:
+                # Critical cases: there is a deficit, the battery is charged, and there are no renewable sources
+                return -xi * max(power_gap, 1) * self.idx 
+            return -xi  
+
 class GridAgent(BaseAgent):
     """
     GridAgent represents the utility grid in the microgrid system.
@@ -611,7 +636,7 @@ class GridAgent(BaseAgent):
     total delivered power, and current demand.
     """
 
-    def __init__(self, env: MultiAgentEnv, ess: BatteryAgent, load_json=False, qtable_path="assets/test/grid_q_table.json"):
+    def __init__(self, env: MultiAgentEnv, ess: BatteryAgent, load_json=False, qtable_path="test/grid/reports/grid_q_table.json"):
         """
         Initialize the GridAgent.
 
@@ -619,7 +644,7 @@ class GridAgent(BaseAgent):
             env (MultiAgentEnv): The environment instance.
             ess (BatteryAgent): Reference to the battery agent for SOC access.
         """
-        super().__init__("grid", [0, 1], alpha=0.1, gamma=0.9)  # 0=idle, 1=produce
+        super().__init__("grid", [0, 1], alpha=0.1, gamma=0.9, load_json=load_json, qtable_path=qtable_path)  # 0=idle, 1=produce
         self.ess = ess  # Battery agent reference
 
     def initialize_q_table(self, env: MultiAgentEnv):
@@ -726,7 +751,7 @@ class LoadAgent(BaseAgent):
         :param env: Reference to the simulation environment.
         :param ess: Reference to the battery agent providing SoC index.
         """
-        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="assets/test/load_q_table.json")
+        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="/test/load/reports/load_q_table.json")
 
         self.env = env
         self.ess = ess
@@ -892,7 +917,7 @@ class Simulation:
             if ep != self.num_episodes - 1:
                 self.env.scale_demand = random.uniform(0.1, MAX_SCALE)
             else:
-                self.env.scale_demand = 1
+                self.env.scale_demand = 5
             
             # Save snapshot of previous Q-tables (only if not the first episode)
             if ep > 0:
@@ -914,7 +939,7 @@ class Simulation:
                     if ep != self.num_episodes - 1:
                         agent.soc = random.uniform(0, 1)                        
                     else:
-                        agent.soc = 0.1
+                        agent.soc = 1
                     # Stops the loop upon finding the battery agent
                     break  
 

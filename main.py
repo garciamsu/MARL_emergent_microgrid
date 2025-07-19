@@ -252,7 +252,6 @@ class SolarAgent(BaseAgent):
         self.load_qtable_json = True
         self.path_qtable = "assets/test/solar_q_table.json"
         
-        
     def get_discretized_state(self, env: MultiAgentEnv, index: int) -> tuple:
         """
         Returns the discretized state tuple for the solar agent:
@@ -357,7 +356,7 @@ class WindAgent(BaseAgent):
     """
 
     def __init__(self, env: MultiAgentEnv):
-        super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="assets/test/wind_q_table.json")
+        super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="assets/test/wind_q_table.json")
 
         # Discretization bins for wind and solar potential (same scale)
         self.wind_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
@@ -423,13 +422,14 @@ class WindAgent(BaseAgent):
         Returns:
             float: Reward signal guiding the wind agent's learning.
         """
+        
         # Reward adjustment parameters
-        sigma = 6
-        kappa = 0.2
-        mu = 6
-        nu = 32
-        beta = 1.5
-        xi = 5
+        sigma = 15
+        kappa = 3
+        mu = 12
+        nu = 1
+        beta = 5
+        xi = 8
         
         power_gap = total_power_idx - demand_power_idx
 
@@ -437,25 +437,26 @@ class WindAgent(BaseAgent):
         if self.action == 1:
             if wind_potential_idx == 0:
                 # ⚠️ Trying to produce without wind → strong penalty
-                return -sigma 
+                return -sigma * math.log(demand_power_idx + 1)
             elif wind_potential_idx > 0 and power_gap >= 0:
                 # ✅ Producing when demand is already covered → moderate reward
                 return kappa * wind_potential_idx
             else:
                 # ✅ Producing when there's energy deficit → higher reward
-                return mu * abs(power_gap or 1)
+                return mu * np.tanh(abs(power_gap))
 
         # Action = idle
         else:
             if wind_potential_idx == 0:
                 # ✅ No wind, no action → small positive reinforcement
-                return nu * (demand_power_idx or 1)
+                return nu
             elif wind_potential_idx > 0 and power_gap >= 0:
                 # ⚠️ Wasting available wind when demand is covered → small penalty
                 return -beta * wind_potential_idx
             else:
                 # ⚠️ Not helping in a deficit despite available wind → strong penalty
-                return -xi * abs(power_gap or 1)
+                return max(-xi * abs(power_gap), -50)
+            
 
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=5):
@@ -1213,8 +1214,6 @@ class Simulation:
     def calculate_ise(self) -> float:
         """
         Calculates the ISE (Integral Square Error) over the 'dif' column
-
-.
 
         :return: Valor de ISE.
         """

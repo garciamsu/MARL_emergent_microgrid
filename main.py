@@ -721,14 +721,17 @@ class GridAgent(BaseAgent):
         """
         
         # Reward adjustment parameters
-        sigma = 5
-        kappa = 18
-        mu = 6
-        nu = 6
-        beta = 6
-        xi = 5
-        pho = 3
-        tau = 4
+        kappa = 31
+        sigma = 6
+        mu = 3
+        nu = 9
+
+        beta = 31
+        xi = 10
+        pho = 5
+        tau = 12
+
+        delta = 0    # small uniform shift for action 1 only
         
         power_gap = total_power_idx - demand_power_idx  # >0 = surplus, <0 = shortage
 
@@ -736,30 +739,31 @@ class GridAgent(BaseAgent):
         if self.action == 1:
             if power_gap < 0 and battery_soc_idx == 0:
                 # Grid is supplying during shortage and battery is empty → necessary → strong reward
-                return kappa * (demand_power_idx or 1)
+                return kappa * math.log(demand_power_idx + 1) + delta
             elif power_gap >= 0 and battery_soc_idx == 0:
                 # The battery has no energy but the demand is satisfied → penalize
-                return -sigma * (power_gap or 1)
-            elif power_gap < 0 and battery_soc_idx > 0:
+                return -(sigma * max(1, abs(power_gap)) + delta)
+            elif power_gap < 0:
                 # Grid is helping, but battery could have helped → mild penalty
-                return -mu * battery_soc_idx
+                return -(mu * battery_soc_idx + delta)
             else:
                 # Grid produces despite sufficient system power → wasteful → strong penalty
-                return -nu * (demand_power_idx or 1) * (power_gap or 1)
+                return -(nu * battery_soc_idx + delta)
         # Action = idle
         else:
             if power_gap < 0 and battery_soc_idx == 0:
                 # Grid is not supplying during shortage and battery is empty → necessary → strong penalty
-                return -beta * (demand_power_idx or 1)
+                return -beta * math.log(demand_power_idx + 1)
             elif power_gap >= 0 and battery_soc_idx == 0:
                 # The battery has no energy but the demand is satisfied → reward
-                return xi * (power_gap or 1)
-            elif power_gap < 0 and battery_soc_idx > 0:
+                return xi * max(1, abs(power_gap))
+            elif power_gap < 0:
                 # Grid is not helping, but battery could have helped → reward
                 return pho * battery_soc_idx
             else:
                 # The grid does not produce despite having sufficient system power and energy in the batteries → excess → strong reward
-                return tau * (demand_power_idx or 1) * (power_gap or 1)
+                return tau * battery_soc_idx
+
 
 class LoadAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
@@ -958,7 +962,7 @@ class Simulation:
                     if ep != self.num_episodes - 1:
                         agent.soc = random.uniform(0, 1)                        
                     else:
-                        agent.soc = 1
+                        agent.soc = 0.05
                     # Stops the loop upon finding the battery agent
                     break  
 

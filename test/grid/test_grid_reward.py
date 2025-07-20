@@ -83,6 +83,7 @@ def run_test(input_path, output_path):
             action=row["action"]
         )
         reward = agent.calculate_reward(
+            battery_soc_idx=row["battery_soc_idx"],
             total_power_idx=row["total_power_idx"],
             demand_power_idx=row["demand_power_idx"]
         )

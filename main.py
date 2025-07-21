@@ -10,6 +10,7 @@ from tabulate import tabulate
 from itertools import cycle
 import json
 from pathlib import Path
+import ast
 from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination, clear_results_directories, digitize_clip, log_q_update
 
 # Global constants
@@ -162,10 +163,12 @@ class BaseAgent:
         with open(self.path_qtable, "r", encoding="utf-8") as f:
             raw = json.load(f)
 
-        def str_state_to_tuple(s: str) -> tuple:
-            s = s.strip("() ").replace(" ", "")
-            return tuple(map(int, s.split(",")))
+        #def str_state_to_tuple(s: str) -> tuple:
+        #    s = s.strip("() ").replace(" ", "")
+        #    return tuple(map(int, s.split(",")))
 
+        def str_state_to_tuple(s: str) -> tuple:
+            return ast.literal_eval(s)
 
         self.q_table = {
             str_state_to_tuple(state_str): {int(a): v for a, v in acts.items()}
@@ -773,7 +776,7 @@ class LoadAgent(BaseAgent):
         :param env: Reference to the simulation environment.
         :param ess: Reference to the battery agent providing SoC index.
         """
-        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="/test/load/reports/load_q_table.json")
+        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/load/reports/load_q_table.json")
 
         self.env = env
         self.ess = ess
@@ -831,41 +834,41 @@ class LoadAgent(BaseAgent):
         """
 
         # Updated reward parameters
-        sigma = 2     
-        mu = 2        
-        kappa = 2    
+        sigma = 9     
+        mu = 4        
+        kappa = 6    
 
-        psi = 2
-        nu = 2       
-        beta = 2   
+        psi = 9
+        nu = 5       
+        beta = 3   
 
         if self.action == 1:  # Turn ON
             # Turn on controllable load without battery and without renewable energy
             if battery_soc_idx == 0 and renewable_potential_idx == 0:
                 # expensive
                 if self.comfort_idx == 'expensive':
-                    return -sigma
+                    return -sigma * self.market_price
                 else:
                     # Cheap
-                    return mu
+                    return mu / self.market_price
             else:
                 # Use of battery or renewables
-                return kappa
+                return kappa * max(1, battery_soc_idx) * max(1, renewable_potential_idx)
 
         else:  # Turn OFF
             #Turn off controllable load without battery and without renewable energy
             if battery_soc_idx == 0 and renewable_potential_idx == 0:
                 # expensive 
                 if self.comfort_idx == 'expensive':
-                    return psi
+                    return psi * self.market_price
                 else:
                     # Cheap
-                    return - nu
+                    return - nu / self.market_price
             else:
                 # Use of battery or renewables
-                return - beta
-            
+                return - beta * max(1, battery_soc_idx) * max(1, renewable_potential_idx)
 
+           
 # -----------------------------------------------------
 # Training simulation
 # -----------------------------------------------------

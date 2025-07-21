@@ -14,40 +14,54 @@ class LoadAgent:
         """
         self.action = action
         self.comfort_idx = comfort_idx
+        self.market_price = 5.3
 
     def calculate_reward(self, battery_soc_idx: int, renewable_potential_idx: int) -> float:
         """
-        Computes reward based on the system state and agent action.
-
+        Computes reward based on full state context and agent's action.
         Encourages smart load usage: consume when local energy is available or market is cheap.
         Avoids usage when grid is under deficit or electricity is expensive.
 
-        Parameters:
-            battery_soc_idx (int): Discretized battery SoC index.
-            renewable_potential_idx (int): Discretized renewable generation index.
-
-        Returns:
-            float: Reward value.
+        :param battery_soc_idx: Discretized battery SoC index.
+        :param renewable_potential_idx: Discretized renewable generation index.
+        :param comfort_idx: 'acceptable' or 'expensive'.
+        :return: Reward value based on symbolic context.
         """
-        # Reward parameters
-        sigma = 2     # penalty for expensive ON
-        mu = 2        # reward for cheap ON with no local energy
-        kappa = 2     # reward for ON with battery or renewable
 
-        psi = 2       # reward for OFF in expensive condition
-        nu = 2        # penalty for OFF in cheap condition with no local energy
-        beta = 2      # penalty for OFF when there is battery or renewable
+        # Updated reward parameters
+        sigma = 9     
+        mu = 4        
+        kappa = 6    
+
+        psi = 9
+        nu = 5       
+        beta = 3   
 
         if self.action == 1:  # Turn ON
+            # Turn on controllable load without battery and without renewable energy
             if battery_soc_idx == 0 and renewable_potential_idx == 0:
-                return -sigma if self.comfort_idx == 'expensive' else mu
+                # expensive
+                if self.comfort_idx == 'expensive':
+                    return -sigma * self.market_price
+                else:
+                    # Cheap
+                    return mu / self.market_price
             else:
-                return kappa
+                # Use of battery or renewables
+                return kappa * max(1, battery_soc_idx) * max(1, renewable_potential_idx)
+
         else:  # Turn OFF
+            #Turn off controllable load without battery and without renewable energy
             if battery_soc_idx == 0 and renewable_potential_idx == 0:
-                return psi if self.comfort_idx == 'expensive' else -nu
+                # expensive 
+                if self.comfort_idx == 'expensive':
+                    return psi * self.market_price
+                else:
+                    # Cheap
+                    return - nu / self.market_price
             else:
-                return -beta
+                # Use of battery or renewables
+                return - beta * max(1, battery_soc_idx) * max(1, renewable_potential_idx)
 
 
 def run_test(input_path, output_path):

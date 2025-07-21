@@ -868,7 +868,6 @@ class LoadAgent(BaseAgent):
                 # Use of battery or renewables
                 return - beta * max(1, battery_soc_idx) * max(1, renewable_potential_idx)
 
-           
 # -----------------------------------------------------
 # Training simulation
 # -----------------------------------------------------
@@ -1498,7 +1497,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=300, epsilon=1, filename="Case1_1.csv")
+    sim = Simulation(num_episodes=450, epsilon=1, filename="Case1_1.csv")
     sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning

@@ -764,7 +764,6 @@ class GridAgent(BaseAgent):
                 # The grid does not produce despite having sufficient system power and energy in the batteries → excess → strong reward
                 return tau * battery_soc_idx
 
-
 class LoadAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, ess: BatteryAgent):
         """
@@ -780,6 +779,7 @@ class LoadAgent(BaseAgent):
         self.ess = ess
         self.comfort = 5  # User-defined maximum acceptable market price
         self.comfort_idx = "acceptable"
+        self.market_price = 0
 
     def get_discretized_state(self, env: MultiAgentEnv, index: int) -> tuple:
         """
@@ -790,15 +790,14 @@ class LoadAgent(BaseAgent):
         :return: Tuple representing the discrete state.
         """
         row = self.env.dataset.iloc[index]
-        market_price = row["price"]
+        self.market_price = row["price"]
 
         # Get components from environment and battery agent
         battery_soc_idx = self.ess.idx
         renewable_potential_idx = env.renewable_potential_idx
-        delta_power_idx = env.delta_power_idx  # Should be set externally in env
-        self.comfort_idx = 'acceptable' if market_price <= self.comfort else 'expensive'
+        self.comfort_idx = 'acceptable' if self.market_price <= self.comfort else 'expensive'
 
-        return (battery_soc_idx, renewable_potential_idx, delta_power_idx, self.comfort_idx)
+        return (battery_soc_idx, renewable_potential_idx, self.comfort_idx)
 
     def initialize_q_table(self, env: MultiAgentEnv):
         """
@@ -806,23 +805,20 @@ class LoadAgent(BaseAgent):
         """
         battery_bins = self.ess.battery_soc_bins
         renewable_bins = self.env.renewable_bins
-        delta_power_labels = ['deficit', 'surplus']
         comfort_labels = ['acceptable', 'expensive']
 
         states = []
         for b in range(len(battery_bins)):
             for r in range(len(renewable_bins)):
-                for d in delta_power_labels:
-                    for c in comfort_labels:
-                        states.append((b, r, d, c))
+                for c in comfort_labels:
+                    states.append((b, r, c))
 
         self.q_table = {
             state: {action: 0.0 for action in self.actions}
             for state in states
         }
 
-    def calculate_reward(self, battery_soc_idx: int, renewable_potential_idx: int, 
-                        delta_power_idx: str) -> float:
+    def calculate_reward(self, battery_soc_idx: int, renewable_potential_idx: int) -> float:
         """
         Computes reward based on full state context and agent's action.
         Encourages smart load usage: consume when local energy is available or market is cheap.
@@ -830,48 +826,46 @@ class LoadAgent(BaseAgent):
 
         :param battery_soc_idx: Discretized battery SoC index.
         :param renewable_potential_idx: Discretized renewable generation index.
-        :param delta_power_idx: 'surplus' or 'deficit'.
         :param comfort_idx: 'acceptable' or 'expensive'.
         :return: Reward value based on symbolic context.
         """
 
         # Updated reward parameters
-        sigma = 8     # Stronger penalty for turning ON in expensive surplus
-        kappa = 12    # Moderate reward for using local (renewable or battery) energy
-        mu = 5        # Increased reward when energy is affordable
-        nu = 14       # Maintain penalty in expensive & deficit scenario
-        beta = 10     # Reward for turning OFF when energy is expensive
-        xi = 6        # Reward for turning OFF when there's no renewable or battery
-        pho = 1.5     # Mild penalty for turning OFF despite green energy available
+        sigma = 2     
+        mu = 2        
+        kappa = 2    
 
-        # Define thresholds
-        low_soc = battery_soc_idx <= 1
-        low_renewables = renewable_potential_idx < 1
+        psi = 2
+        nu = 2       
+        beta = 2   
 
         if self.action == 1:  # Turn ON
-            if delta_power_idx == 1:  # 'surplus'
-                if low_soc and low_renewables:
-                    # Surplus likely from grid, but no local energy — cost matters
-                    if self.comfort_idx == 'expensive':
-                        return -sigma
-                    else:
-                        return mu
+            # Turn on controllable load without battery and without renewable energy
+            if battery_soc_idx == 0 and renewable_potential_idx == 0:
+                # expensive
+                if self.comfort_idx == 'expensive':
+                    return -sigma
                 else:
-                    # Use of battery or renewables
-                    return kappa * (battery_soc_idx or 1) * (renewable_potential_idx or 1)
-            else:  # 'deficit'
-                if self.comfort_idx == 'acceptable':
+                    # Cheap
                     return mu
-                else:
-                    return -nu
+            else:
+                # Use of battery or renewables
+                return kappa
 
         else:  # Turn OFF
-            if delta_power_idx == 0 and self.comfort_idx == 'expensive':
-                return beta
-            elif low_soc and low_renewables:
-                return xi
+            #Turn off controllable load without battery and without renewable energy
+            if battery_soc_idx == 0 and renewable_potential_idx == 0:
+                # expensive 
+                if self.comfort_idx == 'expensive':
+                    return psi
+                else:
+                    # Cheap
+                    return - nu
             else:
-                return -pho * max(renewable_potential_idx, 1)  # Mild regret for not using green/local
+                # Use of battery or renewables
+                return - beta
+            
+
 # -----------------------------------------------------
 # Training simulation
 # -----------------------------------------------------
@@ -1121,8 +1115,7 @@ class Simulation:
                     else:
                         reward = agent.calculate_reward(
                             battery_soc_idx=battery_agent.idx,
-                            renewable_potential_idx=self.env.renewable_potential_idx,
-                            delta_power_idx= self.delta_power_idx)
+                            renewable_potential_idx=self.env.renewable_potential_idx)
 
                         self.instant["reward_demand"] = reward
                     

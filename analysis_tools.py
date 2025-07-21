@@ -374,7 +374,7 @@ def log_q_update(
         updated_q (float): Q(s,a) after update.
         epsilon (float): Current exploration rate.
     """
-    log_dir = f"results/logs/{agent_type.lower()}/"
+    log_dir = f"results/logs/"
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, f"{agent_type.lower()}_log.csv")
     

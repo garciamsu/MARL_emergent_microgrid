@@ -94,5 +94,5 @@ def analyze_agent_log(agent_name: str):
 
 if __name__ == "__main__":
     # Example usage
-    for agent in ["solaragent", "windagent", "gridagent", "batteryagent"]:
+    for agent in ["solaragent", "windagent", "gridagent", "batteryagent", "loadagent"]:
         analyze_agent_log(agent)

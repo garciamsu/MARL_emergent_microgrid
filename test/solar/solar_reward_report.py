@@ -84,6 +84,6 @@ def generate_reports(input_file: str, output_dir: Path):
     print(f"✅ SolarAgent reports generated in: {output_dir}")
 
 if __name__ == "__main__":
-    input_file = Path(__file__).parent / 'reports' / 'Solar_Agent_Reward_Table.csv'
+    input_file = Path(__file__).parent / 'data' / 'Solar_Agent_Reward_Table.csv'
     output_dir = Path(__file__).parent / 'reports'
     generate_reports(input_file, output_dir)

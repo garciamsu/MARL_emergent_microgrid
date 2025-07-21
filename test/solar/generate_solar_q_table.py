@@ -16,7 +16,7 @@ def generate_q_table(input_csv_path: str, output_json_path: str):
 
     # Define each state as a tuple of the input variables relevant for SolarAgent
     df['state'] = list(zip(
-        df['renewable_potential_idx'],
+        df['solar_potential_idx'],
         df['total_power_idx'],
         df['demand_power_idx']
     ))

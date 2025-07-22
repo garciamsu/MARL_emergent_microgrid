@@ -251,7 +251,7 @@ class SolarAgent(BaseAgent):
     """
 
     def __init__(self, env: MultiAgentEnv):
-        super().__init__(name="solar", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="test/solar/reports/solar_q_table.json")
+        super().__init__(name="solar", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/solar/reports/solar_q_table.json")
 
         # Discretization bins for potential generation (same for solar)
         self.solar_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
@@ -363,7 +363,7 @@ class WindAgent(BaseAgent):
     """
 
     def __init__(self, env: MultiAgentEnv):
-        super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="test/solar/reports/wind_q_table.json")
+        super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/solar/reports/wind_q_table.json")
 
         # Discretization bins for wind and solar potential (same scale)
         self.wind_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
@@ -466,7 +466,7 @@ class WindAgent(BaseAgent):
 
 class BatteryAgent(BaseAgent):
     def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=5):
-        super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9, load_json=False, qtable_path="test/battery/reports/battery_q_table.json")
+        super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/battery/reports/battery_q_table.json")
         
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
         
@@ -775,7 +775,7 @@ class LoadAgent(BaseAgent):
         :param env: Reference to the simulation environment.
         :param ess: Reference to the battery agent providing SoC index.
         """
-        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="test/load/reports/load_q_table.json")
+        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/load/reports/load_q_table.json")
 
         self.env = env
         self.ess = ess
@@ -954,18 +954,18 @@ class Simulation:
             for agent in self.agents:
                 if isinstance(agent, BatteryAgent):
                     # Incorporates randomness in the demand so that the training
-                    #if ep != self.num_episodes - 1:
-                    #    agent.soc = random.uniform(0, 1)                        
-                    #else:
-                    #    agent.soc = 0.05
+                    if ep != self.num_episodes - 1:
+                        agent.soc = random.uniform(0, 1)                        
+                    else:
+                        agent.soc = 0.05
                     # Stops the loop upon finding the battery agent
-                    #break 
+                    break 
 
                     # Gradually increases battery SoC from 0 to 1 over the episodes
-                    if ep != self.num_episodes - 1:
-                        agent.soc = ep / (self.num_episodes - 1)
-                    else:
-                        agent.soc = 0.5  # Optional override for last episode 
+                    #if ep != self.num_episodes - 1:
+                    #    agent.soc = ep / (self.num_episodes - 1)
+                    #else:
+                    #    agent.soc = 0.05  # Optional override for last episode 
 
             for i in range(self.max_steps-1):
                 
@@ -1502,7 +1502,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=450, epsilon=1, filename="generated_energy_dataset_utf8.csv")
+    sim = Simulation(num_episodes=300, epsilon=1, filename="Case1_1.csv")
     sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning

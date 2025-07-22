@@ -8,4 +8,4 @@ results/*
 
 # Ignorar todo dentro de cada subdirectorio
 results/evolution/*
-results/plots/*
+#results/plots/*

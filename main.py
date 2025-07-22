@@ -16,7 +16,7 @@ from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, lo
 # Global constants
 C_CONFORT = 0.5   # Comfort threshold for market cost
 BINS = 7          # Defines how many intervals are used to discretize the power variables (renewables, no-renewables and demand).
-SOC_INITIAL = 0.9
+SOC_INITIAL = 0.0
 EPSILON_MIN = 0
 MAX_SCALE = 6
 
@@ -954,12 +954,18 @@ class Simulation:
             for agent in self.agents:
                 if isinstance(agent, BatteryAgent):
                     # Incorporates randomness in the demand so that the training
-                    if ep != self.num_episodes - 1:
-                        agent.soc = random.uniform(0, 1)                        
-                    else:
-                        agent.soc = 0.05
+                    #if ep != self.num_episodes - 1:
+                    #    agent.soc = random.uniform(0, 1)                        
+                    #else:
+                    #    agent.soc = 0.05
                     # Stops the loop upon finding the battery agent
-                    break  
+                    #break 
+
+                    # Gradually increases battery SoC from 0 to 1 over the episodes
+                    if ep != self.num_episodes - 1:
+                        agent.soc = ep / (self.num_episodes - 1)
+                    else:
+                        agent.soc = 0.5  # Optional override for last episode 
 
             for i in range(self.max_steps-1):
                 
@@ -1496,7 +1502,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=300, epsilon=1, filename="Case1_1.csv")
+    sim = Simulation(num_episodes=450, epsilon=1, filename="generated_energy_dataset_utf8.csv")
     sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning

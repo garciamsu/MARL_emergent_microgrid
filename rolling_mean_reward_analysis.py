@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 # Ruta del directorio que contiene los archivos CSV
 folder_path = "./results/evolution/"
-output_folder = "./results/"
+output_folder = "./results/stability"
 
 # Crear carpeta de salida si no existe
 os.makedirs(output_folder, exist_ok=True)
@@ -56,7 +56,7 @@ plt.figure(figsize=(12, 6))
 plt.plot(results_df["episode"], results_df["rolling_mean_reward"], label="Rolling Mean Reward (24h)")
 plt.xlabel("Episode")
 plt.ylabel("Rolling Mean Reward")
-plt.title("Estabilidad del Aprendizaje por Episodio (MARL)")
+plt.title("Stability of Episodic Learning (MARL)")
 plt.grid(True)
 plt.legend()
 

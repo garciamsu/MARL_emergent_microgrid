@@ -47,8 +47,8 @@ class MultiAgentEnv:
         offsets_dict = {"demand": 0, "price": 0, "solar_power": 0, "wind_power": 0}
         self.dataset = self._load_data(csv_filename, offsets_dict)
         self.max_steps = len(self.dataset)
-        self.max_value = self.dataset.apply(pd.to_numeric, errors='coerce').max().max()
-        
+        self.max_value = self.dataset.drop(columns='price').apply(pd.to_numeric, errors='coerce').max().max()
+
         # Uniform Quantization Discretization
         # Define the bins to discretize each variable of interest
         # Adjust the ranges according to your actual dataset
@@ -779,7 +779,7 @@ class LoadAgent(BaseAgent):
 
         self.env = env
         self.ess = ess
-        self.comfort = 5  # User-defined maximum acceptable market price
+        self.comfort = 10  # User-defined maximum acceptable market price
         self.comfort_idx = "acceptable"
         self.market_price = 0
 
@@ -935,7 +935,7 @@ class Simulation:
             if ep != self.num_episodes - 1:
                 self.env.scale_demand = random.uniform(0.1, MAX_SCALE)
             else:
-                self.env.scale_demand = 2
+                self.env.scale_demand = 1.7
             
             # Save snapshot of previous Q-tables (only if not the first episode)
             if ep > 0:
@@ -1502,7 +1502,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=300, epsilon=1, filename="Case1_1.csv")
+    sim = Simulation(num_episodes=300, epsilon=1, filename="Case2.csv")
     sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning

@@ -18,7 +18,7 @@ C_CONFORT = 0.5   # Comfort threshold for market cost
 BINS = 7          # Defines how many intervals are used to discretize the power variables (renewables, no-renewables and demand).
 SOC_INITIAL = 0.0
 EPSILON_MIN = 0
-MAX_SCALE = 6
+MAX_SCALE = 2
 
 # Creates files if they do not exist
 os.makedirs("results", exist_ok=True)
@@ -251,7 +251,7 @@ class SolarAgent(BaseAgent):
     """
 
     def __init__(self, env: MultiAgentEnv):
-        super().__init__(name="solar", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/solar/reports/solar_q_table.json")
+        super().__init__(name="solar", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="test/solar/reports/solar_q_table.json")
 
         # Discretization bins for potential generation (same for solar)
         self.solar_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
@@ -363,7 +363,7 @@ class WindAgent(BaseAgent):
     """
 
     def __init__(self, env: MultiAgentEnv):
-        super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/solar/reports/wind_q_table.json")
+        super().__init__(name="wind", actions=[0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="test/solar/reports/wind_q_table.json")
 
         # Discretization bins for wind and solar potential (same scale)
         self.wind_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
@@ -465,8 +465,8 @@ class WindAgent(BaseAgent):
                 return max(-xi * abs(power_gap), -50)
 
 class BatteryAgent(BaseAgent):
-    def __init__(self, env: MultiAgentEnv, capacity_ah= 30, num_battery_soc_bins=5):
-        super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/battery/reports/battery_q_table.json")
+    def __init__(self, env: MultiAgentEnv, capacity_ah= 3, num_battery_soc_bins=5):
+        super().__init__("battery", [0, 1, 2], alpha=0.1, gamma=0.9, load_json=False, qtable_path="test/battery/reports/battery_q_table.json")
         
         # ["idle", "charge", "discharge"] -> [0, 1, 2]
         
@@ -775,11 +775,11 @@ class LoadAgent(BaseAgent):
         :param env: Reference to the simulation environment.
         :param ess: Reference to the battery agent providing SoC index.
         """
-        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9, load_json=True, qtable_path="test/load/reports/load_q_table.json")
+        super().__init__("load", [0, 1], alpha=0.1, gamma=0.9, load_json=False, qtable_path="test/load/reports/load_q_table.json")
 
         self.env = env
         self.ess = ess
-        self.comfort = 10  # User-defined maximum acceptable market price
+        self.comfort = 6  # User-defined maximum acceptable market price
         self.comfort_idx = "acceptable"
         self.market_price = 0
 
@@ -933,9 +933,9 @@ class Simulation:
 
             # Incorporates randomness in the demand so that the training
             if ep != self.num_episodes - 1:
-                self.env.scale_demand = random.uniform(0.1, MAX_SCALE)
+                self.env.scale_demand = random.uniform(0.2, MAX_SCALE)
             else:
-                self.env.scale_demand = 1.7
+                self.env.scale_demand = 1
             
             # Save snapshot of previous Q-tables (only if not the first episode)
             if ep > 0:
@@ -1502,7 +1502,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=300, epsilon=1, filename="Case2.csv")
+    sim = Simulation(num_episodes=1200, epsilon=1, filename="Case2.csv")
     sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning

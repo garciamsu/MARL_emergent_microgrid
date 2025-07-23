@@ -957,7 +957,7 @@ class Simulation:
                     if ep != self.num_episodes - 1:
                         agent.soc = random.uniform(0, 1)                        
                     else:
-                        agent.soc = 0.05
+                        agent.soc = 1
                     # Stops the loop upon finding the battery agent
                     break 
 
@@ -1502,7 +1502,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=1200, epsilon=1, filename="Case2.csv")
+    sim = Simulation(num_episodes=2000, epsilon=1, filename="Case3.csv")
     sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning

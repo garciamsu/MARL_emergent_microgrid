@@ -1,11 +1,11 @@
 # Ignorar todo dentro de results/
-results/*
+#results/*
 
 # Exceptuar (no ignorar) los subdirectorios
-!results/
-!results/evolution/
-!results/plots/
+#!results/
+#!results/evolution/
+#!results/plots/
 
 # Ignorar todo dentro de cada subdirectorio
-results/evolution/*
+#results/evolution/*
 #results/plots/*

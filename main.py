@@ -277,12 +277,13 @@ class SolarAgent(BaseAgent):
         self.potential = solar_potential
 
         solar_potential_idx = digitize_clip(solar_potential, self.solar_power_bins)
+        renewable_potential_idx = env.renewable_potential_idx
         total_power_idx = digitize_clip(env.total_power, env.renewable_bins)
         demand_power_idx = env.demand_power_idx
 
         self.idx = solar_potential_idx
 
-        return (solar_potential_idx, total_power_idx, demand_power_idx)
+        return (solar_potential_idx, renewable_potential_idx, demand_power_idx)
 
     def initialize_q_table(self, env: MultiAgentEnv) -> None:
         """
@@ -290,16 +291,16 @@ class SolarAgent(BaseAgent):
         """
         states = []
         for solar_idx in range(len(self.solar_power_bins)):
-            for total_idx in range(len(env.renewable_bins)):
+            for renewable_idx in range(len(env.renewable_bins)):
                 for demand_idx in range(len(env.demand_bins)):
-                    states.append((solar_idx, total_idx, demand_idx))
+                    states.append((solar_idx, renewable_idx, demand_idx))
 
         self.q_table = {
             state: {action: 0.0 for action in self.actions}
             for state in states
         }
 
-    def calculate_reward(
+    def calculate_reward_old(
         self,
         solar_potential_idx: int,
         total_power_idx: int,
@@ -351,6 +352,35 @@ class SolarAgent(BaseAgent):
             else:
                 # ⚠️ Not helping in a deficit despite available sun → strong penalty
                 return max(-xi * abs(power_gap), -50)
+
+    def calculate_reward(
+        self,
+        solar_potential_idx: int,
+        renewable_potential_idx: int,
+        demand_power_idx: int
+    ) -> float:
+        
+        # Reward adjustment parameters
+        theta = 3
+        beta = 3
+        eta = 3
+        xi = 3
+        
+        gap = renewable_potential_idx - demand_power_idx
+        
+        # Action = produce
+        if self.action == 1:
+            if gap <= 0 and solar_potential_idx > 0:
+                return theta * max(abs(gap), 1)
+            else:
+                return -beta * gap
+
+        # Action = idle
+        else:
+            if gap > 0:
+                return eta * max(abs(gap), 1)
+            else:                
+                return -xi
 
 class WindAgent(BaseAgent):
     """
@@ -1091,7 +1121,7 @@ class Simulation:
                     if isinstance(agent, SolarAgent):
                         reward = agent.calculate_reward(
                             solar_potential_idx=agent.potential,
-                            total_power_idx=self.env.total_power_idx,
+                            renewable_potential_idx=self.env.renewable_potential_idx,
                             demand_power_idx=self.env.demand_power_idx
                         )
                         self.instant["reward_solar"] = reward
@@ -1502,7 +1532,7 @@ if __name__ == "__main__":
     clear_results_directories()
 
     # Simulation setup
-    sim = Simulation(num_episodes=2000, epsilon=1, filename="Case3.csv")
+    sim = Simulation(num_episodes=300, epsilon=1, filename="Case1_test.csv")
     sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning

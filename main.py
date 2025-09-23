@@ -11,11 +11,10 @@ from itertools import cycle
 import json
 from pathlib import Path
 import ast
-from analysis_tools import compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination, clear_results_directories, digitize_clip, log_q_update
+from analysis_tools import load_config, compute_q_diff_norm, plot_metric, check_stability, load_latest_evolution_csv, process_evolution_data, plot_coordination, clear_directories, digitize_clip, log_q_update
 
 # Global constants
 C_CONFORT = 0.5   # Comfort threshold for market cost
-BINS = 7          # Defines how many intervals are used to discretize the power variables (renewables, no-renewables and demand).
 SOC_INITIAL = 0.0
 EPSILON_MIN = 0
 MAX_SCALE = 2
@@ -37,18 +36,24 @@ class MultiAgentEnv:
     - Can be managed in an episode loop.
     """
 
-    def __init__(self, csv_filename, num_power_bins=7):
+    def __init__(self, config):
         """
         Parameters:
         - num_*_bins: Defines how many bins are used to discretize each variable.
         """
         
+        csv_filename = config["simulation"]["dataset"]
+        num_power_bins = config["discretization"]["bins_power"]
+
         # Load the DataFrame with offsets
-        offsets_dict = {"demand": 0, "price": 0, "solar_power": 0, "wind_power": 0}
-        self.dataset = self._load_data(csv_filename, offsets_dict)
+        self.dataset = self._load_data(csv_filename)
+
         self.max_steps = len(self.dataset)
         self.max_value = self.dataset.drop(columns='price').apply(pd.to_numeric, errors='coerce').max().max()
-
+        print(self.max_steps)
+        print(self.max_value)
+        
+        exit(0)
         # Uniform Quantization Discretization
         # Define the bins to discretize each variable of interest
         # Adjust the ranges according to your actual dataset
@@ -872,38 +877,7 @@ class LoadAgent(BaseAgent):
 # -----------------------------------------------------
 class Simulation:
     def __init__(self, num_episodes=10, epsilon=1, filename="Case1.csv"):
-        self.num_episodes = num_episodes
-        self.instant = {} 
-        self.evolution = []
-        self.df = pd.DataFrame()
-        self.df_episode_metrics = pd.DataFrame()
-        self.prev_q_tables = {} # Dictionary to store the previous Q-table of each agent
-        
-        # Create the environment that loads the CSV and discretizes
-        self.env = MultiAgentEnv(csv_filename=filename, num_power_bins=BINS)
-        
-        # Obtains points automatically from the database
-        self.max_steps = self.env.max_steps
-        
-        # The storage agent is instantiated
-        bat_ag = BatteryAgent(self.env)
-
-        # The set of agents is defined
-        self.agents = [
-            SolarAgent(self.env),
-            WindAgent(self.env),
-            bat_ag,
-            GridAgent(self.env, bat_ag),
-            LoadAgent(self.env, bat_ag)
-        ]
-        
-        # Training parameters
-        self.epsilon = epsilon  # Exploration \epsilon (0=exploitation, 1=exploration)
-
-        # Initialize Q-tables
-        for agent in self.agents:
-            agent.prepare_q_table(self.env)
-
+        pass
     def step(self, index):
         self.env.get_discretized_state(index)
         agent_states = {}
@@ -914,349 +888,6 @@ class Simulation:
             agent.idx = agent_states[agent_type][0]        
        
         return agent_states
-
-    def run(self):
-
-        # Create the loop for the episodes
-        for ep in range(self.num_episodes):
-            
-            # For each episode the power values ​​are initialized
-            self.env.total_power = 0
-            self.env.renewable_power  = 0.0
-            self.env.renewable_power_idx = 0                
-            bat_power = 0.0
-            grid_power = 0.0
-            solar_power = 0.0
-            wind_power = 0.0
-            loadc_power = 0.0
-            battery_agent = None
-
-            # Incorporates randomness in the demand so that the training
-            if ep != self.num_episodes - 1:
-                self.env.scale_demand = random.uniform(0.2, MAX_SCALE)
-            else:
-                self.env.scale_demand = 1
-            
-            # Save snapshot of previous Q-tables (only if not the first episode)
-            if ep > 0:
-                for agent in self.agents:
-                    agent_key = type(agent).__name__
-                    self.prev_q_tables[agent_key] = copy.deepcopy(agent.q_table)
-            else:
-                for agent in self.agents:
-                    agent_key = type(agent).__name__
-                    self.prev_q_tables[agent_key] = {state: {a:0.0 for a in agent.actions} for state in agent.q_table}
-            
-            # Initialization of the evaluation by episode
-            self.evolution = []
-
-            # Initializes the soc at each episode start
-            for agent in self.agents:
-                if isinstance(agent, BatteryAgent):
-                    # Incorporates randomness in the demand so that the training
-                    if ep != self.num_episodes - 1:
-                        agent.soc = random.uniform(0, 1)                        
-                    else:
-                        agent.soc = 1
-                    # Stops the loop upon finding the battery agent
-                    break 
-
-                    # Gradually increases battery SoC from 0 to 1 over the episodes
-                    #if ep != self.num_episodes - 1:
-                    #    agent.soc = ep / (self.num_episodes - 1)
-                    #else:
-                    #    agent.soc = 0.05  # Optional override for last episode 
-
-            for i in range(self.max_steps-1):
-                
-                # We reset the environment and agents at the start of each episode.
-                state = self.step(i)                
-
-                self.instant["time"] = self.env.time         
-                self.instant["epsilon"] = self.epsilon
-
-                # Select the action
-                for agent in self.agents:
-                    if isinstance(agent, SolarAgent):
-                        agent.choose_action(state['SolarAgent'], self.epsilon)
-
-                        agent.solar_state = agent.action
-                        agent.power = agent.potential*agent.action
-                        solar_power = agent.power
-
-                        self.instant["solar_potential"] = agent.potential
-                        self.instant["solar_discrete"] = agent.idx
-                        self.instant["solar"] = agent.power
-                        self.instant["solar_state"] = agent.solar_state
-                    elif isinstance(agent, WindAgent):
-                        agent.choose_action(state['WindAgent'], self.epsilon)
-
-                        agent.wind_state = agent.action
-                        agent.power = agent.potential*agent.action
-                        wind_power = agent.power
-
-                        self.instant["wind_potential"] = agent.potential
-                        self.instant["wind_discrete"] = agent.idx
-                        self.instant["wind"] = agent.power
-                        self.instant["wind_state"] = agent.wind_state
-                    elif isinstance(agent, BatteryAgent):
-                        agent.choose_action(state['BatteryAgent'], self.epsilon)
-                        agent.battery_state = agent.action
-
-                        # Charging
-                        if agent.action == 1:
-                            agent.power = -abs(self.env.demand_power - (solar_power + wind_power))
-                        # Discharging
-                        elif agent.action == 2:
-                            agent.power = abs(self.env.demand_power - (solar_power + wind_power))
-                        # Idle
-                        else:                        
-                            agent.power = 0.0
-
-                        bat_power = agent.power
-                        battery_agent = agent
-
-                        self.instant["bat"] = agent.power
-                        self.instant["bat_soc"] = agent.soc
-                        self.instant["bat_soc_discrete"] = agent.idx
-                        self.instant["bat_state"] = agent.battery_state
-                        
-                        agent.update_soc(power_w=agent.power)
-
-                    elif isinstance(agent, GridAgent):
-                        agent.choose_action(state['GridAgent'], self.epsilon)
-                        
-                        agent.grid_state = agent.action
-                        # Sell
-                        if agent.action == 1: 
-                            agent.power = abs(self.env.demand_power - (solar_power + wind_power) - bat_power)
-                        # Idle
-                        else: 
-                            agent.power = 0
-                        
-                        grid_power = agent.power
-                        agent.idx = digitize_clip(agent.power, self.env.renewable_bins)
-
-                        self.instant["grid"] = agent.power
-                        self.instant["grid_state"] = agent.grid_state
-                        self.instant["grid_discrete"] = agent.idx
-                    else:
-                        agent.choose_action(state['LoadAgent'], self.epsilon)
-                        agent.load_state = agent.action
-
-                        # Turn ON
-                        if agent.action == 1: 
-                            agent.power = 0
-                        # Turn OFF
-                        else:    
-                            # The power that is reduced with the management of controllable loads is known
-                            agent.power = -15
-                        
-                        self.instant["load_state"] = agent.load_state
-                        self.instant["load_comfort_idx"] = agent.comfort_idx
-                        loadc_power = agent.power
-
-                # Updates variables in environment
-                self.env.renewable_power = wind_power + solar_power
-                self.env.renewable_power_idx = digitize_clip(self.env.renewable_power, self.env.renewable_bins)
-
-                self.env.total_power = self.env.renewable_power + bat_power + (grid_power + loadc_power)
-                self.env.total_power_idx = digitize_clip(self.env.total_power, self.env.renewable_bins)
-
-                self.env.demand_power = self.env.demand_power + loadc_power
-                self.env.demand_power_idx = digitize_clip(self.env.demand_power, self.env.demand_bins)
-
-                self.delta_power = self.env.total_power - self.env.demand_power
-                self.delta_power_idx = 1 if self.delta_power >= 0 else 0
-
-                self.instant["renewable_potential"] = self.env.renewable_potential
-                self.instant["renewable_potential_discrete"] = self.env.renewable_potential_idx
-                self.instant["renewable_power"] = self.env.renewable_power
-                self.instant["renewable_power_discrete"] = self.env.renewable_power_idx
-                self.instant["total"] = self.env.total_power
-                self.instant["demand"] = self.env.demand_power
-                self.instant["dif"] = self.delta_power
-                self.instant["dif_idx"] = self.delta_power_idx
-                self.instant["total_discrete"] = self.env.total_power_idx
-                self.instant["demand_discrete"] = self.env.demand_power_idx
-                self.instant["price"] = self.env.price
-
-                # Now we calculate the individual reward per agent and update the Q-table               
-                next_state = self.step(i + 1)  # We advance the environment by an index
-                
-                for agent in self.agents:
-                    agent_type = type(agent).__name__  # Gets the name of the agent class
-                    
-                    # We calculate the reward according to the type of agent
-                    if isinstance(agent, SolarAgent):
-                        reward = agent.calculate_reward(
-                            solar_potential_idx=agent.potential,
-                            total_power_idx=self.env.total_power_idx,
-                            demand_power_idx=self.env.demand_power_idx
-                        )
-                        self.instant["reward_solar"] = reward
-                    elif isinstance(agent, WindAgent):
-                        reward = agent.calculate_reward(
-                            wind_potential_idx=agent.potential,
-                            total_power_idx=self.env.total_power_idx,
-                            demand_power_idx=self.env.demand_power_idx
-                        )
-                        self.instant["reward_wind"] = reward
-                    elif isinstance(agent, BatteryAgent):
-                        
-                        reward = agent.calculate_reward(
-                                renewable_potential_idx=self.env.renewable_potential_idx,
-                                total_power_idx=self.env.total_power_idx,
-                                demand_power_idx=self.env.demand_power_idx
-                                )       
-
-                        self.instant["bat_soc"] = agent.soc
-                        self.instant["reward_bat"] = reward
-                        battery_agent = agent
-                    elif isinstance(agent, GridAgent):
-                        reward = agent.calculate_reward(
-                            battery_soc_idx=battery_agent.idx,
-                            total_power_idx=self.env.total_power_idx,
-                            demand_power_idx=self.env.demand_power_idx)
-                        self.instant["reward_grid"] = reward                        
-                    else:
-                        reward = agent.calculate_reward(
-                            battery_soc_idx=battery_agent.idx,
-                            renewable_potential_idx=self.env.renewable_potential_idx)
-
-                        self.instant["reward_demand"] = reward
-                    
-                    # We updated Q-table
-                    agent.update_q_table(state[agent_type], agent.action, reward, next_state[agent_type], agent_type, ep, i, self.epsilon)
-
-
-                # We update the current status
-                state = next_state
-                self.evolution.append(copy.deepcopy(self.instant))
-              
-            # The learning relationship changes with each episode
-            if self.num_episodes > 1:
-                self.epsilon = max(EPSILON_MIN, 1 - (ep / (self.num_episodes - 1)))
-            else:
-                self.epsilon = self.epsilon                
-            
-            self.df = pd.DataFrame(self.evolution)
-            self.df.to_csv(f"results/evolution/learning_{ep}.csv", index=False)
-            
-            self.update_episode_metrics(ep, self.df)      
-                        
-            # Calculate episode metrics
-            iae = self.calculate_iae()
-            var_dif = self.df['dif'].var()
-
-            # Calculate Q-difference norms
-            q_norms = {
-                type(agent).__name__: compute_q_diff_norm(agent.q_table, self.prev_q_tables[type(agent).__name__])
-                for agent in self.agents
-            }
-
-            # Calculate average rewards
-            mean_rewards = {}
-            for agent in self.agents:
-                col_name = f"reward_{agent.name.lower()}"
-                if col_name in self.df.columns:
-                    mean_rewards[agent.name] = self.df[col_name].mean()
-                else:
-                    mean_rewards[agent.name] = 0.0
-
-            # Record in DataFrame
-            row = {
-                "Episode": ep,
-                "IAE": iae,
-                "Var_dif": var_dif,
-            }
-            row.update({f"Q_Norm_{k}": v for k, v in q_norms.items()})
-            row.update({f"Mean_Reward_{k}": v for k, v in mean_rewards.items()})
-
-            self.df_episode_metrics = pd.concat(
-                [self.df_episode_metrics, pd.DataFrame([row])],
-                ignore_index=True
-            )
-
-            # Save to Excel UTF-8
-            self.df_episode_metrics.to_excel(
-                "results/metrics_episode.xlsx",
-                index=False,
-                engine="openpyxl"
-            )
-            
-            print(f"End of episode  {ep+1}/{self.num_episodes} with epsilon {self.epsilon}")
-
-        # Interactive power charts
-        self.plot_data_interactive(
-            df=self.df,
-            columns_to_plot=["solar_potential", "demand", "bat_soc", "grid", "wind_potential", "price"],
-            title="Environment variables",
-            save_static_plot=True,
-            static_format="svg",  # o "png", "pdf"
-            static_filename="results/plots/env_plot"
-        )              
-        
-        # Interactive graphs of actions and df
-        self.plot_data_interactive(
-            df=self.df,
-            columns_to_plot=["dif"],
-            title="Energy balance",
-            save_static_plot=True,
-            static_format="svg",  # o "png", "pdf"
-            static_filename="results/plots/actions_plot"
-        ) 
-
-        self.plot_metric('Average Reward')  # Puedes usar 'Total Reward' u otra métrica
-        
-        # Graph IAE
-        plot_metric(
-            self.df_episode_metrics,
-            field="IAE",
-            ylabel="Integral Absolute Error",
-            filename_svg="results/plots/IAE_over_episodes.svg"
-        )
-
-        # Graph Variance of Diff
-        plot_metric(
-            self.df_episode_metrics,
-            field="Var_dif",
-            ylabel="Variance of dif",
-            filename_svg="results/plots/Var_dif_over_episodes.svg"
-        )
-
-        # Graphing Q norms by agent
-        for agent in self.agents:
-            agent_key = type(agent).__name__
-            field_q = f"Q_Norm_{agent_key}"
-            plot_metric(
-                self.df_episode_metrics,
-                field=field_q,
-                ylabel=f"Q Norm Difference ({agent_key})",
-                filename_svg=f"results/plots/Q_Norm_{agent_key}.svg"
-            )        
-        
-        # Calculate IAE threshold as median of first 50 episodes ±10%
-        iae_median = self.df_episode_metrics[self.df_episode_metrics['Episode'] < 50]['IAE'].median()
-        iae_threshold = iae_median * 1.10  # +10%
-
-        # Check stability
-        stability = check_stability(self.df_episode_metrics, iae_threshold=iae_threshold)
-
-        print("\n=== Stability Check ===")
-        print(f"IAE Threshold: {iae_threshold:.3f}")
-        print(f"Mean IAE (last 200 eps): {stability['IAE_mean']:.3f} -> {'OK' if stability['IAE_stable'] else 'NOT STABLE'}")
-        print(f"Mean Var (last 200 eps): {stability['Var_mean']:.3f} -> {'OK' if stability['Var_stable'] else 'NOT STABLE'}")
-
-        if stability['IAE_stable'] and stability['Var_stable']:
-            print("SYSTEM DECLARED STABLE ✅")
-        else:
-            print("SYSTEM NOT STABLE ⚠️")        
-       
-        
-        self.show_performance_metrics()
-
-        return self.agents
 
     def calculate_ise(self) -> float:
         """
@@ -1493,19 +1124,408 @@ class Simulation:
 
         plt.show()
 
+def run_training(config):
+
+    # Create the environment that loads the CSV and discretizes
+    env = MultiAgentEnv(config)
+    
+    
+    
+    '''
+    self.num_episodes = num_episodes
+    self.instant = {} 
+    self.evolution = []
+    self.df = pd.DataFrame()
+    self.df_episode_metrics = pd.DataFrame()
+    self.prev_q_tables = {} # Dictionary to store the previous Q-table of each agent
+    
+    # Obtains points automatically from the database
+    self.max_steps = self.env.max_steps
+    
+    # The storage agent is instantiated
+    bat_ag = BatteryAgent(self.env)
+
+    # The set of agents is defined
+    self.agents = [
+        SolarAgent(self.env),
+        WindAgent(self.env),
+        bat_ag,
+        GridAgent(self.env, bat_ag),
+        LoadAgent(self.env, bat_ag)
+    ]
+    
+    # Training parameters
+    self.epsilon = epsilon  # Exploration \epsilon (0=exploitation, 1=exploration)
+
+    # Initialize Q-tables
+    for agent in self.agents:
+        agent.prepare_q_table(self.env)
+
+
+    # Create the loop for the episodes
+    for ep in range(self.num_episodes):
+        
+        # For each episode the power values ​​are initialized
+        self.env.total_power = 0
+        self.env.renewable_power  = 0.0
+        self.env.renewable_power_idx = 0                
+        bat_power = 0.0
+        grid_power = 0.0
+        solar_power = 0.0
+        wind_power = 0.0
+        loadc_power = 0.0
+        battery_agent = None
+
+        # Incorporates randomness in the demand so that the training
+        if ep != self.num_episodes - 1:
+            self.env.scale_demand = random.uniform(0.2, MAX_SCALE)
+        else:
+            self.env.scale_demand = 1
+        
+        # Save snapshot of previous Q-tables (only if not the first episode)
+        if ep > 0:
+            for agent in self.agents:
+                agent_key = type(agent).__name__
+                self.prev_q_tables[agent_key] = copy.deepcopy(agent.q_table)
+        else:
+            for agent in self.agents:
+                agent_key = type(agent).__name__
+                self.prev_q_tables[agent_key] = {state: {a:0.0 for a in agent.actions} for state in agent.q_table}
+        
+        # Initialization of the evaluation by episode
+        self.evolution = []
+
+        # Initializes the soc at each episode start
+        for agent in self.agents:
+            if isinstance(agent, BatteryAgent):
+                # Incorporates randomness in the demand so that the training
+                if ep != self.num_episodes - 1:
+                    agent.soc = random.uniform(0, 1)                        
+                else:
+                    agent.soc = 1
+                # Stops the loop upon finding the battery agent
+                break 
+
+                # Gradually increases battery SoC from 0 to 1 over the episodes
+                #if ep != self.num_episodes - 1:
+                #    agent.soc = ep / (self.num_episodes - 1)
+                #else:
+                #    agent.soc = 0.05  # Optional override for last episode 
+
+        for i in range(self.max_steps-1):
+            
+            # We reset the environment and agents at the start of each episode.
+            state = self.step(i)                
+
+            self.instant["time"] = self.env.time         
+            self.instant["epsilon"] = self.epsilon
+
+            # Select the action
+            for agent in self.agents:
+                if isinstance(agent, SolarAgent):
+                    agent.choose_action(state['SolarAgent'], self.epsilon)
+
+                    agent.solar_state = agent.action
+                    agent.power = agent.potential*agent.action
+                    solar_power = agent.power
+
+                    self.instant["solar_potential"] = agent.potential
+                    self.instant["solar_discrete"] = agent.idx
+                    self.instant["solar"] = agent.power
+                    self.instant["solar_state"] = agent.solar_state
+                elif isinstance(agent, WindAgent):
+                    agent.choose_action(state['WindAgent'], self.epsilon)
+
+                    agent.wind_state = agent.action
+                    agent.power = agent.potential*agent.action
+                    wind_power = agent.power
+
+                    self.instant["wind_potential"] = agent.potential
+                    self.instant["wind_discrete"] = agent.idx
+                    self.instant["wind"] = agent.power
+                    self.instant["wind_state"] = agent.wind_state
+                elif isinstance(agent, BatteryAgent):
+                    agent.choose_action(state['BatteryAgent'], self.epsilon)
+                    agent.battery_state = agent.action
+
+                    # Charging
+                    if agent.action == 1:
+                        agent.power = -abs(self.env.demand_power - (solar_power + wind_power))
+                    # Discharging
+                    elif agent.action == 2:
+                        agent.power = abs(self.env.demand_power - (solar_power + wind_power))
+                    # Idle
+                    else:                        
+                        agent.power = 0.0
+
+                    bat_power = agent.power
+                    battery_agent = agent
+
+                    self.instant["bat"] = agent.power
+                    self.instant["bat_soc"] = agent.soc
+                    self.instant["bat_soc_discrete"] = agent.idx
+                    self.instant["bat_state"] = agent.battery_state
+                    
+                    agent.update_soc(power_w=agent.power)
+
+                elif isinstance(agent, GridAgent):
+                    agent.choose_action(state['GridAgent'], self.epsilon)
+                    
+                    agent.grid_state = agent.action
+                    # Sell
+                    if agent.action == 1: 
+                        agent.power = abs(self.env.demand_power - (solar_power + wind_power) - bat_power)
+                    # Idle
+                    else: 
+                        agent.power = 0
+                    
+                    grid_power = agent.power
+                    agent.idx = digitize_clip(agent.power, self.env.renewable_bins)
+
+                    self.instant["grid"] = agent.power
+                    self.instant["grid_state"] = agent.grid_state
+                    self.instant["grid_discrete"] = agent.idx
+                else:
+                    agent.choose_action(state['LoadAgent'], self.epsilon)
+                    agent.load_state = agent.action
+
+                    # Turn ON
+                    if agent.action == 1: 
+                        agent.power = 0
+                    # Turn OFF
+                    else:    
+                        # The power that is reduced with the management of controllable loads is known
+                        agent.power = -15
+                    
+                    self.instant["load_state"] = agent.load_state
+                    self.instant["load_comfort_idx"] = agent.comfort_idx
+                    loadc_power = agent.power
+
+            # Updates variables in environment
+            self.env.renewable_power = wind_power + solar_power
+            self.env.renewable_power_idx = digitize_clip(self.env.renewable_power, self.env.renewable_bins)
+
+            self.env.total_power = self.env.renewable_power + bat_power + (grid_power + loadc_power)
+            self.env.total_power_idx = digitize_clip(self.env.total_power, self.env.renewable_bins)
+
+            self.env.demand_power = self.env.demand_power + loadc_power
+            self.env.demand_power_idx = digitize_clip(self.env.demand_power, self.env.demand_bins)
+
+            self.delta_power = self.env.total_power - self.env.demand_power
+            self.delta_power_idx = 1 if self.delta_power >= 0 else 0
+
+            self.instant["renewable_potential"] = self.env.renewable_potential
+            self.instant["renewable_potential_discrete"] = self.env.renewable_potential_idx
+            self.instant["renewable_power"] = self.env.renewable_power
+            self.instant["renewable_power_discrete"] = self.env.renewable_power_idx
+            self.instant["total"] = self.env.total_power
+            self.instant["demand"] = self.env.demand_power
+            self.instant["dif"] = self.delta_power
+            self.instant["dif_idx"] = self.delta_power_idx
+            self.instant["total_discrete"] = self.env.total_power_idx
+            self.instant["demand_discrete"] = self.env.demand_power_idx
+            self.instant["price"] = self.env.price
+
+            # Now we calculate the individual reward per agent and update the Q-table               
+            next_state = self.step(i + 1)  # We advance the environment by an index
+            
+            for agent in self.agents:
+                agent_type = type(agent).__name__  # Gets the name of the agent class
+                
+                # We calculate the reward according to the type of agent
+                if isinstance(agent, SolarAgent):
+                    reward = agent.calculate_reward(
+                        solar_potential_idx=agent.potential,
+                        total_power_idx=self.env.total_power_idx,
+                        demand_power_idx=self.env.demand_power_idx
+                    )
+                    self.instant["reward_solar"] = reward
+                elif isinstance(agent, WindAgent):
+                    reward = agent.calculate_reward(
+                        wind_potential_idx=agent.potential,
+                        total_power_idx=self.env.total_power_idx,
+                        demand_power_idx=self.env.demand_power_idx
+                    )
+                    self.instant["reward_wind"] = reward
+                elif isinstance(agent, BatteryAgent):
+                    
+                    reward = agent.calculate_reward(
+                            renewable_potential_idx=self.env.renewable_potential_idx,
+                            total_power_idx=self.env.total_power_idx,
+                            demand_power_idx=self.env.demand_power_idx
+                            )       
+
+                    self.instant["bat_soc"] = agent.soc
+                    self.instant["reward_bat"] = reward
+                    battery_agent = agent
+                elif isinstance(agent, GridAgent):
+                    reward = agent.calculate_reward(
+                        battery_soc_idx=battery_agent.idx,
+                        total_power_idx=self.env.total_power_idx,
+                        demand_power_idx=self.env.demand_power_idx)
+                    self.instant["reward_grid"] = reward                        
+                else:
+                    reward = agent.calculate_reward(
+                        battery_soc_idx=battery_agent.idx,
+                        renewable_potential_idx=self.env.renewable_potential_idx)
+
+                    self.instant["reward_demand"] = reward
+                
+                # We updated Q-table
+                agent.update_q_table(state[agent_type], agent.action, reward, next_state[agent_type], agent_type, ep, i, self.epsilon)
+
+
+            # We update the current status
+            state = next_state
+            self.evolution.append(copy.deepcopy(self.instant))
+            
+        # The learning relationship changes with each episode
+        if self.num_episodes > 1:
+            self.epsilon = max(EPSILON_MIN, 1 - (ep / (self.num_episodes - 1)))
+        else:
+            self.epsilon = self.epsilon                
+        
+        self.df = pd.DataFrame(self.evolution)
+        self.df.to_csv(f"results/evolution/learning_{ep}.csv", index=False)
+        
+        self.update_episode_metrics(ep, self.df)      
+                    
+        # Calculate episode metrics
+        iae = self.calculate_iae()
+        var_dif = self.df['dif'].var()
+
+        # Calculate Q-difference norms
+        q_norms = {
+            type(agent).__name__: compute_q_diff_norm(agent.q_table, self.prev_q_tables[type(agent).__name__])
+            for agent in self.agents
+        }
+
+        # Calculate average rewards
+        mean_rewards = {}
+        for agent in self.agents:
+            col_name = f"reward_{agent.name.lower()}"
+            if col_name in self.df.columns:
+                mean_rewards[agent.name] = self.df[col_name].mean()
+            else:
+                mean_rewards[agent.name] = 0.0
+
+        # Record in DataFrame
+        row = {
+            "Episode": ep,
+            "IAE": iae,
+            "Var_dif": var_dif,
+        }
+        row.update({f"Q_Norm_{k}": v for k, v in q_norms.items()})
+        row.update({f"Mean_Reward_{k}": v for k, v in mean_rewards.items()})
+
+        self.df_episode_metrics = pd.concat(
+            [self.df_episode_metrics, pd.DataFrame([row])],
+            ignore_index=True
+        )
+
+        # Save to Excel UTF-8
+        self.df_episode_metrics.to_excel(
+            "results/metrics_episode.xlsx",
+            index=False,
+            engine="openpyxl"
+        )
+        
+        print(f"End of episode  {ep+1}/{self.num_episodes} with epsilon {self.epsilon}")
+
+    # Interactive power charts
+    self.plot_data_interactive(
+        df=self.df,
+        columns_to_plot=["solar_potential", "demand", "bat_soc", "grid", "wind_potential", "price"],
+        title="Environment variables",
+        save_static_plot=True,
+        static_format="svg",  # o "png", "pdf"
+        static_filename="results/plots/env_plot"
+    )              
+    
+    # Interactive graphs of actions and df
+    self.plot_data_interactive(
+        df=self.df,
+        columns_to_plot=["dif"],
+        title="Energy balance",
+        save_static_plot=True,
+        static_format="svg",  # o "png", "pdf"
+        static_filename="results/plots/actions_plot"
+    ) 
+
+    self.plot_metric('Average Reward')  # Puedes usar 'Total Reward' u otra métrica
+    
+    # Graph IAE
+    plot_metric(
+        self.df_episode_metrics,
+        field="IAE",
+        ylabel="Integral Absolute Error",
+        filename_svg="results/plots/IAE_over_episodes.svg"
+    )
+
+    # Graph Variance of Diff
+    plot_metric(
+        self.df_episode_metrics,
+        field="Var_dif",
+        ylabel="Variance of dif",
+        filename_svg="results/plots/Var_dif_over_episodes.svg"
+    )
+
+    # Graphing Q norms by agent
+    for agent in self.agents:
+        agent_key = type(agent).__name__
+        field_q = f"Q_Norm_{agent_key}"
+        plot_metric(
+            self.df_episode_metrics,
+            field=field_q,
+            ylabel=f"Q Norm Difference ({agent_key})",
+            filename_svg=f"results/plots/Q_Norm_{agent_key}.svg"
+        )        
+    
+    # Calculate IAE threshold as median of first 50 episodes ±10%
+    iae_median = self.df_episode_metrics[self.df_episode_metrics['Episode'] < 50]['IAE'].median()
+    iae_threshold = iae_median * 1.10  # +10%
+
+    # Check stability
+    stability = check_stability(self.df_episode_metrics, iae_threshold=iae_threshold)
+
+    print("\n=== Stability Check ===")
+    print(f"IAE Threshold: {iae_threshold:.3f}")
+    print(f"Mean IAE (last 200 eps): {stability['IAE_mean']:.3f} -> {'OK' if stability['IAE_stable'] else 'NOT STABLE'}")
+    print(f"Mean Var (last 200 eps): {stability['Var_mean']:.3f} -> {'OK' if stability['Var_stable'] else 'NOT STABLE'}")
+
+    if stability['IAE_stable'] and stability['Var_stable']:
+        print("SYSTEM DECLARED STABLE ✅")
+    else:
+        print("SYSTEM NOT STABLE ⚠️")        
+    
+    
+    self.show_performance_metrics()
+
+    return self.agents
+    '''
+
 # -----------------------------------------------------
 # Main program
 # -----------------------------------------------------
 if __name__ == "__main__":
     
     # Cleans up files contained in temporary directories
-    clear_results_directories()
+    clear_directories()
+    
+    # Configuration loading
+    config = load_config()
+    print(config)
+    if config["mode"] == "train":
+        run_training(config)
+    elif config["mode"] == "offline":
+        # TODO: implement offline analysis
+        pass
 
     # Simulation setup
-    sim = Simulation(num_episodes=2000, epsilon=1, filename="Case3.csv")
-    sim.run()
+    # sim = Simulation(num_episodes=2000, epsilon=1, filename="Case3.csv")
+    # sim.run()
 
     # Graphs with the results of the interaction when the agents have completed the learning
-    df_raw = load_latest_evolution_csv()
-    df_clean = process_evolution_data(df_raw)
-    plot_coordination(df_clean)
+    # df_raw = load_latest_evolution_csv()
+    # df_clean = process_evolution_data(df_raw)
+    # plot_coordination(df_clean)

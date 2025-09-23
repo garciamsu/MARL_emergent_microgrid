@@ -6,6 +6,8 @@ import glob
 import os
 import csv
 
+import yaml
+
 def load_latest_evolution_csv():
     """
     Searches for the most recent learning_XXX.csv file in /results/evolution/,
@@ -300,7 +302,7 @@ def plot_coordination(df):
 
     plt.show()
 
-def clear_results_directories():
+def clear_directories():
     """
     Deletes all files inside the directories:
     results/, results/evolution/, results/plots/.
@@ -395,3 +397,9 @@ def log_q_update(
         if not file_exists:
             writer.writerow(header)
         writer.writerow(row)
+
+def load_config(path="configs/default.yaml"):
+    with open(path, 'r') as f:
+        config = yaml.safe_load(f)
+    # TODO: validate config with schema
+    return config

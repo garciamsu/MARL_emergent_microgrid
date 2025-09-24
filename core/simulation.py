@@ -9,7 +9,6 @@ from analysis_tools.plotting import plot_metric
 
 EPSILON_MIN = 0
 
-
 def instantiate_agents(config, env):
     agents = {}
     for agent_type, spec in config["agents"].items():
@@ -28,9 +27,9 @@ def run_training(config):
     env = MultiAgentEnv(config)
     agents = instantiate_agents(config, env)
 
-    os.makedirs("results/evolution", exist_ok=True)
-    os.makedirs("results/plots", exist_ok=True)
+    print(agents)
 
+    '''
     num_episodes = config["simulation"]["episodes"]
     epsilon = config["simulation"].get("epsilon", {}).get("start", 1.0)
 
@@ -107,5 +106,5 @@ def run_training(config):
                     field="Var_dif",
                     ylabel="Variance of dif",
                     filename_svg="results/plots/Var_dif_over_episodes.svg")
-
+    '''
     return agents

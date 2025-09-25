@@ -4,26 +4,11 @@ import pandas as pd
 from utils.discretization import digitize_clip
 from core.environment import MultiAgentEnv
 from core.registry import create_agent, create_policy, create_reward
+from agents import instantiate_agents
 import core.policies
 import core.rewards
 
 EPSILON_MIN = 0
-
-def instantiate_agents(config, env):
-    agents = {}
-    for agent_type, spec in config["agents"].items():
-        for idx in range(spec["count"]):
-            name = f"{agent_type}#{idx}"
-            policy = create_policy(spec["policy"])
-            reward_fn = create_reward(spec["reward"])
-            # Elimina las claves duplicadas
-            spec_clean = {k: v for k, v in spec.items() if k not in ["policy", "reward"]}
-            agent = create_agent(
-                agent_type, env=env, policy=policy, reward_fn=reward_fn, **spec_clean
-            )
-            agents[name] = agent
-    return agents
-
 
 def run_training(config):
     """
@@ -50,7 +35,7 @@ def run_training(config):
     decay = epsilon_cfg.get("decay", "linear")
 
     results = []
-
+    
     for ep in range(num_episodes):
         env.reset()
         evolution = []
@@ -61,7 +46,9 @@ def run_training(config):
                 name: ag.get_discretized_state(env, index)
                 for name, ag in agents.items()
             }
-
+            
+            print(state)
+        '''
             # 2. Choose action per agent
             for ag in agents.values():
                 ag.choose_action(state[type(ag).__name__], epsilon)
@@ -152,6 +139,7 @@ def run_training(config):
 
         print(f"Episode {ep+1}/{num_episodes} completed, epsilon={epsilon:.3f}")
 
+        '''
     return agents, results
 
 

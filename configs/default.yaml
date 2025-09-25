@@ -86,7 +86,7 @@ agents:
       gamma: 0.9
     reward:
       type: DefaultSolarReward
-      params: {theta: 3, beta: 3, eta: 3, xi: 3}
+      params: {theta: 3, beta: 3}
     state_space:
       - {var: solar_power, source: env, bins: auto}
       - {var: P_ren_pot,  source: env, bins: auto}
@@ -103,7 +103,7 @@ agents:
       gamma: 0.9
     reward:
       type: DefaultWindReward
-      params: {sigma: 15, kappa: 3, mu: 12, nu: 1, beta: 5, xi: 8}
+      params: {theta: 3, beta: 3}
     state_space:
       - {var: wind_power, source: env, bins: auto}
       - {var: P_ren_pot,  source: env, bins: auto}
@@ -120,7 +120,7 @@ agents:
       gamma: 0.9
     reward:
       type: DefaultBatteryReward
-      params: {sigma: 10, kappa: 14, mu: 7, nu: 12, beta: 5, xi: 8, psi: 8}
+      params: {sigma: 10, mu: 7}
     state_space:
       - {var: soc,        source: self, bins: [0,0.2,0.4,0.6,0.8,1.0]}
       - {var: P_dem,      source: env,  bins: auto}
@@ -141,7 +141,7 @@ agents:
       gamma: 0.9
     reward:
       type: DefaultGridReward
-      params: {kappa: 31, sigma: 6, mu: 3, nu: 9, beta: 31, xi: 10, pho: 5, tau: 12}
+      params: {sigma: 6, mu: 3}
     state_space:
       - {var: price, source: env, bins: auto}
       - {var: demand, source: env, bins: auto}
@@ -157,7 +157,7 @@ agents:
       gamma: 0.9
     reward:
       type: DefaultLoadReward
-      params: {sigma: 9, mu: 4, kappa: 6, psi: 9, nu: 5, beta: 3}
+      params: {sigma: 9, mu: 4}
     state_space:
       - {var: demand,       source: env,  bins: auto}
       - {var: comfort_idx,  source: self, categories: [acceptable, expensive]}

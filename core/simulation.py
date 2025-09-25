@@ -1,6 +1,8 @@
 import pandas as pd
-from .environment import MultiAgentEnv
-# from core.registry import create_agent, create_policy, create_reward
+from core.environment import MultiAgentEnv
+from core.registry import create_agent, create_policy, create_reward
+import core.policies
+import core.rewards
 
 EPSILON_MIN = 0
 
@@ -11,10 +13,10 @@ def instantiate_agents(config, env):
             name = f"{agent_type}#{idx}"
             policy = create_policy(spec["policy"])
             reward_fn = create_reward(spec["reward"])
-            agent = create_agent(
-                agent_type, env=env, policy=policy, reward_fn=reward_fn, **spec
-            )
-            agents[name] = agent
+            #agent = create_agent(
+            #    agent_type, env=env, policy=policy, reward_fn=reward_fn, **spec
+            #)
+            #agents[name] = agent
     return agents
 
 

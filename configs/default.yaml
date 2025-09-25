@@ -10,7 +10,7 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 300
+  episodes: 1
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case1.csv
@@ -79,7 +79,7 @@ metrics:
 agents:
 
   solar:
-    count: 1
+    count: 3
     policy:
       type: tabular_ql
       alpha: 0.1
@@ -96,7 +96,7 @@ agents:
       efficiency: 0.98
 
   wind:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.1
@@ -113,7 +113,7 @@ agents:
       efficiency: 0.95
 
   battery:
-    count: 2
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.1
@@ -134,7 +134,7 @@ agents:
       p_discharge_max: 100
 
   grid:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.1
@@ -150,7 +150,7 @@ agents:
       export_allowed: true
 
   load:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.1

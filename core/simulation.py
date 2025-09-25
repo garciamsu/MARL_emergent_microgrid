@@ -1,11 +1,6 @@
-import os
-import random
-import copy
 import pandas as pd
-from core.environment import MultiAgentEnv
-from core.registry import create_agent, create_policy, create_reward
-from analysis_tools.metrics import compute_q_diff_norm, check_stability
-from analysis_tools.plotting import plot_metric
+from .environment import MultiAgentEnv
+# from core.registry import create_agent, create_policy, create_reward
 
 EPSILON_MIN = 0
 
@@ -24,6 +19,7 @@ def instantiate_agents(config, env):
 
 
 def run_training(config):
+
     env = MultiAgentEnv(config)
     agents = instantiate_agents(config, env)
 
@@ -107,4 +103,4 @@ def run_training(config):
                     ylabel="Variance of dif",
                     filename_svg="results/plots/Var_dif_over_episodes.svg")
     '''
-    return agents
+    return "agents"

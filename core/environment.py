@@ -9,40 +9,55 @@ class MultiAgentEnv:
     """
 
     def __init__(self, config):
+        """
+        Initialize the environment with dataset and discretization parameters.
+        """
+        # --- Configuration parameters ---
         csv_filename = config["simulation"]["dataset"]
-        num_power_bins = config["discretization"]["bins_power"]
+        self.num_power_bins = config["discretization"]["bins_power"]
 
-        # Load dataset
+        # --- Load dataset ---
         self.dataset = self._load_data(csv_filename)
-
         self.max_steps = len(self.dataset)
-        self.max_value = self.dataset.drop(columns="price").apply(
-            pd.to_numeric, errors="coerce"
-        ).max().max()
 
-        self.demand_bins = np.linspace(0, self.max_value, num_power_bins)
-        self.renewable_bins = np.linspace(0, self.max_value, num_power_bins)
+        # --- Compute maximum value for discretization ---
+        self.max_value = (
+            self.dataset.drop(columns="price")
+            .apply(pd.to_numeric, errors="coerce")
+            .max()
+            .max()
+        )
 
-        self.num_power_bins = num_power_bins
+        # --- Define discretization bins ---
+        self.demand_bins = np.linspace(0, self.max_value, self.num_power_bins)
+        self.renewable_bins = np.linspace(0, self.max_value, self.num_power_bins)
+
+        # --- Initialize state ---
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
+        """
+        Reset environment attributes to their initial values and discretized states.
+        """
+        # Continuous variables
         self.renewable_potential = 0
-        self.renewable_potential_idx = digitize_clip(
-            self.renewable_potential, self.renewable_bins
-        )
         self.renewable_power = 0
-        self.renewable_power_idx = digitize_clip(
-            self.renewable_power, self.renewable_bins
-        )
         self.demand_power = 0
-        self.demand_power_idx = digitize_clip(self.demand_power, self.renewable_bins)
         self.total_power = 0
-        self.total_power_idx = digitize_clip(self.total_power, self.renewable_bins)
         self.price = 0
         self.delta_power = 0
+
+        # Discretized states
+        self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.renewable_bins)
+        self.renewable_power_idx = digitize_clip(self.renewable_power, self.renewable_bins)
+        self.demand_power_idx = digitize_clip(self.demand_power, self.demand_bins)
+        self.total_power_idx = digitize_clip(self.total_power, self.renewable_bins)
         self.delta_power_idx = "surplus"
+
+        # Auxiliaries
         self.scale_demand = 1
+
+        # Global state
         self.state = None
 
     def _load_data(self, filename: str, offsets: dict = None) -> pd.DataFrame:
@@ -59,16 +74,18 @@ class MultiAgentEnv:
 
         return df
 
-    def get_discretized_state(self, index):
+    def get_value(self, index: int) -> None:
+        """
+        Update environment attributes with values and discretized states 
+        from the dataset row at the given index.
+        """
+        
+        # Extract values from dataset row
         row = self.dataset.iloc[index]
+        
         self.demand_power = row["demand"] * self.scale_demand
-        self.renewable_potential = row["solar_power"] + row["wind_power"]
         self.price = row["price"]
         self.time = row["Datetime"]
 
+        # Compute discretized states
         self.demand_power_idx = digitize_clip(self.demand_power, self.demand_bins)
-        self.renewable_potential_idx = digitize_clip(
-            self.renewable_potential, self.renewable_bins
-        )
-
-        return (self.demand_power_idx, self.renewable_potential_idx)

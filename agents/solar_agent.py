@@ -4,7 +4,6 @@ from agents.base_agent import BaseAgent
 from core.registry import register_agent
 from utils.discretization import digitize_clip
 
-
 @register_agent("solar")
 class SolarAgent(BaseAgent):
     def __init__(self, env, **kwargs):

@@ -26,6 +26,20 @@ def instantiate_agents(config, env):
 
 
 def run_training(config):
+    """
+    Run a full multi-agent Q-learning training loop.
+
+    This function orchestrates the training process across multiple agents
+    (Solar, Wind, Battery, Grid, Load), updating the environment and Q-tables
+    at each step and saving per-episode results.
+
+    Args:
+        config (dict): Full configuration loaded from YAML/JSON.
+
+    Returns:
+        agents (dict): Dictionary of trained agents.
+        results (list[pd.DataFrame]): List of per-episode DataFrames with logs.
+    """
     env = MultiAgentEnv(config)
     agents = instantiate_agents(config, env)
 
@@ -42,31 +56,79 @@ def run_training(config):
         evolution = []
 
         for index in range(env.max_steps - 1):
-            # 1. Estado actual para cada agente
+            # 1. Discretized state per agent
             state = {
                 name: ag.get_discretized_state(env, index)
                 for name, ag in agents.items()
             }
 
-            # 2. Elegir acción para cada agente
+            # 2. Choose action per agent
             for ag in agents.values():
                 ag.choose_action(state[type(ag).__name__], epsilon)
 
-            # 3. Actualizar variables del entorno según las acciones
-            # (ejemplo simple: sumar potencias de agentes productores)
-            total_power = 0
+            # 3. Environment update based on agent actions
+            solar_power, wind_power, bat_power, grid_power, load_power = 0, 0, 0, 0, 0
+            battery_agent = None
+
             for ag in agents.values():
-                total_power += getattr(ag, "power", 0)
-            env.total_power = total_power
+                if ag.name.startswith("solar"):
+                    # Solar: produce if action=1
+                    solar_power = ag.potential * ag.action
+                    ag.power = solar_power
+
+                elif ag.name.startswith("wind"):
+                    # Wind: produce if action=1
+                    wind_power = ag.potential * ag.action
+                    ag.power = wind_power
+
+                elif ag.name.startswith("battery"):
+                    # Battery: idle=0, charge=1, discharge=2
+                    if ag.action == 1:   # charge
+                        bat_power = -abs(env.demand_power - (solar_power + wind_power))
+                    elif ag.action == 2: # discharge
+                        bat_power = abs(env.demand_power - (solar_power + wind_power))
+                    else:
+                        bat_power = 0
+                    ag.power = bat_power
+                    ag.update_soc(power_w=bat_power)
+                    battery_agent = ag
+
+                elif ag.name.startswith("grid"):
+                    # Grid: supply if action=1
+                    if ag.action == 1:
+                        grid_power = abs(env.demand_power - (solar_power + wind_power) - bat_power)
+                    else:
+                        grid_power = 0
+                    ag.power = grid_power
+
+                elif ag.name.startswith("load"):
+                    # Load: ON=1 (extra demand), OFF=0 (demand reduction)
+                    if ag.action == 1:
+                        load_power = 0  # default extra demand
+                    else:
+                        load_power = -15  # controllable reduction
+                    ag.power = load_power
+
+            # Update environment state
+            env.renewable_power = solar_power + wind_power
+            env.renewable_power_idx = digitize_clip(env.renewable_power, env.renewable_bins)
+
+            env.total_power = env.renewable_power + bat_power + grid_power + load_power
             env.total_power_idx = digitize_clip(env.total_power, env.renewable_bins)
 
-            # 4. Avanzar un paso y calcular siguiente estado
+            env.demand_power = env.demand_power + load_power
+            env.demand_power_idx = digitize_clip(env.demand_power, env.demand_bins)
+
+            env.delta_power = env.total_power - env.demand_power
+            env.delta_power_idx = 1 if env.delta_power >= 0 else 0
+
+            # 4. Next state
             next_state = {
                 name: ag.get_discretized_state(env, index + 1)
                 for name, ag in agents.items()
             }
 
-            # 5. Calcular recompensas y actualizar Q-tables
+            # 5. Reward calculation and Q-table update
             step_record = {"episode": ep, "step": index}
             for name, ag in agents.items():
                 reward = ag.calculate_reward(*state[type(ag).__name__])
@@ -74,15 +136,16 @@ def run_training(config):
                                   reward, next_state[type(ag).__name__])
                 step_record[f"reward_{name}"] = reward
                 step_record[f"action_{name}"] = ag.action
+                step_record[f"power_{name}"] = getattr(ag, "power", 0.0)
             evolution.append(step_record)
 
-        # 6. Actualizar política de exploración (ε)
+        # 6. Epsilon update
         if decay == "linear":
             epsilon = max(epsilon_min, epsilon - (1.0 - epsilon_min) / num_episodes)
         elif decay == "exponential":
             epsilon = max(epsilon_min, epsilon * 0.99)
 
-        # 7. Guardar evolución por episodio
+        # 7. Save episode data
         df = pd.DataFrame(evolution)
         df.to_csv(f"results/evolution/episode_{ep}.csv", index=False)
         results.append(df)

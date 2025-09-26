@@ -74,7 +74,7 @@ class MultiAgentEnv:
 
         return df
 
-    def get_value(self, index: int) -> None:
+    def get_value(self, field: str, index: int) -> None:
         """
         Update environment attributes with values and discretized states 
         from the dataset row at the given index.
@@ -83,9 +83,10 @@ class MultiAgentEnv:
         # Extract values from dataset row
         row = self.dataset.iloc[index]
         
-        self.demand_power = row["demand"] * self.scale_demand
-        self.price = row["price"]
-        self.time = row["Datetime"]
+        # self.demand_power = row["demand"] * self.scale_demand
+        # self.price = row["price"]
+        # self.time = row["Datetime"]
 
         # Compute discretized states
-        self.demand_power_idx = digitize_clip(self.demand_power, self.demand_bins)
+        # self.demand_power_idx = digitize_clip(self.demand_power, self.demand_bins)
+        return row[field]

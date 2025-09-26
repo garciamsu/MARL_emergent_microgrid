@@ -34,6 +34,8 @@ def run_training(config):
     epsilon_min = epsilon_cfg.get("min", 0.05)
     decay = epsilon_cfg.get("decay", "linear")
 
+    print(agents)
+
     results = []
     
     for ep in range(num_episodes):
@@ -47,7 +49,9 @@ def run_training(config):
                 for name, ag in agents.items()
             }
             
-            print(state)
+            #for ag in agents.values():
+            #    print(ag.state_space)            
+            
         '''
             # 2. Choose action per agent
             for ag in agents.values():

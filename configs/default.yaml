@@ -79,7 +79,7 @@ metrics:
 agents:
 
   solar:
-    count: 3
+    count: 3    
     policy:
       type: tabular_ql
       alpha: 0.1
@@ -88,8 +88,7 @@ agents:
       type: DefaultSolarReward
       params: {theta: 3, beta: 3}
     state_space:
-      - {var: solar_power, source: env, bins: auto}
-      - {var: P_ren_pot,  source: env, bins: auto}
+      - {var: solar_power, source: local, bins: auto}
       - {var: demand,     source: env, bins: auto}
     limits:
       p_max: 500

@@ -6,18 +6,33 @@ from utils.discretization import digitize_clip
 
 @register_agent("solar")
 class SolarAgent(BaseAgent):
-    def __init__(self, env, **kwargs):
-        super().__init__("solar", [0, 1])
+    def __init__(self, env, name="solar", state_space=None, **kwargs):
+        super().__init__(name, [0, 1])
         self.solar_power_bins = np.linspace(0, env.max_value, env.num_power_bins)
+        self.state_space = state_space
 
     def get_discretized_state(self, env, index):
-        row = env.dataset.iloc[index]
-        solar_potential = row["solar_power"]
-        solar_idx = digitize_clip(solar_potential, self.solar_power_bins)
-        total_idx = digitize_clip(env.total_power, env.renewable_bins)
-        demand_idx = env.demand_power_idx
-        self.idx = solar_idx
-        return (solar_idx, total_idx, demand_idx)
+        """
+        Build the discretized state tuple for this agent.
+        Iterates through self.state_space and applies logic depending on source.
+        """
+        
+        state_values = []
+       
+        for state in self.state_space:
+            if state["source"] == "local":
+                # Example: var_solar_0 (if agent name is solar#0 and var = "var")
+                var_name = f"{state['var']}_{self.name.split('#')[1]}"
+                value = getattr(self, var_name, None)  # get local attribute if exists
+            else:
+                # Use environment value
+                value = env.get_value(state["var"], index)
+
+            state_values.append(value)
+            
+            print(state_values)
+
+        return tuple(state_values)
 
     def initialize_q_table(self, env):
         states = [(s, t, d)

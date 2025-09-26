@@ -21,7 +21,7 @@ def instantiate_agents(config, env):
             reward_fn = create_reward(spec["reward"])
             spec_clean = {k: v for k, v in spec.items() if k not in ["policy", "reward"]}
             agent = create_agent(
-                agent_type, env=env, policy=policy, reward_fn=reward_fn, **spec_clean
+                agent_type, env=env, name=name, policy=policy, reward_fn=reward_fn, **spec_clean
             )
             agents[name] = agent
     return agents

@@ -49,6 +49,7 @@ def run_training(config):
                 for name, ag in agents.items()
             }
             
+            print(state)
             #for ag in agents.values():
             #    print(ag.state_space)            
             

@@ -15,7 +15,7 @@ class BatteryAgent(BaseAgent):
     def get_discretized_state(self, env, index):
         self.idx = digitize_clip(self.soc, self.battery_soc_bins)
         renewable_idx = env.renewable_potential_idx
-        total_idx = digitize_clip(env.total_power, env.renewable_bins)
+        total_idx = digitize_clip(env.total_power, env.power_bins)
         demand_idx = env.demand_power_idx
         return (self.idx, renewable_idx, total_idx, demand_idx)
 
@@ -23,9 +23,9 @@ class BatteryAgent(BaseAgent):
         states = [
             (soc, ren, tot, dem)
             for soc in range(len(self.battery_soc_bins))
-            for ren in range(len(env.renewable_bins))
-            for tot in range(len(env.renewable_bins))
-            for dem in range(len(env.demand_bins))
+            for ren in range(len(env.power_bins))
+            for tot in range(len(env.power_bins))
+            for dem in range(len(env.power_bins))
         ]
         self.q_table = {s: {a: 0.0 for a in self.actions} for s in states}
 

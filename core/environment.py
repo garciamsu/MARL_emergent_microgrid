@@ -29,8 +29,7 @@ class MultiAgentEnv:
         )
 
         # --- Define discretization bins ---
-        self.demand_bins = np.linspace(0, self.max_value, self.num_power_bins)
-        self.renewable_bins = np.linspace(0, self.max_value, self.num_power_bins)
+        self.power_bins = np.linspace(0, self.max_value, self.num_power_bins)
 
         # --- Initialize state ---
         self.reset()
@@ -48,10 +47,10 @@ class MultiAgentEnv:
         self.delta_power = 0
 
         # Discretized states
-        self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.renewable_bins)
-        self.renewable_power_idx = digitize_clip(self.renewable_power, self.renewable_bins)
-        self.demand_power_idx = digitize_clip(self.demand_power, self.demand_bins)
-        self.total_power_idx = digitize_clip(self.total_power, self.renewable_bins)
+        self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.power_bins)
+        self.renewable_power_idx = digitize_clip(self.renewable_power, self.power_bins)
+        self.demand_power_idx = digitize_clip(self.demand_power, self.power_bins)
+        self.total_power_idx = digitize_clip(self.total_power, self.power_bins)
         self.delta_power_idx = "surplus"
 
         # Auxiliaries
@@ -83,10 +82,5 @@ class MultiAgentEnv:
         # Extract values from dataset row
         row = self.dataset.iloc[index]
         
-        # self.demand_power = row["demand"] * self.scale_demand
-        # self.price = row["price"]
-        # self.time = row["Datetime"]
-
         # Compute discretized states
-        # self.demand_power_idx = digitize_clip(self.demand_power, self.demand_bins)
-        return row[field]
+        return digitize_clip(row[field], self.power_bins)

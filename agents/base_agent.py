@@ -1,5 +1,5 @@
 import random
-
+from utils.discretization import digitize_clip
 
 class BaseAgent:
     def __init__(self, env, name, actions, alpha=0.1, gamma=0.9, **kwargs):
@@ -22,8 +22,7 @@ class BaseAgent:
         row = self.env.dataset.iloc[index]
 
         # Compute discretized states
-        # self.demand_power_idx = digitize_clip(self.demand_power, self.demand_bins)
-        return row[field]
+        return digitize_clip(row[field], self.env.power_bins)
 
     def get_discretized_state(self, env, index):
         """

@@ -14,7 +14,7 @@ class LoadAgent(BaseAgent):
     def initialize_q_table(self, env):
         states = []
         comfort_labels = ["acceptable", "expensive"]
-        for demand_idx in range(len(env.demand_bins)):
+        for demand_idx in range(len(env.power_bins)):
             for c in comfort_labels:
                 states.append((demand_idx, c))
             self.q_table = {state: {a: 0.0 for a in self.actions} for state in states}
@@ -24,7 +24,7 @@ class LoadAgent(BaseAgent):
         row = env.dataset.iloc[index]
         self.market_price = row["price"]
         comfort_idx = "acceptable" if self.market_price <= self.comfort_price else "expensive"
-        demand_idx = np.digitize(env.demand_power, env.demand_bins) - 1
+        demand_idx = np.digitize(env.demand_power, env.power_bins) - 1
         return (demand_idx, comfort_idx)
 
 

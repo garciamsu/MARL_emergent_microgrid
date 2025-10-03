@@ -33,8 +33,8 @@ validation:
 
 discretization:
   bins_power: 7
-  demand_bins: auto
-  renewable_bins: auto
+  power_bins: auto
+  power_bins: auto
 
 # ==============================================================
 # Stability definition

@@ -103,13 +103,13 @@ def run_training(config):
 
             # Update environment state
             env.renewable_power = solar_power + wind_power
-            env.renewable_power_idx = digitize_clip(env.renewable_power, env.renewable_bins)
+            env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
 
             env.total_power = env.renewable_power + bat_power + grid_power + load_power
-            env.total_power_idx = digitize_clip(env.total_power, env.renewable_bins)
+            env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
 
             env.demand_power = env.demand_power + load_power
-            env.demand_power_idx = digitize_clip(env.demand_power, env.demand_bins)
+            env.demand_power_idx = digitize_clip(env.demand_power, env.power_bins)
 
             env.delta_power = env.total_power - env.demand_power
             env.delta_power_idx = 1 if env.delta_power >= 0 else 0

@@ -14,8 +14,8 @@ class SolarAgent(BaseAgent):
     def initialize_q_table(self, env):
         states = [(s, t, d)
                   for s in range(len(self.solar_power_bins))
-                  for t in range(len(env.renewable_bins))
-                  for d in range(len(env.demand_bins))]
+                  for t in range(len(env.power_bins))
+                  for d in range(len(env.power_bins))]
         self.q_table = {state: {a: 0.0 for a in self.actions} for state in states}
 
     def calculate_reward(self, solar_idx, total_idx, demand_idx):

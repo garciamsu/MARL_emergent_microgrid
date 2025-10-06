@@ -11,6 +11,9 @@ class WindAgent(BaseAgent):
         self.potential = 0.0
         self.idx = 0
 
+def update_power(self, env):
+        self.power = self.potential * self.action
+
 def initialize_q_table(self, env):
     states = []
     for wind_idx in range(len(self.wind_power_bins)):

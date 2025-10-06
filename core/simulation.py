@@ -49,70 +49,82 @@ def run_training(config):
                 for name, ag in agents.items()
             }
             
-            print(state)
-            #for ag in agents.values():
-            #    print(ag.state_space)            
-            
-        '''
+        
             # 2. Choose action per agent
             for ag in agents.values():
                 ag.choose_action(state[type(ag).__name__], epsilon)
-
+                print(ag.action)
+                                      
             # 3. Environment update based on agent actions
             solar_power, wind_power, bat_power, grid_power, load_power = 0, 0, 0, 0, 0
             battery_agent = None
 
             for ag in agents.values():
-                if ag.name.startswith("solar"):
-                    # Solar: produce if action=1
-                    solar_power = ag.potential * ag.action
-                    ag.power = solar_power
+                ag.update_power(env)
+    
+            # -------------------------------------------------------------
+            # Environment update (supports multiple agents per type)
+            # -------------------------------------------------------------
+            solar_agents = [ag for ag in agents.values() if "solar" in ag.name]
+            wind_agents = [ag for ag in agents.values() if "wind" in ag.name]
+            battery_agents = [ag for ag in agents.values() if "battery" in ag.name]
+            grid_agents = [ag for ag in agents.values() if "grid" in ag.name]
+            load_agents = [ag for ag in agents.values() if "load" in ag.name]
 
-                elif ag.name.startswith("wind"):
-                    # Wind: produce if action=1
-                    wind_power = ag.potential * ag.action
-                    ag.power = wind_power
+            # Reset dynamic records
+            env.energy_balance = {}
+            total_generation = 0.0
+            total_consumption = 0.0
 
-                elif ag.name.startswith("battery"):
-                    # Battery: idle=0, charge=1, discharge=2
-                    if ag.action == 1:   # charge
-                        bat_power = -abs(env.demand_power - (solar_power + wind_power))
-                    elif ag.action == 2: # discharge
-                        bat_power = abs(env.demand_power - (solar_power + wind_power))
-                    else:
-                        bat_power = 0
-                    ag.power = bat_power
-                    ag.update_soc(power_w=bat_power)
-                    battery_agent = ag
+            # --- SOLAR ---
+            for ag in solar_agents:
+                ag.update_power(env)
+                env.energy_balance[ag.name] = ag.power
+                total_generation += ag.power
 
-                elif ag.name.startswith("grid"):
-                    # Grid: supply if action=1
-                    if ag.action == 1:
-                        grid_power = abs(env.demand_power - (solar_power + wind_power) - bat_power)
-                    else:
-                        grid_power = 0
-                    ag.power = grid_power
+            # --- WIND ---
+            for ag in wind_agents:
+                ag.update_power(env)
+                env.energy_balance[ag.name] = ag.power
+                total_generation += ag.power
 
-                elif ag.name.startswith("load"):
-                    # Load: ON=1 (extra demand), OFF=0 (demand reduction)
-                    if ag.action == 1:
-                        load_power = 0  # default extra demand
-                    else:
-                        load_power = -15  # controllable reduction
-                    ag.power = load_power
+            # --- BATTERIES ---
+            for ag in battery_agents:
+                ag.update_power(env)
+                env.energy_balance[ag.name] = ag.power
+                if ag.power >= 0:
+                    total_generation += ag.power
+                else:
+                    total_consumption += abs(ag.power)
 
-            # Update environment state
-            env.renewable_power = solar_power + wind_power
-            env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
+            # --- GRID ---
+            for ag in grid_agents:
+                ag.update_power(env)
+                env.energy_balance[ag.name] = ag.power
+                if ag.power >= 0:
+                    total_generation += ag.power
+                else:
+                    total_consumption += abs(ag.power)
 
-            env.total_power = env.renewable_power + bat_power + grid_power + load_power
-            env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
+            # --- LOADS ---
+            for ag in load_agents:
+                ag.update_power(env)
+                env.energy_balance[ag.name] = ag.power
+                if ag.power >= 0:
+                    total_generation += ag.power
+                else:
+                    total_consumption += abs(ag.power)
 
-            env.demand_power = env.demand_power + load_power
-            env.demand_power_idx = digitize_clip(env.demand_power, env.power_bins)
+            # --- AGGREGATION ---
+            env.renewable_power = sum(
+                env.energy_balance[n] for n in env.energy_balance if "solar" in n or "wind" in n
+            )
+            env.total_power = total_generation - total_consumption
+            env.demand_power = max(env.demand_power + total_consumption, 0)
 
+            # --- BALANCE ---
             env.delta_power = env.total_power - env.demand_power
-            env.delta_power_idx = 1 if env.delta_power >= 0 else 0
+            env.delta_power_idx = "surplus" if env.delta_power >= 0 else "deficit"
 
             # 4. Next state
             next_state = {
@@ -144,7 +156,6 @@ def run_training(config):
 
         print(f"Episode {ep+1}/{num_episodes} completed, epsilon={epsilon:.3f}")
 
-        '''
     return agents, results
 
 

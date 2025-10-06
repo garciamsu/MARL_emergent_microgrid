@@ -11,6 +11,9 @@ class BatteryAgent(BaseAgent):
         self.capacity_ah = capacity_ah
         self.soc = 0.5
         self.battery_soc_bins = np.linspace(0, 1, num_battery_soc_bins)
+        
+    def update_power(self, env):
+        self.power = self.potential * self.action
 
     def get_discretized_state(self, env, index):
         self.idx = digitize_clip(self.soc, self.battery_soc_bins)

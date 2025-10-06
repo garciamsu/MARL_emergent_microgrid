@@ -10,6 +10,9 @@ class SolarAgent(BaseAgent):
         super().__init__(env, name, [0, 1])
         self.solar_power_bins = np.linspace(0, self.env.max_value, self.env.num_power_bins)
         self.state_space = state_space        
+    
+    def update_power(self, env):
+        self.power = self.potential * self.action
 
     def initialize_q_table(self, env):
         states = [(s, t, d)

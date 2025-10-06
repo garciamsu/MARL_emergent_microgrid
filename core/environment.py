@@ -73,7 +73,7 @@ class MultiAgentEnv:
 
         return df
 
-    def get_value(self, field: str, index: int) -> None:
+    def get_dataset(self, field: str, index: int) -> None:
         """
         Update environment attributes with values and discretized states 
         from the dataset row at the given index.
@@ -84,3 +84,25 @@ class MultiAgentEnv:
         
         # Compute discretized states
         return digitize_clip(row[field], self.power_bins)
+
+    def get_value(self, var) -> None:
+        """
+        Get the discretized index value for a given variable.
+        """
+        
+        if var == "potential":
+            self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.power_bins)
+            return self.renewable_potential_idx   
+        elif var == "renewable":
+            self.renewable_power_idx = digitize_clip(self.renewable_power, self.power_bins)
+            return self.renewable_power_idx
+        elif var == "demand":
+            self.demand_power_idx = digitize_clip(self.demand_power, self.power_bins)
+            return self.demand_power_idx
+        elif var == "total":
+            self.total_power_idx = digitize_clip(self.total_power, self.power_bins)
+            return self.total_power_idx
+        else:
+            return 0        
+
+   

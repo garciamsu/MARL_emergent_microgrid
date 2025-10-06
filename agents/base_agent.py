@@ -12,7 +12,7 @@ class BaseAgent:
         self.action = 0
         self.idx = 0
 
-    def get_value(self, field: str, index: int) -> None:
+    def get_dataset(self, field: str, index: int) -> None:
         """
         Update agent attributes with values and discretized states 
         from the dataset row at the given index.
@@ -36,10 +36,12 @@ class BaseAgent:
             if state["source"] == "local":
                 # Example: var_solar_0 (if agent name is solar#0 and var = "var")
                 var_name = f"{state['var']}_{self.name.split('#')[1]}"
-                value = self.get_value(var_name, index)
+                value = self.get_dataset(var_name, index)
+            elif state["source"] == "global":
+                value = env.get_value(state["var"])
             else:
                 # Use environment value
-                value = env.get_value(state["var"], index)
+                value = env.get_dataset(state["var"], index)
 
             state_values.append(value)
             

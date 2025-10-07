@@ -79,7 +79,7 @@ metrics:
 agents:
 
   solar:
-    count: 3    
+    count: 3
     policy:
       type: tabular_ql
       alpha: 0.1

@@ -44,7 +44,7 @@ class MultiAgentEnv:
         self.demand_power = 0
         self.total_power = 0
         self.price = 0
-        self.delta_power = 0
+        self.energy_balance = 0
 
         # Discretized states
         self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.power_bins)
@@ -75,13 +75,13 @@ class MultiAgentEnv:
 
     def get_dataset(self, field: str, index: int) -> None:
         """
-        Update environment attributes with values and discretized states 
+        Update environment attributes with values and discretized states
         from the dataset row at the given index.
         """
-        
+
         # Extract values from dataset row
         row = self.dataset.iloc[index]
-        
+
         # Compute discretized states
         return digitize_clip(row[field], self.power_bins)
 
@@ -89,10 +89,10 @@ class MultiAgentEnv:
         """
         Get the discretized index value for a given variable.
         """
-        
+
         if var == "potential":
             self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.power_bins)
-            return self.renewable_potential_idx   
+            return self.renewable_potential_idx
         elif var == "renewable":
             self.renewable_power_idx = digitize_clip(self.renewable_power, self.power_bins)
             return self.renewable_power_idx
@@ -103,6 +103,4 @@ class MultiAgentEnv:
             self.total_power_idx = digitize_clip(self.total_power, self.power_bins)
             return self.total_power_idx
         else:
-            return 0        
-
-   
+            return 0

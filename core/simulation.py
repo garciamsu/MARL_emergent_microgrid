@@ -34,48 +34,44 @@ def run_training(config):
     epsilon_min = epsilon_cfg.get("min", 0.05)
     decay = epsilon_cfg.get("decay", "linear")
 
-    print(agents)
-
     results = []
-    
-    for ep in range(num_episodes):
+
+    for episode in range(num_episodes):
         env.reset()
         evolution = []
 
         for index in range(env.max_steps - 1):
             # 1. Discretized state per agent
             state = {
-                name: ag.get_discretized_state(env, index)
-                for name, ag in agents.items()
+                name: agent.get_discretized_state(env, index)
+                for name, agent in agents.items()
             }
-            
-        
-            # 2. Choose action per agent
-            for ag in agents.values():
-                ag.choose_action(state[type(ag).__name__], epsilon)
-                print(ag.action)
-                                      
-            # 3. Environment update based on agent actions
-            solar_power, wind_power, bat_power, grid_power, load_power = 0, 0, 0, 0, 0
-            battery_agent = None
 
-            for ag in agents.values():
-                ag.update_power(env)
-    
+            # 2. Choose action per agent
+            for agent in agents.values():
+                agent.choose_action(state[agent.name], epsilon)
+
+            # 3. Environment update based on agent actions
+            for agent in agents.values():
+                agent.update_power(env)
+
             # -------------------------------------------------------------
             # Environment update (supports multiple agents per type)
             # -------------------------------------------------------------
-            solar_agents = [ag for ag in agents.values() if "solar" in ag.name]
-            wind_agents = [ag for ag in agents.values() if "wind" in ag.name]
-            battery_agents = [ag for ag in agents.values() if "battery" in ag.name]
-            grid_agents = [ag for ag in agents.values() if "grid" in ag.name]
-            load_agents = [ag for ag in agents.values() if "load" in ag.name]
+            solar_agents = [agent for agent in agents.values() if "solar" in agent.name]
+            # wind_agents = [agent for agent in agents.values() if "wind" in agent.name]
+            # battery_agents = [agent for agent in agents.values() if "battery" in agent.name]
+            # grid_agents = [agent for agent in agents.values() if "grid" in agent.name]
+            # load_agents = [agent for agent in agents.values() if "load" in agent.name]
+
+            print(solar_agents)
 
             # Reset dynamic records
             env.energy_balance = {}
             total_generation = 0.0
             total_consumption = 0.0
 
+            '''
             # --- SOLAR ---
             for ag in solar_agents:
                 ag.update_power(env)
@@ -123,17 +119,17 @@ def run_training(config):
             env.demand_power = max(env.demand_power + total_consumption, 0)
 
             # --- BALANCE ---
-            env.delta_power = env.total_power - env.demand_power
-            env.delta_power_idx = "surplus" if env.delta_power >= 0 else "deficit"
+            env.energy_balance = env.total_power - env.demand_power
+            env.delta_power_idx = "surplus" if env.energy_balance >= 0 else "deficit"
 
             # 4. Next state
             next_state = {
-                name: ag.get_discretized_state(env, index + 1)
-                for name, ag in agents.items()
+                name: agent.get_discretized_state(env, index + 1)
+                for name, agent in agents.items()
             }
 
             # 5. Reward calculation and Q-table update
-            step_record = {"episode": ep, "step": index}
+            step_record = {"episode": episode, "step": index}
             for name, ag in agents.items():
                 reward = ag.calculate_reward(*state[type(ag).__name__])
                 ag.update_q_table(state[type(ag).__name__], ag.action,
@@ -143,6 +139,7 @@ def run_training(config):
                 step_record[f"power_{name}"] = getattr(ag, "power", 0.0)
             evolution.append(step_record)
 
+            '''
         # 6. Epsilon update
         if decay == "linear":
             epsilon = max(epsilon_min, epsilon - (1.0 - epsilon_min) / num_episodes)
@@ -151,12 +148,9 @@ def run_training(config):
 
         # 7. Save episode data
         df = pd.DataFrame(evolution)
-        df.to_csv(f"results/evolution/episode_{ep}.csv", index=False)
+        df.to_csv(f"results/evolution/episode_{episode}.csv", index=False)
         results.append(df)
 
-        print(f"Episode {ep+1}/{num_episodes} completed, epsilon={epsilon:.3f}")
+        print(f"Episode {episode+1}/{num_episodes} completed, epsilon={epsilon:.3f}")
 
     return agents, results
-
-
-            

@@ -11,15 +11,18 @@ class BaseAgent:
         self.q_table = {}
         self.action = 0
         self.idx = 0
-
+        self.power = 0
+        self.potential = 0
+ 
     def get_dataset(self, field: str, index: int) -> None:
         """
-        Update agent attributes with values and discretized states 
+        Update agent attributes with values and discretized states
         from the dataset row at the given index.
         """
-        
+
         # Extract values from dataset row
         row = self.env.dataset.iloc[index]
+        self.potential = row[field]  # Update potential
 
         # Compute discretized states
         return digitize_clip(row[field], self.env.power_bins)
@@ -29,12 +32,12 @@ class BaseAgent:
         Build the discretized state tuple for this agent.
         Iterates through self.state_space and applies logic depending on source.
         """
-        
+
         state_values = []
-       
+
         for state in self.state_space:
             if state["source"] == "local":
-                # Example: var_solar_0 (if agent name is solar#0 and var = "var")
+                # Example: var_wind_0 (if agent name is wind#0 and var = "var")
                 var_name = f"{state['var']}_{self.name.split('#')[1]}"
                 value = self.get_dataset(var_name, index)
             elif state["source"] == "global":
@@ -44,7 +47,7 @@ class BaseAgent:
                 value = env.get_dataset(state["var"], index)
 
             state_values.append(value)
-            
+
         return tuple(state_values)
 
     def choose_action(self, state, epsilon=0.1):

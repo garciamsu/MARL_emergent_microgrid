@@ -84,7 +84,29 @@ def run_training(config):
             }
 
             # 5. Reward calculation and Q-table update
-            step_record = {"episode": episode, "step": index}
+
+            # Step log: environment global variables and per-agent fields
+            step_record = {
+                "episode": episode,
+                "step": index,
+            }
+
+            # Per-agent variables (safe defaults if attribute is missing)
+            for name, ag in agents.items():
+                step_record[f"potential_{name}"] = getattr(ag, "potential", None)
+                step_record[f"action_{name}"] = getattr(ag, "action", None)
+                step_record[f"power_{name}"] = getattr(ag, "power", 0.0)
+
+            # Append environment globals at the end (preserve insertion order)
+            step_record.update({
+                "env_total_generation": total_generation,
+                "env_total_consumption": total_consumption,
+                "env_total_renewable": total_renewable,
+                "env_total_power": env.total_power,
+                "env_demand_power": env.demand_power,
+                "env_energy_balance": env.energy_balance,
+                "env_delta_power_idx": env.delta_power_idx,
+            })
             
             '''
             for name, ag in agents.items():

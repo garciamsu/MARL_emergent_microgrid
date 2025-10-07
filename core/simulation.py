@@ -85,6 +85,8 @@ def run_training(config):
 
             # 5. Reward calculation and Q-table update
             step_record = {"episode": episode, "step": index}
+            
+            '''
             for name, ag in agents.items():
                 reward = ag.calculate_reward(*state[type(ag).__name__])
                 ag.update_q_table(state[type(ag).__name__], ag.action,
@@ -92,6 +94,7 @@ def run_training(config):
                 step_record[f"reward_{name}"] = reward
                 step_record[f"action_{name}"] = ag.action
                 step_record[f"power_{name}"] = getattr(ag, "power", 0.0)
+            '''
             evolution.append(step_record)
 
 

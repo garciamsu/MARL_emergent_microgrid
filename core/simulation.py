@@ -51,75 +51,30 @@ def run_training(config):
             for agent in agents.values():
                 agent.choose_action(state[agent.name], epsilon)
 
-            # 3. Environment update based on agent actions
+            # 3. Environment update based on agent actions            
+            # Initialize accumulators
+            total_renewable = 0.0
+            total_generation = 0.0
+            total_consumption = 0.0
+            
+            # Update power for each agent
             for agent in agents.values():
                 agent.update_power(env)
 
-            # -------------------------------------------------------------
-            # Environment update (supports multiple agents per type)
-            # -------------------------------------------------------------
-            solar_agents = [agent for agent in agents.values() if "solar" in agent.name]
-            # wind_agents = [agent for agent in agents.values() if "wind" in agent.name]
-            # battery_agents = [agent for agent in agents.values() if "battery" in agent.name]
-            # grid_agents = [agent for agent in agents.values() if "grid" in agent.name]
-            # load_agents = [agent for agent in agents.values() if "load" in agent.name]
+                # Accumulate renewable generation (solar or wind)
+                if "solar" in agent.name.lower() or "wind" in agent.name.lower():
+                    total_renewable += agent.power
 
-            print(solar_agents)
-
-            # Reset dynamic records
-            env.energy_balance = {}
-            total_generation = 0.0
-            total_consumption = 0.0
-
-            '''
-            # --- SOLAR ---
-            for ag in solar_agents:
-                ag.update_power(env)
-                env.energy_balance[ag.name] = ag.power
-                total_generation += ag.power
-
-            # --- WIND ---
-            for ag in wind_agents:
-                ag.update_power(env)
-                env.energy_balance[ag.name] = ag.power
-                total_generation += ag.power
-
-            # --- BATTERIES ---
-            for ag in battery_agents:
-                ag.update_power(env)
-                env.energy_balance[ag.name] = ag.power
-                if ag.power >= 0:
-                    total_generation += ag.power
+                # Classify power as generation or consumption
+                if agent.power >= 0:
+                    total_generation += agent.power
                 else:
-                    total_consumption += abs(ag.power)
+                    total_consumption += abs(agent.power)
 
-            # --- GRID ---
-            for ag in grid_agents:
-                ag.update_power(env)
-                env.energy_balance[ag.name] = ag.power
-                if ag.power >= 0:
-                    total_generation += ag.power
-                else:
-                    total_consumption += abs(ag.power)
-
-            # --- LOADS ---
-            for ag in load_agents:
-                ag.update_power(env)
-                env.energy_balance[ag.name] = ag.power
-                if ag.power >= 0:
-                    total_generation += ag.power
-                else:
-                    total_consumption += abs(ag.power)
-
-            # --- AGGREGATION ---
-            env.renewable_power = sum(
-                env.energy_balance[n] for n in env.energy_balance if "solar" in n or "wind" in n
-            )
-            env.total_power = total_generation - total_consumption
+            # Update environment global variables
+            env.total_power = total_generation
             env.demand_power = max(env.demand_power + total_consumption, 0)
-
-            # --- BALANCE ---
-            env.energy_balance = env.total_power - env.demand_power
+            env.energy_balance = total_generation - total_consumption
             env.delta_power_idx = "surplus" if env.energy_balance >= 0 else "deficit"
 
             # 4. Next state
@@ -139,7 +94,7 @@ def run_training(config):
                 step_record[f"power_{name}"] = getattr(ag, "power", 0.0)
             evolution.append(step_record)
 
-            '''
+
         # 6. Epsilon update
         if decay == "linear":
             epsilon = max(epsilon_min, epsilon - (1.0 - epsilon_min) / num_episodes)

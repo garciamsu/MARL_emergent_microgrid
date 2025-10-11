@@ -112,12 +112,14 @@ def run_training(config):
 
             # 5. Reward calculation and Q-table update
             for name, agent in agents.items():
+                print(state[agent.name])
                 reward = agent.calculate_reward(state[agent.name])
-                agent.update_q_table(state[agent.name], agent.action,
-                                  reward, next_state[state[agent.name]])
-                step_record[f"reward_{name}"] = reward
-                step_record[f"action_{name}"] = agent.action
-                step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
+                print(reward)
+            #    agent.update_q_table(state[agent.name], agent.action,
+            #                      reward, next_state[state[agent.name]])
+            #    step_record[f"reward_{name}"] = reward
+            #    step_record[f"action_{name}"] = agent.action
+            #    step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
 
             evolution.append(step_record)
 

@@ -1,12 +1,8 @@
-import copy
-import random
+"""Simulation training loop for MARL emergent microgrid."""
+
 import pandas as pd
-from utils.discretization import digitize_clip
 from core.environment import MultiAgentEnv
-from core.registry import create_agent, create_policy, create_reward
 from agents import instantiate_agents
-import core.policies
-import core.rewards
 
 EPSILON_MIN = 0
 
@@ -112,14 +108,21 @@ def run_training(config):
 
             # 5. Reward calculation and Q-table update
             for name, agent in agents.items():
-                print(state[agent.name])
-                reward = agent.calculate_reward(state[agent.name])
-                print(reward)
-            #    agent.update_q_table(state[agent.name], agent.action,
-            #                      reward, next_state[state[agent.name]])
-            #    step_record[f"reward_{name}"] = reward
-            #    step_record[f"action_{name}"] = agent.action
-            #    step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
+                state_tuple = state[name]
+                next_state_tuple = next_state[name]
+                # Call calculate_reward with unpacked state when applicable
+                try:
+                    reward = agent.calculate_reward(*state_tuple)
+                except TypeError:
+                    reward = agent.calculate_reward(state_tuple)
+
+                # Q-learning update
+                agent.update_q_table(state_tuple, agent.action, reward, next_state_tuple)
+
+                # Log per-agent values
+                step_record[f"reward_{name}"] = reward
+                step_record[f"action_{name}"] = agent.action
+                step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
 
             evolution.append(step_record)
 
@@ -130,9 +133,9 @@ def run_training(config):
             epsilon = max(epsilon_min, epsilon * 0.99)
 
         # 7. Save episode data
-        df = pd.DataFrame(evolution)
-        df.to_csv(f"results/evolution/episode_{episode}.csv", index=False)
-        results.append(df)
+        episode_df = pd.DataFrame(evolution)
+        episode_df.to_csv(f"results/evolution/episode_{episode}.csv", index=False)
+        results.append(episode_df)
 
         print(f"Episode {episode+1}/{num_episodes} completed, epsilon={epsilon:.3f}")
 

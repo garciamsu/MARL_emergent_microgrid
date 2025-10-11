@@ -47,16 +47,26 @@ def run_training(config):
                 for name, agent in agents.items()
             }
 
+            # Step log: environment global variables and per-agent fields
+            step_record = {
+                "episode": episode,
+                "step": index,
+            }
+
             # 2. Choose action per agent
             for agent in agents.values():
                 agent.choose_action(state[agent.name], epsilon)
 
-            # 3. Environment update based on agent actions            
+            # 3. Environment update based on agent actions
+
+            # Update environment with current demand
+            env.get_dataset("demand", index)
+
             # Initialize accumulators
             total_renewable = 0.0
             total_generation = 0.0
             total_consumption = 0.0
-            
+
             # Update power for each agent
             for agent in agents.values():
                 agent.update_power(env)
@@ -71,33 +81,19 @@ def run_training(config):
                 else:
                     total_consumption += abs(agent.power)
 
+            # Step log: Per-agent variables (safe defaults if attribute is missing)
+            for name, agent in agents.items():
+                step_record[f"potential_{name}"] = getattr(agent, "potential", None)
+                step_record[f"action_{name}"] = getattr(agent, "action", None)
+                step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
+
             # Update environment global variables
             env.total_power = total_generation
             env.demand_power = max(env.demand_power + total_consumption, 0)
             env.energy_balance = total_generation - total_consumption
             env.delta_power_idx = "surplus" if env.energy_balance >= 0 else "deficit"
 
-            # 4. Next state
-            next_state = {
-                name: agent.get_discretized_state(env, index + 1)
-                for name, agent in agents.items()
-            }
-
-            # 5. Reward calculation and Q-table update
-
-            # Step log: environment global variables and per-agent fields
-            step_record = {
-                "episode": episode,
-                "step": index,
-            }
-
-            # Per-agent variables (safe defaults if attribute is missing)
-            for name, ag in agents.items():
-                step_record[f"potential_{name}"] = getattr(ag, "potential", None)
-                step_record[f"action_{name}"] = getattr(ag, "action", None)
-                step_record[f"power_{name}"] = getattr(ag, "power", 0.0)
-
-            # Append environment globals at the end (preserve insertion order)
+            # Step log: Append environment globals at the end (preserve insertion order)
             step_record.update({
                 "env_total_generation": total_generation,
                 "env_total_consumption": total_consumption,
@@ -107,18 +103,23 @@ def run_training(config):
                 "env_energy_balance": env.energy_balance,
                 "env_delta_power_idx": env.delta_power_idx,
             })
-            
-            '''
-            for name, ag in agents.items():
-                reward = ag.calculate_reward(*state[type(ag).__name__])
-                ag.update_q_table(state[type(ag).__name__], ag.action,
-                                  reward, next_state[type(ag).__name__])
-                step_record[f"reward_{name}"] = reward
-                step_record[f"action_{name}"] = ag.action
-                step_record[f"power_{name}"] = getattr(ag, "power", 0.0)
-            '''
-            evolution.append(step_record)
 
+            # 4. Next state
+            next_state = {
+                name: agent.get_discretized_state(env, index + 1)
+                for name, agent in agents.items()
+            }
+
+            # 5. Reward calculation and Q-table update
+            for name, agent in agents.items():
+                reward = agent.calculate_reward(state[agent.name])
+                agent.update_q_table(state[agent.name], agent.action,
+                                  reward, next_state[state[agent.name]])
+                step_record[f"reward_{name}"] = reward
+                step_record[f"action_{name}"] = agent.action
+                step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
+
+            evolution.append(step_record)
 
         # 6. Epsilon update
         if decay == "linear":

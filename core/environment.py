@@ -82,6 +82,9 @@ class MultiAgentEnv:
         # Extract values from dataset row
         row = self.dataset.iloc[index]
 
+        if field == "demand":
+            self.demand_power = row[field] * self.scale_demand  # Update demand
+
         # Compute discretized states
         return digitize_clip(row[field], self.power_bins)
 

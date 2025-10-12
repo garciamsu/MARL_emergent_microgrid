@@ -21,20 +21,63 @@ class SolarAgent(BaseAgent):
                   for d in range(len(env.power_bins))]
         self.q_table = {state: {a: 0.0 for a in self.actions} for state in states}
 
-    def calculate_reward(self, solar_idx, total_idx, demand_idx):
-        sigma, kappa, mu, nu, beta, xi = 15, 3, 12, 1, 5, 8
-        power_gap = total_idx - demand_idx
+    def calculate_reward(self, state):
+        """
+        Calculate the reward for the solar agent based on the energy balance and action taken.
+
+        Parameters
+        ----------
+        state : tuple
+            A tuple containing:
+            - solar_idx (int or float): Discretized solar power index.
+            - demand_idx (int or float): Discretized demand index.
+            - renewable_idx (int or float): Discretized total renewable power index.
+
+        Returns
+        -------
+        float
+            Reward value computed according to the energy balance and agent's action.
+
+        Description
+        -----------
+        The reward function encourages the solar agent to contribute energy
+        when the system is under-supplied (renewables < demand) and discourages
+        overproduction when the system is already meeting or exceeding demand.
+        The weight factor `wi` adjusts the impact of solar generation relative
+        to total renewable contribution.
+
+        Reward logic:
+        - If action == 1 (produce):
+            - If renewable < demand: penalize shortage (negative reward)
+            - Else: reward proportional to surplus (positive reward)
+        - If action == 0 (do nothing):
+            - If renewable > demand: penalize missed opportunity (negative reward)
+            - Else: reward inaction that prevents overproduction
+        """
+
+        solar_idx, demand_idx, renewable_idx = state
+        theta, beta, eta, xi = 1.0, 1.0, 1.0, 1.0
+
+        # Avoid division by zero in the weight factor
+        wi = (solar_idx / renewable_idx) if renewable_idx != 0 else 1.0
+
+        delta_abs = abs(renewable_idx - demand_idx)
+
         if self.action == 1:
-            if solar_idx == 0:
-                return -sigma * math.log(demand_idx + 1)
-            elif solar_idx > 0 and power_gap >= 0:
-                return kappa * solar_idx
+            # Agent decides to produce
+            if renewable_idx <= demand_idx:
+                # Penalize shortage: renewables not enough to meet demand
+                reward = -theta * wi * delta_abs
             else:
-                return mu * np.tanh(abs(power_gap))
+                # Reward surplus (renewables exceed demand)
+                reward = beta * wi * delta_abs
         else:
-            if solar_idx == 0:
-                return nu
-            elif solar_idx > 0 and power_gap >= 0:
-                return -beta * solar_idx
+            # Agent decides not to produce
+            if renewable_idx > demand_idx:
+                # Penalize missed opportunity (underutilized renewables)
+                reward = -eta * wi * delta_abs
             else:
-                return max(-xi * abs(power_gap), -50)
+                # Reward correct inaction during shortage
+                reward = xi * wi
+
+        return reward

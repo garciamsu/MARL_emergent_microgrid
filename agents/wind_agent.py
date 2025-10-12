@@ -19,13 +19,64 @@ class WindAgent(BaseAgent):
                 states.append((wind_idx, demand_idx))
                 self.q_table = {state: {a: 0.0 for a in self.actions} for state in states}
 
+    def calculate_reward(self, state):
+        """
+        Calculate the reward for the wind agent based on the current energy balance and the action taken.
 
-    def calculate_reward(self, wind_idx, demand_idx):
+        Parameters
+        ----------
+        state : tuple
+            A tuple containing:
+            - wind_idx (int or float): Discretized wind power index.
+            - demand_idx (int or float): Discretized demand index.
+            - renewable_idx (int or float): Discretized total renewable power index.
+
+        Returns
+        -------
+        float
+            Reward value computed based on the system balance and the agent's decision.
+
+        Description
+        -----------
+        The reward function encourages the wind agent to contribute energy when
+        total renewable generation is below demand and discourages overproduction
+        when renewable generation exceeds demand.
+
+        The weight factor `wi` scales the reward according to the agent's relative
+        contribution within total renewable power.
+
+        Reward logic:
+        - If action == 1 (produce):
+            - Penalize if total renewables < demand (shortage)
+            - Reward if total renewables > demand (helping balance)
+        - If action == 0 (do nothing):
+            - Penalize if total renewables > demand (missed opportunity)
+            - Reward if total renewables < demand (preventing surplus)
+        """
+
+        wind_idx, demand_idx, renewable_idx = state
+        theta, beta, eta, xi = 1.0, 1.0, 1.0, 1.0
+
+        # Avoid division by zero in weight factor
+        wi = (wind_idx / renewable_idx) if renewable_idx != 0 else 1.0
+
+        delta_abs = abs(renewable_idx - demand_idx)
+
         if self.action == 1:
-            if wind_idx == 0:
-                return -10 # trying to produce with no wind
-            return 5 # reward for producing with wind available
+            # Agent decides to produce
+            if renewable_idx <= demand_idx:
+                # Penalize shortage (the agent contributes but the system still lacks energy)
+                reward = -theta * wi * delta_abs
+            else:
+                # Reward surplus contribution (helped exceed demand)
+                reward = beta * wi * delta_abs
         else:
-            if wind_idx > 0:
-                return -2 # penalty for idling when wind available
-            return 1 # neutral if no wind
+            # Agent decides not to produce
+            if renewable_idx > demand_idx:
+                # Penalize missed opportunity to help during surplus control
+                reward = -eta * wi * delta_abs
+            else:
+                # Reward inaction when production is unnecessary or would worsen deficit
+                reward = xi * wi
+
+        return reward

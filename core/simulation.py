@@ -110,19 +110,21 @@ def run_training(config):
             for name, agent in agents.items():
                 state_tuple = state[name]
                 next_state_tuple = next_state[name]
+
                 # Call calculate_reward with unpacked state when applicable
                 try:
                     reward = agent.calculate_reward(*state_tuple)
                 except TypeError:
                     reward = agent.calculate_reward(state_tuple)
 
+                print(reward)
                 # Q-learning update
-                agent.update_q_table(state_tuple, agent.action, reward, next_state_tuple)
+                #agent.update_q_table(state_tuple, agent.action, reward, next_state_tuple)
 
                 # Log per-agent values
-                step_record[f"reward_{name}"] = reward
-                step_record[f"action_{name}"] = agent.action
-                step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
+                #step_record[f"reward_{name}"] = reward
+                #step_record[f"action_{name}"] = agent.action
+                #step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
 
             evolution.append(step_record)
 

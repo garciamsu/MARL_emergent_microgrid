@@ -122,9 +122,7 @@ def run_training(config):
                 #agent.update_q_table(state_tuple, agent.action, reward, next_state_tuple)
 
                 # Log per-agent values
-                #step_record[f"reward_{name}"] = reward
-                #step_record[f"action_{name}"] = agent.action
-                #step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
+                step_record[f"reward_{name}"] = reward
 
             evolution.append(step_record)
 

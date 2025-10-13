@@ -113,7 +113,7 @@ agents:
       efficiency: 0.95
 
   battery:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.1

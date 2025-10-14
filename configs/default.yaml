@@ -145,7 +145,7 @@ agents:
     state_space:
       - {var: soc_idx,  source: external, bins: auto}
       - {var: demand,   source: env,      bins: auto}
-      - {var: total,    source: global,   bins: auto}
+      - {var: renewable,    source: global,   bins: auto}
     limits:
       p_max: 1000
       export_allowed: true

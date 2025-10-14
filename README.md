@@ -1,178 +1,237 @@
-# Distributed Multi-Agent Reinforcement Learning Environment
+# Entorno Distribuido de Aprendizaje por Refuerzo Multi‑Agente (Microred)
 
-This repository provides a Python-based simulation framework for studying **distributed coordination of renewable energy resources** using **multi-agent reinforcement learning (MARL)**.  
-The system models the interaction between solar generation, wind generation, battery storage, controllable loads, and the main utility grid, applying Q-learning with discretized state-action spaces.
+Este repositorio provee un marco de simulación en Python para estudiar la **coordinación distribuida de recursos energéticos renovables** usando **aprendizaje por refuerzo multi‑agente (MARL)**. El sistema modela la interacción entre generación solar, generación eólica, almacenamiento en baterías, cargas controlables y la red eléctrica principal, aplicando Q‑Learning tabular sobre espacios de estado‐acción discretizados.
 
-The codebase is designed for **engineers and researchers familiar with Python and reinforcement learning**, aiming to facilitate reproducibility and extensibility.
-
----
-
-## Features
-
-- Multi-agent simulation of energy systems under dynamic conditions
-- Modular architecture with specialized agent classes
-- Discretization of state variables into configurable bins
-- Q-learning implementation with per-agent policies
-- Automatic generation of:
-  - Evolution logs (`CSV`)
-  - Episode metrics (`Excel`)
-  - Q-table snapshots (`Excel`)
-  - High-resolution and vector plots (`SVG`)
-- Analysis and visualization utilities
+El código está orientado a **ingenieros e investigadores** familiarizados con Python y RL, priorizando reproducibilidad y extensibilidad.
 
 ---
 
-## Installation
+## Características Clave
 
-**Recommended platform:** Linux Ubuntu 22.04.5 LTS  
-**Python version:** 3.11.7  
-**Environment manager:** Anaconda (conda 24.9.1)
+- Simulación multi‑agente de una microred bajo condiciones dinámicas.
+- Arquitectura modular con clases de agentes especializadas.
+- Discretización configurable de variables de estado.
+- Políticas tabulares por agente (Q‑Learning).
+- Generación automática de:
+  - Logs de evolución por paso (`CSV`)
+  - Métricas por episodio (`Excel`)
+  - Q‑tables (snapshots) (`Excel` en futuras extensiones)
+  - Gráficas vectoriales (`SVG`) (base preparada)
+- Utilidades de análisis y limpieza de resultados.
 
-### Create a conda environment
+---
+
+## Instalación
+
+**Plataforma recomendada:** Linux Ubuntu 22.04.5 LTS  
+**Versión Python:** 3.11.7  
+**Gestor de entorno:** Anaconda
+
+### Crear entorno
 
 ```bash
 conda create -n marl_env python=3.11.7
-```
-
-### Activate the environment
-
-```bash
 conda activate marl_env
 ```
 
-### Install required packages
+### Instalar dependencias
 
 ```bash
 pip install -r requirements.txt
 ```
 
-*(Make sure `requirements.txt` includes `numpy`, `pandas`, `matplotlib`, `openpyxl`, etc.)*
-
 ---
 
-## Running the Simulation
+## Ejecución Básica
 
-The main entry point is `main.py`.
+Punto de entrada: `main.py`.
 
 ```bash
 python main.py
 ```
 
-**Parameters** such as:
+Al ejecutar se realiza:
+1. Limpieza de directorios de resultados previos.
+2. Carga de configuración (`configs/default.yaml`).
+3. Creación del entorno y agentes.
+4. Entrenamiento episodio a episodio.
+5. Exportación de logs a `results/` y logging estructurado.
 
-- Number of episodes
-- Exploration factor (`epsilon`)
-- Input dataset (`csv_filename`)
-
-are set in the `Simulation` class instantiation.  
-**Details of parameter values are described in the accompanying scientific article.**
-
-Running the simulation will:
-
-1. Initialize the environment and all agents
-2. Train agents via Q-learning
-3. Generate results in the `results/` directory
-4. Output performance metrics to the console
+### Parámetros principales (en `configs/default.yaml`)
+| Bloque | Claves |
+|--------|-------|
+| Simulación | `simulation.episodes`, `simulation.dataset`, `simulation.seed` |
+| Exploración | `simulation.epsilon.start`, `simulation.epsilon.end`, `simulation.epsilon.schedule`, `decay` |
+| Política | `agents.<tipo>.policy.{alpha,gamma}` |
+| Recompensas | `agents.<tipo>.reward` + parámetros internos |
+| Discretización | `discretization.bins_power` |
 
 ---
 
-## Folder Structure
+## Estructura de Carpetas (resultados)
 
-After a simulation run, your project will look like this:
-
+Tras una corrida típica:
 ```
 results/
 ├── evolution/
-│   └── learning_<episode>.csv          # Detailed logs per episode
-├── plots/
-│   ├── IAE_over_episodes.svg
-│   ├── Var_dif_over_episodes.svg
-│   ├── Q_Norm_<agent>.svg
-│   └── env_plot.svg
-└── metrics_episode.xlsx                # Episode summary metrics
+│   └── episode_<n>.csv            # Traza paso a paso del episodio
+├── logs/
+│   └── run_YYYYMMDD_HHMMSS.log    # Log consolidado
+└── plots/                         # Reservado para figuras
 ```
 
 ---
 
-## Metrics Overview
+## Métricas (concepto)
 
-To **evaluate coordination effectiveness**, the system computes:
+Indicadores de desempeño energético (implementables / extendibles):
+- ΔP: Balance instantáneo (generación – consumo).
+- IAE / ISE: Errores integrales (absoluto / cuadrático).
+- REP / GEP: Penetración renovable / de red.
+- Recompensas promedio por episodio.
 
-- **Energy Balance (ΔP):** Instantaneous difference between generation and demand
-- **ISE:** Integral Square Error
-- **IAE:** Integral Absolute Error
-- **REP:** Renewable Energy Penetration (%)
-- **GEP:** Grid Energy Penetration (%)
-
-To **evaluate learning**, it also calculates:
-
-- **Average Reward per Episode**
-- **Average Cumulative Reward**
-
-**Additional stability metrics** are implemented and will be detailed in the publication.
+Los CSV en `evolution/` permiten derivar estas métricas externamente.
 
 ---
 
-## Extending the Framework
+## Afinación de Hiperparámetros (Tuning)
 
-You can create new agents or customize the environment:
+Campos clave en `configs/default.yaml`:
 
-### Adding a New Agent
+| Área | Claves |
+|------|-------|
+| Episodios & dataset | `simulation.episodes`, `simulation.dataset` |
+| Exploración | `simulation.epsilon.{schedule,start,end,decay}` |
+| Aprendizaje | `agents.<tipo>.policy.alpha`, `agents.<tipo>.policy.gamma` |
+| Discretización | `discretization.bins_power` |
+| Reproducibilidad | `simulation.seed` |
 
-1. **Subclass `BaseAgent`**
-2. Implement:
-   - `get_discretized_state()`: Define state representation
-   - `initialize_q_table()`: Configure state-action space
-   - `calculate_reward()`: Design the reward function
+Ejemplo (cambiar a decaimiento exponencial):
+```yaml
+simulation:
+  episodes: 50
+  seed: 123
+  epsilon:
+    schedule: exponential
+    start: 1.0
+    end: 0.05
+    decay: 0.97
+```
 
-### Customizing the Environment
+### Flujo sugerido
+1. Comenzar con pocos bins para iterar rápido.
+2. Explorar `alpha`: 0.05, 0.1, 0.2, 0.3.
+3. Ajustar `epsilon` para mantener exploración útil en ~30–40% inicial.
+4. Refinar funciones de recompensa (ver agentes / `core/rewards.py`).
+5. Aumentar resolución (más bins) sólo tras estabilización.
 
-- Subclass `MultiAgentEnv` to load different datasets or apply new discretization schemes.
-
-This design supports **flexible experimentation without altering core components.**
-
----
-
-## Utilities
-
-The module `analysis_tools.py` provides helper functions:
-
-| Function | Purpose |
-|---|---|
-| `load_latest_evolution_csv()` | Load the most recent simulation log |
-| `plot_metric()` | Generate metric plots |
-| `compute_q_diff_norm()` | Compute L2 norm between Q-tables |
-| `check_stability()` | Evaluate stability over episodes |
-| `process_evolution_data()` | Prepare logs for visualization |
-| `plot_coordination()` | Generate multi-panel plots of agent behavior |
-| `clear_results_directories()` | **Clean all files under `results/`** |
-
-> **Note:** `clear_results_directories()` removes previous outputs before a new simulation run.
-
----
-
-## Outputs and Visualization
-
-By default, the simulation generates:
-
-- Time series plots of power and energy balance
-- SVG graphics of learning progress (`IAE`, `Var_dif`, `Q Norms`)
-- Per-agent Q-tables and rewards
-
-Visual outputs help validate whether agents learn effective coordination strategies.
+### Barrido manual
+```bash
+for cfg in configs/exp_*.yaml; do python main.py --config "$cfg"; done
+```
+(El flag `--config` puede añadirse fácilmente con argparse — pendiente si se requiere.)
 
 ---
 
-## Notes
+## Logging y Reproducibilidad
 
-- Input datasets should be placed in `assets/datasets/` in CSV format.
-- Default time resolution: **1 hour per time step**
-- For parameter explanations and case studies, see the accompanying article.
+- Semilla global: `simulation.seed` (controla Python, NumPy y Torch si disponible).
+- Logger central: `core.utils.build_logger()` genera archivo en `results/logs/`.
+- Cada episodio registra `epsilon` residual.
+- Limpieza previa: `analysis_tools.utils.clear_directories()`.
 
 ---
 
-## License
+## Tests y Verificación Rápida
 
-This project is released for **academic research** purposes.  
-Please **cite appropriately** if used in publications.
+### Self-check (sin pytest)
+```bash
+python scripts/self_check.py
+```
+Salida esperada: `Self-check passed: 1 episode executed.`
+
+### Test de humo (pytest)
+```bash
+python -m pytest -k smoke -q
+```
+Valida que un episodio corre y produce un DataFrame no vacío.
+
+---
+
+## Extender el Framework
+
+### Nuevo Agente
+1. Crear archivo en `agents/` con sufijo `_agent.py`.
+2. Decorar la clase con `@register_agent("nombre")`.
+3. Implementar al menos: `update_power`, `calculate_reward` y (opcional) `initialize_q_table`.
+4. Añadir su bloque en `configs/default.yaml`.
+
+### Personalizar Entorno
+- Extender `MultiAgentEnv` para nuevos campos / transformaciones.
+- (Futuro) Convertir a interfaz Gym / PettingZoo (`reset`, `step`).
+
+### Espacio de Estado Declarativo
+Cada entrada en `state_space` posee:
+| Clave | Descripción |
+|-------|-------------|
+| var | nombre lógico de la variable |
+| source | `local` / `env` / `global` / `self` / `external` |
+| bins | Placeholder para validación futura |
+
+---
+
+## Recompensas
+
+Actualmente hay lógica de recompensa dentro de cada agente. El archivo `core/rewards.py` ofrece una capa para factorizar y reutilizar definiciones (puede consolidarse en una fase siguiente). Se recomienda revisar señales de recompensa para evitar saturación (todos los pasos con el mismo valor).
+
+---
+
+## Refactor Reciente (Resumen)
+- Docstrings en inglés añadidos a módulos núcleo y agentes.
+- Seeding determinista (`core.utils.set_global_seed`).
+- Logging estructurado (`core.utils.build_logger`).
+- Entrada modular (`main.main`).
+- Estructura preparada para tuning y futuros wrappers.
+
+---
+
+## Roadmap Sugerido
+1. Argparse (`--config`, `--episodes`, `--epsilon-schedule`).
+2. API estilo Gym / PettingZoo.
+3. Callbacks (on_step, on_episode_end) y export incremental de métricas.
+4. Persistencia / reanudación de Q‑tables.
+5. Barridos automáticos (grid / random search) en `experiments/`.
+6. Reporte de métricas en JSON para dashboards.
+
+---
+
+## Comandos Rápidos
+```bash
+# Instalar dependencias
+python -m pip install -r requirements.txt
+
+# Entrenamiento principal
+python main.py
+
+# Self-check
+python scripts/self_check.py
+
+# Test de humo
+python -m pytest -k smoke -q
+
+# Limpieza manual (opcional)
+python -c "from analysis_tools.utils import clear_directories; clear_directories()"
+```
+
+---
+
+## Notas
+- Colocar datasets CSV en `assets/datasets/`.
+- Paso temporal por defecto: 1 hora.
+- Ajustar recompensas según objetivos energéticos reales.
+
+---
+
+## Licencia
+Proyecto para fines de **investigación académica**. Por favor **citar apropiadamente** si se utiliza en publicaciones.
 

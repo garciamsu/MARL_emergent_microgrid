@@ -3,6 +3,8 @@ from core.registry import register_agent
 
 @register_agent("grid")
 class GridAgent(BaseAgent):
+    """Grid import agent with binary action (import vs idle/export placeholder)."""
+
     def __init__(self, env,  name="grid", battery=None, state_space=None, **kwargs):
         super().__init__(env,  name, actions=[0, 1], state_space=state_space, **kwargs)
         self.env = env
@@ -17,6 +19,10 @@ class GridAgent(BaseAgent):
         self.q_table = {state: {a: 0.0 for a in self.actions} for state in states}
 
     def update_power(self, env):
+        """Compute power drawn from (positive) or supplied to (negative) grid.
+
+        Current simplified model: potential * action (no export modeling yet).
+        """
         self.power = self.potential * self.action
 
     def calculate_reward(self, state):

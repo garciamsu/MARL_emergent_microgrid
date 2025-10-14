@@ -6,6 +6,14 @@ from utils.discretization import digitize_clip
 
 @register_agent("battery")
 class BatteryAgent(BaseAgent):
+    """Battery agent with three discrete actions.
+
+    Actions (convention):
+        0 -> idle
+        1 -> charge
+        2 -> discharge
+    """
+
     def __init__(self, env,  name="battery",capacity_ah=3, num_battery_soc_bins=5, state_space=None, **kwargs):
         super().__init__(env, name, [0, 1, 2], state_space=state_space, **kwargs)
         self.capacity_ah = capacity_ah
@@ -14,6 +22,11 @@ class BatteryAgent(BaseAgent):
         self.battery_soc_bins = np.linspace(0, self.soc_max, num_battery_soc_bins)
 
     def update_power(self, env):
+        """Placeholder mapping from action/potential to power.
+
+        Currently uses potential * action which does not reflect realistic
+        charge/discharge asymmetry; left for future refinement.
+        """
         self.power = self.potential * self.action
 
     def initialize_q_table(self, env):

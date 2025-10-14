@@ -1,21 +1,32 @@
-"""Entrypoint for running MARL emergent microgrid simulations."""
+"""Entry point for MARL emergent microgrid experiments."""
 
-import agents
-import core.policies  # ensure policy registry is populated
-import core.rewards   # ensure reward registry is populated
+import agents  # noqa: F401  (populate registry via side effects)
+import core.policies  # noqa: F401
+import core.rewards  # noqa: F401
+
 from analysis_tools.utils import clear_directories
 from core.simulation import run_training
-from configs.loader import load_config  # función simple que abre el YAML
+from configs.loader import load_config
 
-if __name__ == "__main__":
-    # Clean old results
+
+def main(config_path: str = "configs/default.yaml") -> None:
+    """Orchestrate a run based on configuration file.
+
+    Args:
+        config_path (str): Path to YAML config.
+    """
     clear_directories()
+    config = load_config(config_path)
 
-    # Load configuration
-    config = load_config("configs/default.yaml")
-
-    if config["mode"] == "train":
+    mode = config.get("mode", "train")
+    if mode == "train":
         run_training(config)
-    elif config["mode"] == "offline":
-        # TODO: implement offline analysis
+    elif mode == "offline":  # pragma: no cover - placeholder
+        # TODO: implement offline analysis (e.g., evaluation only / plotting)
         pass
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

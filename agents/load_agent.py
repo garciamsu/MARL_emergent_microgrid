@@ -4,12 +4,12 @@ from core.registry import register_agent
 
 @register_agent("load")
 class LoadAgent(BaseAgent):
+    """Controllable demand agent with binary action (consume vs shed/idle)."""
+
     def __init__(self, env,  name="load", state_space=None, **kwargs):
         super().__init__(env,  name, actions=[0, 1], state_space=state_space, **kwargs)
         self.env = env
-        # Nuevo: extraer límites desde el config
         self.limits = kwargs.get("limits", {})
-        # comfort_threshold definido en configs/default.yaml -> agents.load.limits.comfort_threshold
         self.comfort_threshold = self.limits.get("comfort_threshold", 1)
         self.market_price = 1
 
@@ -21,6 +21,10 @@ class LoadAgent(BaseAgent):
         self.q_table = {state: {a: 0.0 for a in self.actions} for state in states}
 
     def update_power(self, env):
+        """Compute load consumption (positive demand contribution).
+
+        Current simplified mapping: potential * action.
+        """
         self.power = self.potential * self.action
 
     def calculate_reward(self, state):

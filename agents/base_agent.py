@@ -2,23 +2,31 @@ import random
 from utils.discretization import digitize_clip
 
 class BaseAgent:
-    def __init__(self, env, name, actions, state_space=None, alpha=0.1, gamma=0.9, **kwargs):
-        """Agente base para todos los tipos de recursos.
+    """Base class for all resource agents.
 
-        Parameters
-        ----------
-        env : object
-            Referencia al entorno que contiene dataset y discretizaciones.
-        name : str
-            Identificador del agente.
-        actions : list
-            Lista de acciones discretas disponibles.
-        state_space : list | None
-            Definición del espacio de estados (lista de especificaciones) opcional.
-        alpha : float
-            Tasa de aprendizaje para Q-Learning.
-        gamma : float
-            Factor de descuento.
+    Provides:
+        - Generic epsilon-greedy action selection (via ``choose_action``).
+        - Tabular Q-value storage using nested dicts.
+        - Generic discrete state construction based on a declarative
+          ``state_space`` specification list.
+
+    Expected keys in each state descriptor (state_space list):
+        - var (str): Variable name.
+        - source (str): One of {``local``, ``global``, ``self``, ``external``, ``env``}.
+        - bins (Any): Currently unused at runtime (placeholder for future
+          per-variable bin customization / validation).
+    """
+
+    def __init__(self, env, name, actions, state_space=None, alpha=0.1, gamma=0.9, **kwargs):
+        """Initialize agent.
+
+        Args:
+            env: Environment reference.
+            name (str): Unique agent identifier (e.g. ``solar#0``).
+            actions (list[int]): Discrete action set.
+            state_space (list[dict] | None): Declarative state space definition.
+            alpha (float): Learning rate for Q-learning updates.
+            gamma (float): Discount factor.
         """
         self.name = name
         self.actions = actions
@@ -34,9 +42,10 @@ class BaseAgent:
         self.state_space = state_space or []
  
     def get_dataset(self, field: str, index: int) -> None:
-        """
-        Update agent attributes with values and discretized states
-        from the dataset row at the given index.
+        """Return discretized value for a dataset field at a given index.
+
+        Also updates the agent's ``potential`` attribute with raw (continuous)
+        value which several agents later reuse in ``update_power``.
         """
 
         # Extract values from dataset row
@@ -47,9 +56,11 @@ class BaseAgent:
         return digitize_clip(row[field], self.env.power_bins)
 
     def get_discretized_state(self, env, index):
-        """
-        Build the discretized state tuple for this agent.
-        Iterates through self.state_space and applies logic depending on source.
+        """Construct the discretized state tuple for this agent.
+
+        Iterates over the declarative ``state_space`` configuration and pulls
+        values from either local dataset columns, environment global attributes
+        or internal indices.
         """
 
         state_values = []
@@ -85,6 +96,7 @@ class BaseAgent:
         return self.action
 
     def update_q_table(self, state, action, reward, next_state):
+        """One-step tabular Q-learning update."""
         q_values = self.q_table.setdefault(state, {a: 0.0 for a in self.actions})
         current_q = q_values[action]
         next_q_values = self.q_table.get(next_state, {a: 0.0 for a in self.actions})

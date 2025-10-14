@@ -1,26 +1,48 @@
-"""Simulation training loop for MARL emergent microgrid."""
+"""High-level training loop for the multi-agent microgrid.
+
+The current implementation performs an episodic tabular Q-learning procedure
+over a fixed historical dataset (no stochastic environment transitions beyond
+what the dataset provides). Each agent:
+
+1. Extracts a discretized local/global state tuple.
+2. Chooses an action via epsilon-greedy policy.
+3. Updates its internal power contribution through ``update_power``.
+4. Receives a scalar reward from its domain-specific ``calculate_reward``.
+5. Updates its tabular Q-values.
+
+Limitations / Future work:
+- Provide a proper environment ``step`` returning joint observations & rewards.
+- Support parallel environments or experience replay buffers.
+- Add termination conditions distinct from dataset exhaustion.
+- Decouple logging export from the loop with an event/callback system.
+"""
 
 import pandas as pd
 from core.environment import MultiAgentEnv
 from agents import instantiate_agents
+from core.utils import set_global_seed, build_logger
 
 EPSILON_MIN = 0
 
 def run_training(config):
-    """
-    Run a full multi-agent Q-learning training loop.
-
-    This function orchestrates the training process across multiple agents
-    (Solar, Wind, Battery, Grid, Load), updating the environment and Q-tables
-    at each step and saving per-episode results.
+    """Execute multi-agent tabular Q-learning.
 
     Args:
-        config (dict): Full configuration loaded from YAML/JSON.
+        config (dict): Full configuration structure loaded from YAML.
 
     Returns:
-        agents (dict): Dictionary of trained agents.
-        results (list[pd.DataFrame]): List of per-episode DataFrames with logs.
+        tuple:
+            agents (dict[str, BaseAgent]): Mapping agent name -> trained agent.
+            results (list[pd.DataFrame]): Per-episode step-wise log DataFrames.
+
+    Side Effects:
+        Writes CSV evolution logs into ``results/evolution``.
     """
+    # Seeding & logger
+    seed = config.get("simulation", {}).get("seed", 42)
+    set_global_seed(seed)
+    logger = build_logger()
+
     env = MultiAgentEnv(config)
     agents = instantiate_agents(config, env)
 
@@ -119,7 +141,7 @@ def run_training(config):
                     reward = agent.calculate_reward(state_tuple)
 
                 # Q-learning update
-                #agent.update_q_table(state_tuple, agent.action, reward, next_state_tuple)
+                agent.update_q_table(state_tuple, agent.action, reward, next_state_tuple)
 
                 # Log per-agent values
                 step_record[f"reward_{name}"] = reward
@@ -137,6 +159,6 @@ def run_training(config):
         episode_df.to_csv(f"results/evolution/episode_{episode}.csv", index=False)
         results.append(episode_df)
 
-        print(f"Episode {episode+1}/{num_episodes} completed, epsilon={epsilon:.3f}")
+        logger.info(f"Episode {episode+1}/{num_episodes} completed | epsilon={epsilon:.3f}")
 
     return agents, results

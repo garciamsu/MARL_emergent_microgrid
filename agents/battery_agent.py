@@ -6,8 +6,8 @@ from utils.discretization import digitize_clip
 
 @register_agent("battery")
 class BatteryAgent(BaseAgent):
-    def __init__(self, env,  name="battery",capacity_ah=3, num_battery_soc_bins=5, **kwargs):
-        super().__init__(env, name, [0, 1, 2])
+    def __init__(self, env,  name="battery",capacity_ah=3, num_battery_soc_bins=5, state_space=None, **kwargs):
+        super().__init__(env, name, [0, 1, 2], state_space=state_space, **kwargs)
         self.capacity_ah = capacity_ah
         self.soc = 0.5
         self.soc_max = 1
@@ -15,12 +15,6 @@ class BatteryAgent(BaseAgent):
 
     def update_power(self, env):
         self.power = self.potential * self.action
-
-    def get_discretized_state(self, env, index):
-        self.idx = digitize_clip(self.soc, self.battery_soc_bins)
-        total_idx = digitize_clip(env.total_power, env.power_bins)
-        demand_idx = env.demand_power_idx
-        return (self.idx, demand_idx, total_idx)
 
     def initialize_q_table(self, env):
         states = [
@@ -31,7 +25,7 @@ class BatteryAgent(BaseAgent):
         ]
         self.q_table = {s: {a: 0.0 for a in self.actions} for s in states}
 
-    def calculate_reward(self, demand_idx, total_idx):
+    def calculate_reward(self, state):
         """
         Calculate the reward for the Battery Agent based on its internal state (SOC),
         current action, and the system power balance.
@@ -67,8 +61,11 @@ class BatteryAgent(BaseAgent):
         beta = 1.0    # Penalty for invalid charge
         xi = 1.0      # Penalty for being idle during imbalance
 
+        print(state)
+        soc, demand_idx, total_idx = state
+
         # --- Derived variables ---
-        soc = self.idx
+        # soc = self.idx
         delta_p = total_idx - demand_idx
 
         # --- Case 1: Discharge (s_BAT = 2) ---

@@ -2,7 +2,24 @@ import random
 from utils.discretization import digitize_clip
 
 class BaseAgent:
-    def __init__(self, env, name, actions, alpha=0.1, gamma=0.9, **kwargs):
+    def __init__(self, env, name, actions, state_space=None, alpha=0.1, gamma=0.9, **kwargs):
+        """Agente base para todos los tipos de recursos.
+
+        Parameters
+        ----------
+        env : object
+            Referencia al entorno que contiene dataset y discretizaciones.
+        name : str
+            Identificador del agente.
+        actions : list
+            Lista de acciones discretas disponibles.
+        state_space : list | None
+            Definición del espacio de estados (lista de especificaciones) opcional.
+        alpha : float
+            Tasa de aprendizaje para Q-Learning.
+        gamma : float
+            Factor de descuento.
+        """
         self.name = name
         self.actions = actions
         self.alpha = alpha
@@ -13,6 +30,8 @@ class BaseAgent:
         self.idx = 0
         self.power = 0
         self.potential = 0
+        # Guarda la definición del espacio de estado si se provee, evita variable no definida
+        self.state_space = state_space or []
  
     def get_dataset(self, field: str, index: int) -> None:
         """
@@ -41,7 +60,14 @@ class BaseAgent:
                 var_name = f"{state['var']}_{self.name.split('#')[1]}"
                 value = self.get_dataset(var_name, index)
             elif state["source"] == "global":
+                # Use global index/state from environment
                 value = env.get_value(state["var"])
+            elif state["source"] == "self":
+                # Use agent's own index/state
+                value = self.idx
+            elif state["source"] == "external":
+                # Use external value from environment
+                value = getattr(env, state["var"])
             else:
                 # Use environment value
                 value = env.get_dataset(state["var"], index)

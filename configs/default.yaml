@@ -105,7 +105,7 @@ agents:
       type: DefaultWindReward
       params: {theta: 3, beta: 3}
     state_space:
-      - {var: wind_power, source: local,   bins: auto}
+      - {var: wind_power,  source: local,    bins: auto}
       - {var: demand,      source: env,     bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
@@ -122,9 +122,9 @@ agents:
       type: DefaultBatteryReward
       params: {sigma: 10, mu: 7}
     state_space:
-      - {var: soc,        source: self, bins: [0,0.2,0.4,0.6,0.8,1.0]}
-      - {var: P_dem,      source: env,  bins: auto}
-      - {var: P_tot,      source: env,  bins: auto}
+      - {var: soc,         source: self,    bins: [0,0.2,0.4,0.6,0.8,1.0]}
+      - {var: demand,      source: env,     bins: auto}
+      - {var: renewable,   source: global,  bins: auto}
     limits:
       capacity_ah: 3
       v_nom: 48
@@ -134,7 +134,7 @@ agents:
       p_discharge_max: 100
 
   grid:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.1
@@ -143,14 +143,15 @@ agents:
       type: DefaultGridReward
       params: {sigma: 6, mu: 3}
     state_space:
-      - {var: price, source: env, bins: auto}
-      - {var: demand, source: env, bins: auto}
+      - {var: soc_idx,  source: external, bins: auto}
+      - {var: demand,   source: env,      bins: auto}
+      - {var: total,    source: global,   bins: auto}
     limits:
       p_max: 1000
       export_allowed: true
 
   load:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.1
@@ -159,8 +160,9 @@ agents:
       type: DefaultLoadReward
       params: {sigma: 9, mu: 4}
     state_space:
-      - {var: demand,       source: env,  bins: auto}
-      - {var: comfort_idx,  source: self, categories: [acceptable, expensive]}
+      - {var: soc_idx,      source: external,  bins: auto}
+      - {var: demand,   source: env,      bins: auto}
+      - {var: renewable,   source: global,  bins: auto}
     limits:
       p_load: 200
       comfort_threshold: 6

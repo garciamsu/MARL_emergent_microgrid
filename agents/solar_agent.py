@@ -7,9 +7,8 @@ from utils.discretization import digitize_clip
 @register_agent("solar")
 class SolarAgent(BaseAgent):
     def __init__(self, env,  name="solar", state_space=None, **kwargs):
-        super().__init__(env, name, [0, 1])
+        super().__init__(env, name, [0, 1], state_space=state_space, **kwargs)
         self.solar_power_bins = np.linspace(0, self.env.max_value, self.env.num_power_bins)
-        self.state_space = state_space
 
     def update_power(self, env):
         self.power = self.potential * self.action

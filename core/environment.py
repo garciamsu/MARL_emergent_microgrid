@@ -45,6 +45,7 @@ class MultiAgentEnv:
         self.total_power = 0
         self.price = 0
         self.energy_balance = 0
+        self.soc_idx = 0
 
         # Discretized states
         self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.power_bins)

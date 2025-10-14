@@ -43,7 +43,7 @@ class GridAgent(BaseAgent):
         """
         soc_idx, demand_idx, total_idx = state
         delta_P = total_idx - demand_idx
-        print(state)
+
         # Reward parameters
         psi = 1.0
         sigma = 1.0

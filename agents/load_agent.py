@@ -7,16 +7,18 @@ class LoadAgent(BaseAgent):
     def __init__(self, env,  name="load", state_space=None, **kwargs):
         super().__init__(env,  name, actions=[0, 1], state_space=state_space, **kwargs)
         self.env = env
-        self.comfort_price = 0.5
-        self.market_price = 0
+        # Nuevo: extraer límites desde el config
+        self.limits = kwargs.get("limits", {})
+        # comfort_threshold definido en configs/default.yaml -> agents.load.limits.comfort_threshold
+        self.comfort_threshold = self.limits.get("comfort_threshold", 1)
+        self.market_price = 1
 
     def initialize_q_table(self, env):
-        states = []
-        comfort_labels = ["acceptable", "expensive"]
-        for demand_idx in range(len(env.power_bins)):
-            for c in comfort_labels:
-                states.append((demand_idx, c))
-            self.q_table = {state: {a: 0.0 for a in self.actions} for state in states}
+        states = [(s, d, t)
+                  for s in range(len(self.battery_soc_bins))
+                  for d in range(len(env.power_bins))
+                  for t in range(len(env.power_bins))]
+        self.q_table = {state: {a: 0.0 for a in self.actions} for state in states}
 
     def update_power(self, env):
         self.power = self.potential * self.action
@@ -46,9 +48,7 @@ class LoadAgent(BaseAgent):
                 Ri = β                             Otherwise
         """
         soc_idx, demand_idx, renewable_idx = state
-        market_cost = self.market_price
-        comfort_cost = self.comfort_price
-
+        market_cost = self.env.price
         # Reward parameters
         sigma = 1.0
         psi = 1.0
@@ -58,7 +58,7 @@ class LoadAgent(BaseAgent):
         # Conditional reward calculation
         if self.action == 1 and (soc_idx > 0 or renewable_idx > demand_idx):
             reward = sigma * market_cost
-        elif self.action == 1 and comfort_cost < market_cost:
+        elif self.action == 1 and self.comfort_threshold < market_cost:
             reward = -psi / market_cost
         elif self.action == 0 and (soc_idx > 0 or renewable_idx > demand_idx):
             reward = -nu * soc_idx * renewable_idx

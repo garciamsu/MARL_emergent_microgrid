@@ -61,7 +61,6 @@ class BatteryAgent(BaseAgent):
         beta = 1.0    # Penalty for invalid charge
         xi = 1.0      # Penalty for being idle during imbalance
 
-        print(state)
         soc, demand_idx, total_idx = state
 
         # --- Derived variables ---

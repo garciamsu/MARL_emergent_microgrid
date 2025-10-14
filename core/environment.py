@@ -85,6 +85,8 @@ class MultiAgentEnv:
 
         if field == "demand":
             self.demand_power = row[field] * self.scale_demand  # Update demand
+        if field == "price":
+            self.price = row[field] # Update price
 
         # Compute discretized states
         return digitize_clip(row[field], self.power_bins)

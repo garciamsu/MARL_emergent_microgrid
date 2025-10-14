@@ -57,6 +57,7 @@ def run_training(config):
 
             # Update environment with current demand
             env.get_dataset("demand", index)
+            env.get_dataset("price", index)
 
             # Initialize accumulators
             total_renewable = 0.0
@@ -117,7 +118,6 @@ def run_training(config):
                 except TypeError:
                     reward = agent.calculate_reward(state_tuple)
 
-                print(reward)
                 # Q-learning update
                 #agent.update_q_table(state_tuple, agent.action, reward, next_state_tuple)
 

@@ -53,6 +53,8 @@ def run_training(config):
     decay = epsilon_cfg.get("decay", "linear")
 
     results = []
+    # Simulation time step in hours (used for SOC integration)
+    dt_h = config.get("simulation", {}).get("dt_h", 1.0)
 
     for episode in range(num_episodes):
         env.reset()
@@ -100,11 +102,24 @@ def run_training(config):
                 else:
                     total_consumption += abs(agent.power)
 
+                # Update SOC for battery agents and publish discrete SOC to env
+                if agent.name.startswith("battery"):
+                    try:
+                        v_nom = getattr(agent, "v_nom", 48.0)
+                        agent.update_soc(agent.power, dt_h=dt_h, nominal_voltage=v_nom)
+                        env.soc_idx = agent.idx
+                    except AttributeError:
+                        # Agent may not implement update_soc yet
+                        pass
+
             # Step log: Per-agent variables (safe defaults if attribute is missing)
             for name, agent in agents.items():
                 step_record[f"potential_{name}"] = getattr(agent, "potential", None)
                 step_record[f"action_{name}"] = getattr(agent, "action", None)
                 step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
+                if name.startswith("battery"):
+                    step_record[f"soc_{name}"] = getattr(agent, "soc", None)
+                    step_record[f"soc_idx_{name}"] = getattr(agent, "idx", None)
 
             # Update environment global variables
             env.total_power = total_generation
@@ -159,6 +174,6 @@ def run_training(config):
         episode_df.to_csv(f"results/evolution/episode_{episode}.csv", index=False)
         results.append(episode_df)
 
-        logger.info(f"Episode {episode+1}/{num_episodes} completed | epsilon={epsilon:.3f}")
+    logger.info("Episode %d/%d completed | epsilon=%.3f", episode + 1, num_episodes, epsilon)
 
     return agents, results

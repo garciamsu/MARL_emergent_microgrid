@@ -75,8 +75,8 @@ class MultiAgentEnv:
         row = self.dataset.iloc[index]
         if field == "demand":
             self.demand_power = row[field] * self.scale_demand
-        if field == "price":
-            self.price = row[field]
+            self.price = row["price"]
+        
         return digitize_clip(row[field], self.power_bins)
 
     def get_value(self, var: str) -> int:

@@ -31,8 +31,8 @@ class LoadAgent(BaseAgent):
         The potential is the base demand from dataset.
         Power is negative (consumption convention).
         """
-        # Base demand from dataset
-        base_demand = env.demand_power
+        # Base demand from dataset (stored in env.base_demand)
+        base_demand = getattr(env, 'base_demand', 0.0)
         
         # Calculate actual demand based on action
         if self.action == 1:

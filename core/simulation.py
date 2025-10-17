@@ -81,13 +81,17 @@ def run_training(config):
             # Sequential update order: Renewables → Load → Battery → Grid
 
             # Load base demand and price from dataset
+            base_demand_from_dataset = env.dataset.iloc[index]["demand"] * env.scale_demand
             env.get_dataset("demand", index)
             env.get_dataset("price", index)
+            
+            # Store base demand for load agent to use
+            env.base_demand = base_demand_from_dataset
             
             # Reset power accumulators
             env.total_power = 0.0
             env.renewable_power = 0.0
-            env.demand_power = 0.0
+            env.demand_power = 0.0  # MUST reset to accumulate correctly
 
             # PHASE 1: Update renewable agents (solar, wind)
             for agent in agents.values():
@@ -136,8 +140,6 @@ def run_training(config):
 
             # Step log: Append environment globals at the end (preserve insertion order)
             step_record.update({
-                "env_total_generation": env.total_power,
-                "env_total_consumption": env.demand_power,
                 "env_total_renewable": env.renewable_power,
                 "env_total_power": env.total_power,
                 "env_demand_power": env.demand_power,

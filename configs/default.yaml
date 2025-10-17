@@ -10,16 +10,16 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 1
+  episodes: 1000
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case1.csv
 
   epsilon:
-    schedule: linear    # linear | exponential | constant | custom
+    schedule: exponential    # linear | exponential | constant | custom
     start: 1.0
-    end: 0.05
-    decay: 0.99
+    end: 0.01
+    decay: 0.997
     values: []          # only for custom
 
 validation:
@@ -82,11 +82,11 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.1
-      gamma: 0.9
+      alpha: 0.15
+      gamma: 0.95
     reward:
       type: DefaultSolarReward
-      params: {theta: 3, beta: 3}
+      params: {theta: 4, beta: 4}
     state_space:
       - {var: solar_power, source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -99,11 +99,11 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.1
-      gamma: 0.9
+      alpha: 0.15
+      gamma: 0.95
     reward:
       type: DefaultWindReward
-      params: {theta: 3, beta: 3}
+      params: {theta: 5, beta: 5}
     state_space:
       - {var: wind_power,  source: local,    bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -116,11 +116,11 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.1
-      gamma: 0.9
+      alpha: 0.15
+      gamma: 0.95
     reward:
       type: DefaultBatteryReward
-      params: {sigma: 10, mu: 7}
+      params: {sigma: 12, mu: 8}
     state_space:
       - {var: soc,         source: self,    bins: [0,0.2,0.4,0.6,0.8,1.0]}
       - {var: demand,      source: env,     bins: auto}
@@ -137,8 +137,8 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.1
-      gamma: 0.9
+      alpha: 0.15
+      gamma: 0.95
     reward:
       type: DefaultGridReward
       params: {sigma: 6, mu: 3}
@@ -154,11 +154,11 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.1
-      gamma: 0.9
+      alpha: 0.15
+      gamma: 0.95
     reward:
       type: DefaultLoadReward
-      params: {sigma: 9, mu: 4}
+      params: {sigma: 12, mu: 6}
     state_space:
       - {var: soc_idx,      source: external,  bins: auto}
       - {var: demand,   source: env,      bins: auto}

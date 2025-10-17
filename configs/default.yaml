@@ -78,6 +78,23 @@ metrics:
 
 agents:
 
+  load:
+    count: 1
+    policy:
+      type: tabular_ql
+      alpha: 0.1
+      gamma: 0.9
+    reward:
+      type: DefaultLoadReward
+      params: {sigma: 9, mu: 4}
+    state_space:
+      - {var: soc_idx,      source: external,  bins: auto}
+      - {var: demand,   source: env,      bins: auto}
+      - {var: renewable,   source: global,  bins: auto}
+    limits:
+      p_load: 200
+      comfort_threshold: 6
+
   solar:
     count: 1
     policy:
@@ -126,7 +143,7 @@ agents:
       - {var: demand,      source: env,     bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
-      capacity_ah: 3000
+      capacity_ah: 100
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
@@ -149,20 +166,3 @@ agents:
     limits:
       p_max: 1000
       export_allowed: true
-
-  load:
-    count: 1
-    policy:
-      type: tabular_ql
-      alpha: 0.1
-      gamma: 0.9
-    reward:
-      type: DefaultLoadReward
-      params: {sigma: 9, mu: 4}
-    state_space:
-      - {var: soc_idx,      source: external,  bins: auto}
-      - {var: demand,   source: env,      bins: auto}
-      - {var: renewable,   source: global,  bins: auto}
-    limits:
-      p_load: 200
-      comfort_threshold: 6

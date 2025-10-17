@@ -79,14 +79,11 @@ def run_training(config):
 
             # 3. Environment update based on agent actions
 
-            # Update environment with current demand
+            # Update environment
             env.get_dataset("demand", index)
             env.get_dataset("price", index)
-
-            # Initialize accumulators
-            total_renewable = 0.0
-            total_generation = 0.0
-            total_consumption = 0.0
+            env.total_power = 0.0
+            env.renewable_power = 0.0
 
             # Update power for each agent
             for agent in agents.values():
@@ -94,13 +91,13 @@ def run_training(config):
 
                 # Accumulate renewable generation (solar or wind)
                 if "solar" in agent.name.lower() or "wind" in agent.name.lower():
-                    total_renewable += agent.power
+                    env.renewable_power += agent.power
 
                 # Classify power as generation or consumption
                 if agent.power >= 0:
-                    total_generation += agent.power
+                    env.total_power += agent.power
                 else:
-                    total_consumption += abs(agent.power)
+                    env.demand_power += abs(agent.power)
 
                 # Update SOC for battery agents and publish discrete SOC to env
                 if agent.name.startswith("battery"):
@@ -122,16 +119,14 @@ def run_training(config):
                     step_record[f"soc_idx_{name}"] = getattr(agent, "idx", None)
 
             # Update environment global variables
-            env.total_power = total_generation
-            env.demand_power = max(env.demand_power + total_consumption, 0)
-            env.energy_balance = total_generation - total_consumption
+            env.energy_balance = env.total_power - env.demand_power
             env.delta_power_idx = "surplus" if env.energy_balance >= 0 else "deficit"
 
             # Step log: Append environment globals at the end (preserve insertion order)
             step_record.update({
-                "env_total_generation": total_generation,
-                "env_total_consumption": total_consumption,
-                "env_total_renewable": total_renewable,
+                "env_total_generation": env.total_power,
+                "env_total_consumption": env.demand_power,
+                "env_total_renewable": env.renewable_power,
                 "env_total_power": env.total_power,
                 "env_demand_power": env.demand_power,
                 "env_energy_balance": env.energy_balance,

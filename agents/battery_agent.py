@@ -44,16 +44,22 @@ class BatteryAgent(BaseAgent):
             - Magnitudes are clipped by p_charge_max / p_discharge_max.
             - A richer policy could modulate power with potentials or prices.
         """
-        if self.action == 1:  # charge
-            self.power = -abs(self.p_charge_max)
-        elif self.action == 2:  # discharge
-            self.power = +abs(self.p_discharge_max)
-        else:  # idle
-            self.power = 0.0
 
-        # 
+        if env.demand_power > env.renewable_power:
+            if self.action == 1:  # charge
+                self.power = -abs(env.demand_power - env.renewable_power)
+            elif self.action == 2:  # discharge
+                self.power = +abs(env.demand_power - env.renewable_power)
+            else:  # idle
+                self.power = 0.0
+        else:
+            if self.action == 1:  # charge
+                self.power = -abs(env.renewable_power - env.demand_power)
+            else:  # idle
+                self.power = 0.0
+
+        # Update environment with battery power
         self.update_soc(power_w=self.power)
-
 
     def update_soc(
             self,

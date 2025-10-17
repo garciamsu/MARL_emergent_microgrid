@@ -24,4 +24,7 @@ def instantiate_agents(config, env):
                 agent_type, env=env, name=name, policy=policy, reward_fn=reward_fn, **spec_clean
             )
             agents[name] = agent
+            # Inicializar Q-table basado en state_space declarado
+            if hasattr(agent, "initialize_q_table"):
+                agent.initialize_q_table(env)
     return agents

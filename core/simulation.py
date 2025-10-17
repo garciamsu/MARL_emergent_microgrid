@@ -22,6 +22,90 @@ from core.environment import MultiAgentEnv
 from agents import instantiate_agents
 from core.utils import set_global_seed, build_logger
 
+
+def make_epsilon_scheduler(cfg: dict, episodes: int):
+    """Construye un scheduler de epsilon a partir de la config.
+
+    Admite:
+    - schedule: linear | exponential | constant | custom
+    - start: valor inicial
+    - end: valor objetivo (linear y opcional en exponential)
+    - decay: factor (exponential). Si falta y hay end/start, se deriva para alcanzar end.
+    - min: clip inferior (por defecto end si existe, o 0.01)
+    - values: lista de tamaño >= episodes (custom). Si es más corta, se rellena con el último valor.
+    """
+    schedule = cfg.get("schedule", "linear").lower()
+    start = float(cfg.get("start", 1.0))
+    end_raw = cfg.get("end", None)
+    end = float(end_raw) if end_raw is not None else None
+    decay_raw = cfg.get("decay", None)
+    decay = float(decay_raw) if isinstance(decay_raw, (int, float, str)) and str(decay_raw).replace('.', '', 1).isdigit() else None
+    values = cfg.get("values", []) or []
+    min_eps = float(cfg.get("min", end if end is not None else 0.01))
+
+    # Normalización/validación simples
+    start = max(0.0, min(1.0, start))
+    if end is not None:
+        end = max(0.0, min(1.0, end))
+    min_eps = max(0.0, min(1.0, min_eps))
+
+    def clip(x: float) -> float:
+        return max(min_eps, min(1.0, float(x)))
+
+    if schedule == "linear":
+        # Si no hay end, usamos min_eps como objetivo
+        target = end if end is not None else min_eps
+
+        def f(t: int, _prev: float) -> float:
+            frac = (t + 1) / max(1, episodes)
+            return clip(start - (start - target) * frac)
+
+        return f
+
+    if schedule == "exponential":
+        if decay is None:
+            if end is not None and start > 0 and end > 0:
+                # Derivar decay para alcanzar end en 'episodes' pasos
+                decay_eff = (end / start) ** (1.0 / max(1, episodes))
+            else:
+                decay_eff = 0.99  # fallback sensato
+        else:
+            decay_eff = decay
+
+        def f(_t: int, prev: float) -> float:
+            base = prev if prev is not None else start
+            return clip(base * decay_eff)
+
+        return f
+
+    if schedule == "constant":
+        def f(_t: int, _prev: float) -> float:
+            return clip(start)
+
+        return f
+
+    if schedule == "custom":
+        series = [clip(v) for v in values]
+        if not series:
+            # Si no hay values, caemos a constante en start
+            series = [clip(start)] * episodes
+        if len(series) < episodes:
+            series = series + [series[-1]] * (episodes - len(series))
+
+        def f(t: int, _prev: float) -> float:
+            return series[min(t, len(series) - 1)]
+
+        return f
+
+    # Por defecto, lineal
+    target = end if end is not None else min_eps
+
+    def f(t: int, _prev: float) -> float:
+        frac = (t + 1) / max(1, episodes)
+        return clip(start - (start - target) * frac)
+
+    return f
+
 EPSILON_MIN = 0
 
 def run_training(config):
@@ -48,9 +132,8 @@ def run_training(config):
 
     num_episodes = config["simulation"]["episodes"]
     epsilon_cfg = config["simulation"].get("epsilon", {})
-    epsilon = epsilon_cfg.get("start", 1.0)
-    epsilon_min = epsilon_cfg.get("min", 0.05)
-    decay = epsilon_cfg.get("decay", "linear")
+    scheduler = make_epsilon_scheduler(epsilon_cfg, num_episodes)
+    epsilon = float(epsilon_cfg.get("start", 1.0))
 
     results = []
     # Simulation time step in hours (used for SOC integration)
@@ -158,11 +241,12 @@ def run_training(config):
                 state_tuple = state[name]
                 next_state_tuple = next_state[name]
 
-                # Call calculate_reward with unpacked state when applicable
-                try:
-                    reward = agent.calculate_reward(*state_tuple)
-                except TypeError:
-                    reward = agent.calculate_reward(state_tuple)
+                # Requiere reward_fn definido por YAML
+                if getattr(agent, "reward_fn", None) is None:
+                    raise RuntimeError(
+                        f"El agente {name} no tiene reward_fn configurado. Define 'agents.{agent.name.split('#')[0]}.reward' en el YAML."
+                    )
+                reward = agent.reward_fn.compute(agent, env, state_tuple)
 
                 # Q-learning update
                 agent.update_q_table(state_tuple, agent.action, reward, next_state_tuple)
@@ -172,11 +256,8 @@ def run_training(config):
 
             evolution.append(step_record)
 
-        # 6. Epsilon update
-        if decay == "linear":
-            epsilon = max(epsilon_min, epsilon - (1.0 - epsilon_min) / num_episodes)
-        elif decay == "exponential":
-            epsilon = max(epsilon_min, epsilon * 0.99)
+        # 6. Epsilon update (según scheduler configurado)
+        epsilon = scheduler(episode, epsilon)
 
         # 7. Save episode data
         episode_df = pd.DataFrame(evolution)

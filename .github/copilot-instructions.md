@@ -7,11 +7,11 @@
 
 ## Arquitectura esencial
 - `core/`:
-  - `environment.MultiAgentEnv` carga CSV de `assets/datasets/`, crea bins (`discretization.bins_power`) y expone índices discretizados (`get_value`, `get_dataset`). Usa `dt_h` para SOC.
+  - `environment.MultiAgentEnv` carga CSV de `assets/datasets/`, crea bins (`discretization.bins_power`) y expone índices discretizados (`get_value`, `get_dataset`). Usa `dt_h` (fijado a 1.0) para SOC.
   - `simulation.run_training` itera episodios y pasos; orden de actualización por paso: 1) `solar`/`wind` → 2) `load` → 3) `battery` → 4) `grid`.
   - `policies.TabularQL` (epsilon-greedy), `registry` (decoradores), `utils` (semilla+logger).
-- `agents/`: `BaseAgent` define `get_discretized_state`, `choose_action`, `update_q_table`. Agentes concretos implementan `update_power` y `calculate_reward` (la recompensa efectiva vive aquí).
-- Autoregistro: `agents/__init__.py` importa todos los `*_agent.py` del folder; basta con crear el archivo y anotar con `@register_agent`.
+- `agents/`: `BaseAgent` define `get_discretized_state`, `choose_action`, `update_q_table`. Las recompensas se consumen desde `reward_fn` (YAML) — no hay `calculate_reward` en los agentes. Q-table se inicializa con `initialize_q_table` a partir de `state_space`.
+- Autoregistro: `agents/__init__.py` importa todos los `*_agent.py`.
 
 ## Estado, acciones y acumuladores
 - `state_space` declarativo por agente: fuentes `local|env|global|self|external`.
@@ -22,20 +22,20 @@
 - Orden importa: la batería usa el balance preliminar (renovables − demanda) antes de que actúe la red.
 
 ## Configuración clave (`configs/default.yaml`)
-- `simulation`: `episodes`, `dt_h`, `seed`, `dataset`, `epsilon`.
-- `discretization.bins_power` usado por el entorno (las claves `power_bins` repetidas actualmente no se usan).
-- `agents.<tipo>`: `policy` (p.ej. `tabular_ql`), `state_space`, `limits`.
+- `simulation`: `episodes`, `dt_h=1.0` (validado), `seed`, `dataset`, `epsilon`.
+- `discretization.bins_power` (la clave `power_bins` repetida no se usa).
+- `agents.<tipo>`: `policy`, `state_space`, `limits`, `reward` (OBLIGATORIO ahora).
 
 ## Gotchas reales del código
-- Epsilon: el loop asigna `decay = epsilon_cfg.get('decay', 'linear')` y luego compara `decay` con cadenas (`"linear"|"exponential"`). Si en YAML `decay` es numérico (ej.: `0.997`), NO habrá decaimiento (no entra en ninguna rama) y, en caso de exponencial, usa fijo `0.99`. Soluciones: cambiar el código para respetar `schedule`+`decay`, o en YAML definir sólo `schedule` y ajustar el código; no confiar en `end`.
-- `reward_fn` del YAML se instancia pero NO se invoca; se usa `agent.calculate_reward(...)` de cada clase.
-- `initialize_q_table` existe pero no se usa; la Q-table se crea bajo demanda.
-- `dt_h` impacta SOC y límites efectivos por paso en batería; cambiarlo sin revisar `p_charge_max`/`p_discharge_max` puede saturar/ahogar SOC.
-- Bloques de config no utilizados hoy: `validation`, `stability`, `metrics`, parte de `io` (rutas de salida están codificadas como `results/...`). Documenta si empiezas a usarlos.
+- Epsilon: ahora se usa un scheduler según `simulation.epsilon.schedule` (`linear|exponential|constant|custom`) que respeta `start`, `end`, `decay`, `min` y `values` (sin 0.99 fijo). Si falta `decay` en `exponential` y hay `start/end`, se deriva; siempre se clippea a `min`.
+- Recompensas: el loop exige `reward_fn` y llama `reward_fn.compute(agent, env, state_tuple)`. Si falta, se lanza error indicando el bloque YAML requerido.
+- Q-table: se inicializa al instanciar cada agente con `initialize_q_table(env)` en base a `state_space`; si un estado no está, se lanza error (no hay creación bajo demanda).
+- `dt_h` está fijado a 1.0 por validación para evitar inconsistencias en la cinemática de la batería.
+- Bloques de config hoy no utilizados: `validation`, `stability`, `metrics`, parte de `io`.
 
 ## Patrones para extender
-- Nuevo agente: `agents/<name>_agent.py` con `@register_agent("<name>")`, heredar `BaseAgent`, implementar `update_power` y `calculate_reward`; agregar bloque en YAML con `state_space`, `limits`, `policy`. Nombrado de instancias: `<tipo>#<idx>`.
-- Al leer `local`, la columna debe incluir sufijo del índice (ej.: `wind_power_0`).
+- Nuevo agente: `agents/<name>_agent.py` con `@register_agent("<name>")`, heredar `BaseAgent`, implementar `update_power`; en YAML define `state_space`, `limits`, `policy`, `reward`.
+- Para `local`, incluye el sufijo de índice en el CSV (ej.: `wind_power_0`).
 
 ## Archivos de referencia
-`core/simulation.py`, `core/environment.py`, `agents/base_agent.py`, `agents/*_agent.py`, `core/policies.py`, `core/registry.py`, `configs/default.yaml`.
+`core/simulation.py`, `core/environment.py`, `agents/base_agent.py`, `agents/*_agent.py`, `core/policies.py`, `core/registry.py`, `core/rewards.py`, `configs/default.yaml`.

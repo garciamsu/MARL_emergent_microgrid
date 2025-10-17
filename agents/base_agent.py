@@ -1,5 +1,6 @@
 import random
 from utils.discretization import digitize_clip
+from itertools import product
 
 class BaseAgent:
     """Base class for all resource agents.
@@ -38,6 +39,8 @@ class BaseAgent:
         self.idx = 0
         self.power = 0
         self.potential = 0
+        # Recompensa inyectada desde configuración (si existe)
+        self.reward_fn = kwargs.get("reward_fn", None)
         # Guarda la definición del espacio de estado si se provee, evita variable no definida
         self.state_space = state_space or []
  
@@ -88,18 +91,59 @@ class BaseAgent:
         return tuple(state_values)
 
     def choose_action(self, state, epsilon=0.1):
+        # No crear estados bajo demanda: la Q-table debe haberse inicializado previamente
+        q_values = self.q_table.get(state)
+        if q_values is None:
+            raise KeyError(f"Estado {state} no está en la Q-table de {self.name}. Verifique initialize_q_table vs state_space.")
         if random.random() < epsilon:
             self.action = random.choice(self.actions)
         else:
-            q_values = self.q_table.get(state, {a: 0.0 for a in self.actions})
             self.action = max(q_values, key=q_values.get)
         return self.action
 
     def update_q_table(self, state, action, reward, next_state):
         """One-step tabular Q-learning update."""
-        q_values = self.q_table.setdefault(state, {a: 0.0 for a in self.actions})
+        q_values = self.q_table.get(state)
+        if q_values is None:
+            raise KeyError(f"Estado {state} no inicializado en Q-table de {self.name}.")
         current_q = q_values[action]
-        next_q_values = self.q_table.get(next_state, {a: 0.0 for a in self.actions})
+        next_q_values = self.q_table.get(next_state)
+        if next_q_values is None:
+            raise KeyError(f"Estado siguiente {next_state} no inicializado en Q-table de {self.name}.")
         max_next_q = max(next_q_values.values())
         new_q = current_q + self.alpha * (reward + self.gamma * max_next_q - current_q)
         self.q_table[state][action] = new_q
+
+    def initialize_q_table(self, env):
+        """Inicializa la Q-table a partir de la definición declarativa de state_space.
+
+        Para cada dimensión en state_space, determina la cardinalidad:
+        - bins es lista/tupla/ndarray -> len(bins)
+        - bins == 'auto' o ausente -> len(env.power_bins)
+        - Caso especial SOC: si var in {'soc','soc_idx'} y existe self.battery_soc_bins -> len(self.battery_soc_bins)
+        Construye el producto cartesiano de los rangos y crea entradas con 0.0.
+        """
+        dims = []
+        for desc in (self.state_space or []):
+            bins_decl = desc.get("bins", "auto")
+            var = desc.get("var")
+            source = desc.get("source")
+
+            # Caso especial SOC
+            if var in {"soc", "soc_idx"} and hasattr(self, "battery_soc_bins"):
+                cardinality = len(self.battery_soc_bins)
+            else:
+                if isinstance(bins_decl, (list, tuple)):
+                    cardinality = len(bins_decl)
+                else:
+                    # auto u otro valor -> usar bins de potencia del entorno
+                    cardinality = len(getattr(env, "power_bins", [])) or 1
+
+            dims.append(range(cardinality))
+
+        # Si no hay state_space, no hay estados discretos definidos
+        if not dims:
+            self.q_table = {}
+            return
+
+        self.q_table = {state: {a: 0.0 for a in self.actions} for state in product(*dims)}

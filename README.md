@@ -133,6 +133,16 @@ for cfg in configs/exp_*.yaml; do python main.py --config "$cfg"; done
 
 ---
 
+### Tiempo de paso (dt_h) [Importante]
+- En este proyecto `dt_h` está fijado a 1.0 h por validación (ver `configs/loader.py`). Cualquier valor distinto producirá un error de configuración.
+- Motivo: mantener estable la cinemática de la batería y evitar cambios implícitos en la energía transferida por paso (E_step = P · dt_h).
+- Si en el futuro necesitas permitir `dt_h ≠ 1.0`, considera implementar uno de estos modos en el arranque:
+  - physical: usa `P_max` tal cual (límite físico del hardware).
+  - per_step_invariant: `P_max_eff = P_max_base × (1.0 / dt_h)` para mantener Wh por paso constante.
+  - c_rate: `P_max_eff = c_rate_max × (capacity_ah × v_nom)`.
+
+---
+
 ## Logging y Reproducibilidad
 
 - Semilla global: `simulation.seed` (controla Python, NumPy y Torch si disponible).
@@ -163,7 +173,7 @@ Valida que un episodio corre y produce un DataFrame no vacío.
 ### Nuevo Agente
 1. Crear archivo en `agents/` con sufijo `_agent.py`.
 2. Decorar la clase con `@register_agent("nombre")`.
-3. Implementar al menos: `update_power`, `calculate_reward` y (opcional) `initialize_q_table`.
+3. Implementar al menos: `update_power`. La recompensa se define vía YAML en `agents.<tipo>.reward` y se consume desde `core/rewards.py`. La Q-table se inicializa automáticamente desde `state_space`.
 4. Añadir su bloque en `configs/default.yaml`.
 
 ### Personalizar Entorno
@@ -182,7 +192,7 @@ Cada entrada en `state_space` posee:
 
 ## Recompensas
 
-Actualmente hay lógica de recompensa dentro de cada agente. El archivo `core/rewards.py` ofrece una capa para factorizar y reutilizar definiciones (puede consolidarse en una fase siguiente). Se recomienda revisar señales de recompensa para evitar saturación (todos los pasos con el mismo valor).
+Las recompensas ahora se definen y consumen vía `core/rewards.py` según el YAML (`agents.<tipo>.reward`). No existe `calculate_reward` en los agentes.
 
 ---
 

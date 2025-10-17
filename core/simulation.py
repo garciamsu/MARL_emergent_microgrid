@@ -78,26 +78,48 @@ def run_training(config):
                 agent.choose_action(state[agent.name], epsilon)
 
             # 3. Environment update based on agent actions
+            # Sequential update order: Renewables → Load → Battery → Grid
 
-            # Update environment
+            # Load base demand and price from dataset
             env.get_dataset("demand", index)
             env.get_dataset("price", index)
+            
+            # Reset power accumulators
             env.total_power = 0.0
             env.renewable_power = 0.0
+            env.demand_power = 0.0
 
-            # Update power for each agent
+            # PHASE 1: Update renewable agents (solar, wind)
             for agent in agents.values():
-                agent.update_power(env)
-
-                # Accumulate renewable generation (solar or wind)
                 if "solar" in agent.name.lower() or "wind" in agent.name.lower():
+                    agent.update_power(env)
                     env.renewable_power += agent.power
-
-                # Classify power as generation or consumption
-                if agent.power >= 0:
                     env.total_power += agent.power
-                else:
+
+            # PHASE 2: Update load agent (can reduce demand)
+            for agent in agents.values():
+                if "load" in agent.name.lower():
+                    agent.update_power(env)
+                    # Load power is negative (consumption)
                     env.demand_power += abs(agent.power)
+
+            # PHASE 3: Update battery agent (reacts to balance)
+            for agent in agents.values():
+                if "battery" in agent.name.lower():
+                    agent.update_power(env)
+                    # Battery can charge (negative) or discharge (positive)
+                    if agent.power >= 0:
+                        env.total_power += agent.power
+                    else:
+                        env.demand_power += abs(agent.power)
+
+            # PHASE 4: Update grid agent (last resort)
+            for agent in agents.values():
+                if "grid" in agent.name.lower():
+                    agent.update_power(env)
+                    # Grid only imports (positive power)
+                    if agent.power > 0:
+                        env.total_power += agent.power
 
             # Step log: Per-agent variables (safe defaults if attribute is missing)
             for name, agent in agents.items():

@@ -11,6 +11,7 @@ class LoadAgent(BaseAgent):
         self.env = env
         self.limits = kwargs.get("limits", {})
         self.comfort_threshold = self.limits.get("comfort_threshold", 1)
+        self.p_load = self.limits.get("p_load", 200.0)  # Controllable load in W
         self.market_price = 1
 
     def initialize_q_table(self, env):
@@ -23,9 +24,26 @@ class LoadAgent(BaseAgent):
     def update_power(self, env):
         """Compute load consumption (positive demand contribution).
 
-        Current simplified mapping: potential * action.
+        Action semantics:
+            0 -> Shed controllable load (reduce consumption by p_load)
+            1 -> Full demand (consume all base demand from dataset)
+
+        The potential is the base demand from dataset.
+        Power is negative (consumption convention).
         """
-        self.power = self.potential * self.action
+        # Base demand from dataset
+        base_demand = env.demand_power
+        
+        # Calculate actual demand based on action
+        if self.action == 1:
+            # Full demand: base + controllable
+            self.potential = base_demand
+            self.power = -base_demand
+        else:  # action == 0
+            # Shed controllable load: only critical base load
+            self.potential = base_demand
+            controllable_demand = max(0, base_demand - self.p_load)
+            self.power = -controllable_demand
 
     def calculate_reward(self, state):
         """

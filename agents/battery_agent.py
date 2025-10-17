@@ -40,27 +40,56 @@ class BatteryAgent(BaseAgent):
             1 -> charge     -> power < 0 (consumption from grid/renewables)
             2 -> discharge  -> power > 0 (generation to the system)
 
-        Notes:
-            - Magnitudes are clipped by p_charge_max / p_discharge_max.
-            - A richer policy could modulate power with potentials or prices.
-            - Updates SOC and publishes discrete SOC index to environment.
+        The battery reacts to the preliminary balance between renewables and demand.
+        Power is clipped by physical constraints (SOC and max power rates).
         """
+        # Calculate preliminary balance (renewables - demand)
+        preliminary_balance = env.renewable_power - env.demand_power
 
-        if env.demand_power > env.renewable_power:
-            if self.action == 1:  # charge
-                self.power = -abs(env.demand_power - env.renewable_power)
-            elif self.action == 2:  # discharge
-                self.power = +abs(env.demand_power - env.renewable_power)
-            else:  # idle
-                self.power = 0.0
-        else:
-            if self.action == 1:  # charge
-                self.power = -abs(env.renewable_power - env.demand_power)
-            else:  # idle
-                self.power = 0.0
+        if self.action == 0:  # idle
+            self.power = 0.0
+            self.potential = 0.0
+
+        elif self.action == 1:  # charge
+            # Can charge when there's surplus (preliminary_balance > 0)
+            surplus = max(0, preliminary_balance)
+            
+            # Clip by maximum charge rate
+            max_charge_power = min(surplus, self.p_charge_max)
+            
+            # Clip by remaining capacity (prevent overcharge)
+            capacity_wh = self.capacity_ah * self.v_nom
+            dt_h = getattr(env, 'dt_h', 1.0)
+            max_energy_to_full = (self.soc_max - self.soc) * capacity_wh
+            max_charge_by_soc = max_energy_to_full / dt_h if dt_h > 0 else 0
+            
+            # Take minimum of all constraints
+            charge_power = min(max_charge_power, max_charge_by_soc)
+            
+            self.potential = surplus
+            self.power = -charge_power  # negative = charging
+
+        elif self.action == 2:  # discharge
+            # Can discharge when there's deficit (preliminary_balance < 0)
+            deficit = abs(min(0, preliminary_balance))
+            
+            # Clip by maximum discharge rate
+            max_discharge_power = min(deficit, self.p_discharge_max)
+            
+            # Clip by available energy (prevent overdischarge)
+            capacity_wh = self.capacity_ah * self.v_nom
+            dt_h = getattr(env, 'dt_h', 1.0)
+            max_energy_available = (self.soc - self.soc_min) * capacity_wh
+            max_discharge_by_soc = max_energy_available / dt_h if dt_h > 0 else 0
+            
+            # Take minimum of all constraints
+            discharge_power = min(max_discharge_power, max_discharge_by_soc)
+            
+            self.potential = deficit
+            self.power = discharge_power  # positive = discharging
 
         # Update SOC based on power and publish discrete SOC to environment
-        dt_h = getattr(env, 'dt_h', 1.0)  # Get time step from env, default 1.0h
+        dt_h = getattr(env, 'dt_h', 1.0)
         self.update_soc(power_w=self.power, dt_h=dt_h, nominal_voltage=self.v_nom)
         env.soc_idx = self.idx
 

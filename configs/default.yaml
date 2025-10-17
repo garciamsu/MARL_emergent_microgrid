@@ -130,8 +130,8 @@ agents:
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
-      p_charge_max: 100
-      p_discharge_max: 100
+      p_charge_max: 200
+      p_discharge_max: 200
 
   grid:
     count: 1
@@ -164,5 +164,5 @@ agents:
       - {var: demand,   source: env,      bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
-      p_load: 200
+      p_load: 10
       comfort_threshold: 6

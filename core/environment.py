@@ -23,6 +23,9 @@ class MultiAgentEnv:
         """
         csv_filename = config["simulation"]["dataset"]
         self.num_power_bins = config["discretization"]["bins_power"]
+        
+        # Simulation time step in hours (used for SOC integration)
+        self.dt_h = config.get("simulation", {}).get("dt_h", 1.0)
 
         # Load dataset and derive meta info
         self.dataset = self._load_data(csv_filename)

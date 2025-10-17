@@ -43,6 +43,7 @@ class BatteryAgent(BaseAgent):
         Notes:
             - Magnitudes are clipped by p_charge_max / p_discharge_max.
             - A richer policy could modulate power with potentials or prices.
+            - Updates SOC and publishes discrete SOC index to environment.
         """
 
         if env.demand_power > env.renewable_power:
@@ -58,8 +59,10 @@ class BatteryAgent(BaseAgent):
             else:  # idle
                 self.power = 0.0
 
-        # Update environment with battery power
-        self.update_soc(power_w=self.power)
+        # Update SOC based on power and publish discrete SOC to environment
+        dt_h = getattr(env, 'dt_h', 1.0)  # Get time step from env, default 1.0h
+        self.update_soc(power_w=self.power, dt_h=dt_h, nominal_voltage=self.v_nom)
+        env.soc_idx = self.idx
 
     def update_soc(
             self,

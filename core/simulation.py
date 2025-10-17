@@ -99,16 +99,6 @@ def run_training(config):
                 else:
                     env.demand_power += abs(agent.power)
 
-                # Update SOC for battery agents and publish discrete SOC to env
-                if agent.name.startswith("battery"):
-                    try:
-                        v_nom = getattr(agent, "v_nom", 48.0)
-                        agent.update_soc(agent.power, dt_h=dt_h, nominal_voltage=v_nom)
-                        env.soc_idx = agent.idx
-                    except AttributeError:
-                        # Agent may not implement update_soc yet
-                        pass
-
             # Step log: Per-agent variables (safe defaults if attribute is missing)
             for name, agent in agents.items():
                 step_record[f"potential_{name}"] = getattr(agent, "potential", None)

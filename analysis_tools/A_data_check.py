@@ -42,26 +42,40 @@ def validate_dataset(dataset_path: str) -> bool:
     print(f"   Filas: {len(df)}")
     print(f"   Columnas: {list(df.columns)}")
     
-    # Columnas requeridas
-    required_cols = ["demand", "solar", "wind"]
-    missing = [c for c in required_cols if c not in df.columns]
+    # Columnas requeridas - buscar con sufijos si es necesario
+    required_base = ["demand"]
+    optional_patterns = ["solar_power", "wind_power", "solar", "wind"]
+    
+    missing = [c for c in required_base if c not in df.columns]
     
     if missing:
-        print(f"❌ ERROR: Faltan columnas requeridas: {missing}")
+        print(f"❌ ERROR: Falta columna requerida 'demand'")
         return False
     
-    print(f"✅ Dataset válido con columnas requeridas: {required_cols}")
+    # Verificar que haya al menos una columna de generación renovable
+    renewable_cols = [c for c in df.columns if any(p in c for p in optional_patterns)]
+    
+    if not renewable_cols:
+        print(f"❌ ERROR: No se encontraron columnas de generación renovable (solar/wind)")
+        return False
+    
+    print(f"✅ Dataset válido con columnas encontradas:")
+    print(f"   - Demanda: demand")
+    print(f"   - Renovables: {renewable_cols}")
     
     # Verificar rangos
     if df["demand"].min() < 0:
         print(f"⚠️  ADVERTENCIA: Demanda tiene valores negativos (mín: {df['demand'].min()})")
     
-    if df["solar"].min() < 0 or df["wind"].min() < 0:
-        print(f"⚠️  ADVERTENCIA: Generación renovable tiene valores negativos")
+    # Verificar rangos de renovables dinámicamente
+    for col in renewable_cols:
+        if df[col].min() < 0:
+            print(f"⚠️  ADVERTENCIA: {col} tiene valores negativos")
     
-    print(f"   Demanda: rango [{df['demand'].min():.2f}, {df['demand'].max():.2f}] W")
-    print(f"   Solar: rango [{df['solar'].min():.2f}, {df['solar'].max():.2f}] W")
-    print(f"   Wind: rango [{df['wind'].min():.2f}, {df['wind'].max():.2f}] W")
+    print(f"\n📈 Rangos de valores:")
+    print(f"   Demanda: [{df['demand'].min():.2f}, {df['demand'].max():.2f}] W")
+    for col in renewable_cols:
+        print(f"   {col}: [{df[col].min():.2f}, {df[col].max():.2f}] W")
     
     return True
 
@@ -145,7 +159,11 @@ def main():
     
     # 1. Validar dataset
     dataset_name = config["simulation"]["dataset"]
-    dataset_path = os.path.join("assets", "datasets", f"{dataset_name}.csv")
+    # Si el nombre ya incluye .csv, no lo duplicamos
+    if dataset_name.endswith('.csv'):
+        dataset_path = os.path.join("assets", "datasets", dataset_name)
+    else:
+        dataset_path = os.path.join("assets", "datasets", f"{dataset_name}.csv")
     
     dataset_valid = validate_dataset(dataset_path)
     

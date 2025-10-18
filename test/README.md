@@ -54,6 +54,59 @@ Este directorio contiene los scripts de prueba diseñados para validar el compor
   ```
 - **Interpretación de Resultados**: Genera gráficos y análisis en `/output`, como histogramas, boxplots y mapas de calor. Estos reportes ayudan a evaluar el desempeño de los agentes.
 
+## Depuración de Recompensas
+
+### Módulo `reward_debug.py`
+El módulo `reward_debug.py` proporciona herramientas para depurar y entender el cálculo de recompensas de los agentes. Permite imprimir en consola los hiperparámetros, los inputs y una traza paso a paso del cálculo.
+
+### Uso
+Para utilizar el módulo, importe la función `explain_and_compute` en el script de prueba correspondiente. Ejemplo:
+
+```python
+from utils.reward_debug import explain_and_compute
+
+# Dentro del script de prueba
+reward_value = explain_and_compute(reward_fn, agent, env, state_tuple, step=True)
+```
+
+### Parámetros
+- **`reward_fn`**: La función de recompensa que se está depurando.
+- **`agent`**: El agente que ejecuta la acción.
+- **`env`**: El entorno en el que opera el agente.
+- **`state_tuple`**: El estado discreto del agente.
+- **`step`**: Si es `True`, activa el modo paso a paso, esperando la barra espaciadora para continuar.
+
+### Ejemplo de Salida
+```plaintext
+=== Depuración de recompensa: DefaultBatteryReward ===
+
+--- Hiperparámetros ---
+  theta: 0.5  # Ponderación para penalización por déficit renovable
+  beta: 0.3  # Ponderación para bonificación por excedente renovable
+
+--- Atributos del agente ---
+  soc_max: 1.0
+  action: 2
+
+--- Atributos del entorno (env) ---
+  demand_power: 50
+
+--- Inputs (state_tuple) ---
+  soc_idx: 3  # Índice discreto del estado de carga de la batería
+  demand_power_idx: 2  # Índice discreto de la demanda de potencia
+
+--- Tipo de recompensa no reconocido para trazado; usando compute() directo ---
+Resultado: -0.15
+```
+
+### Notas
+- El modo paso a paso (`step=True`) permite pausar la ejecución después de cada cálculo parcial, útil para analizar cada etapa del proceso.
+- Si se presiona `q`, la ejecución se interrumpe.
+
+### Recomendaciones
+- Utilice este módulo para validar que los cálculos de recompensa sean consistentes con las expectativas del modelo.
+- Combine esta herramienta con los scripts de prueba existentes para una depuración más efectiva.
+
 ## Notas Generales
 - **Requisitos Previos**: Asegúrese de que los archivos de entrada necesarios (CSV) estén presentes en el subdirectorio `/input`.
 - **Resultados**: Los resultados de cada prueba se guardan en el subdirectorio `/output`.

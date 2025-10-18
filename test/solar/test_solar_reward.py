@@ -11,6 +11,15 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from core.rewards import DefaultSolarReward
+# buscar el directorio test/utils (dos niveles arriba desde este archivo)
+_utils_dir = Path(__file__).resolve().parents[1] / 'utils'
+if str(_utils_dir) not in sys.path:
+    sys.path.insert(0, str(_utils_dir))
+from reward_debug import explain_and_compute, build_reward_from_config
+
+# Modo de ejecución: True => paso a paso (espera BARRA ESPACIADORA),
+# False => ejecución continua
+STEP_BY_STEP = True
 
 class _AgentStub:
     def __init__(self, action: int):
@@ -31,7 +40,7 @@ def run_test(input_path: Path, output_path: Path):
     data_frame = pd.read_csv(input_path, delimiter=',')
     rewards = []
 
-    reward_fn = DefaultSolarReward()
+    reward_fn = build_reward_from_config('solar', DefaultSolarReward)
     for _, row in data_frame.iterrows():
         agent = _AgentStub(action=int(row["action"]))
         # state_tuple: (solar_idx, demand_idx, renewable_idx)
@@ -40,7 +49,9 @@ def run_test(input_path: Path, output_path: Path):
             int(row["demand_power_idx"]),
             int(row["total_power_idx"])  # treat total as renewable aggregate
         )
-        reward = reward_fn.compute(agent, env=None, state_tuple=state_tuple)
+        reward = explain_and_compute(
+            reward_fn, agent, env=None, state_tuple=state_tuple, step=STEP_BY_STEP
+        )
         rewards.append(reward)
 
     data_frame["reward"] = rewards

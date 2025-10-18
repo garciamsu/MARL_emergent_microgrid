@@ -12,6 +12,15 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from core.rewards import DefaultBatteryReward
+# buscar el directorio test/utils (dos niveles arriba desde este archivo)
+_utils_dir = Path(__file__).resolve().parents[1] / 'utils'
+if str(_utils_dir) not in sys.path:
+    sys.path.insert(0, str(_utils_dir))
+from reward_debug import explain_and_compute, build_reward_from_config
+
+# Modo de ejecución: True => paso a paso (espera BARRA ESPACIADORA),
+# False => ejecución continua
+STEP_BY_STEP = True
 
 
 class _AgentStub:
@@ -33,7 +42,7 @@ def run_test(input_path: Path, output_path: Path):
     data_frame = pd.read_csv(input_path, delimiter=';')
     rewards = []
 
-    reward_fn = DefaultBatteryReward()
+    reward_fn = build_reward_from_config('battery', DefaultBatteryReward)
     max_soc_idx = max(int(data_frame["battery_soc_idx"].max()), 1)
 
     for _, row in data_frame.iterrows():
@@ -42,7 +51,9 @@ def run_test(input_path: Path, output_path: Path):
         agent = _AgentStub(action=int(row["action"]))
         # state_tuple: (soc, demand_idx, total_idx)
         state_tuple = (soc, int(row["demand_power_idx"]), int(row["total_power_idx"]))
-        reward = reward_fn.compute(agent, env=None, state_tuple=state_tuple)
+        reward = explain_and_compute(
+            reward_fn, agent, env=None, state_tuple=state_tuple, step=STEP_BY_STEP
+        )
         rewards.append(reward)
 
     data_frame["reward"] = rewards

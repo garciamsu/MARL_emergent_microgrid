@@ -11,6 +11,17 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from core.rewards import DefaultLoadReward
+# buscar el directorio test/utils (dos niveles arriba desde este archivo)
+_utils_dir = Path(__file__).resolve().parents[1] / 'utils'
+if str(_utils_dir) not in sys.path:
+    sys.path.insert(0, str(_utils_dir))
+from reward_debug import explain_and_compute, build_reward_from_config
+
+# Modo de ejecución: True => paso a paso (espera BARRA ESPACIADORA),
+# False => ejecución continua
+STEP_BY_STEP = True
+# Precio constante por defecto para env.price
+DEFAULT_PRICE = 1.0
 
 class _AgentStub:
     def __init__(self, action: int, comfort_threshold: float = 1):
@@ -31,7 +42,7 @@ def run_test(input_path: Path, output_path: Path):
     data_frame = pd.read_csv(input_path, delimiter=';')
     rewards = []
 
-    reward_fn = DefaultLoadReward()
+    reward_fn = build_reward_from_config('load', DefaultLoadReward)
     # Fake env with price attribute for reward function needs
     class _Env:
         def __init__(self, price):
@@ -40,14 +51,16 @@ def run_test(input_path: Path, output_path: Path):
     for _, row in data_frame.iterrows():
         agent = _AgentStub(action=int(row["action"]))
         # set a nominal price; not present in CSV, so use 1 as neutral
-        env = _Env(price=1)
+    env = _Env(price=DEFAULT_PRICE)
         # state_tuple: (soc_idx, demand_idx, renewable_idx)
         state_tuple = (
             int(row["battery_soc_idx"]),
             int(row.get("demand_power_idx", 0)),
             int(row["renewable_potential_idx"])
         )
-        reward = reward_fn.compute(agent, env=env, state_tuple=state_tuple)
+        reward = explain_and_compute(
+            reward_fn, agent, env=env, state_tuple=state_tuple, step=STEP_BY_STEP
+        )
         rewards.append(reward)
 
     data_frame["reward"] = rewards

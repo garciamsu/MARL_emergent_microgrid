@@ -2,24 +2,23 @@
 Grid reward testing script.
 Calculates rewards using the application's DefaultGridReward function.
 """
-from pathlib import Path
+
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 import pandas as pd
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
+from reward_debug import explain_and_compute, build_reward_from_config
 from core.rewards import DefaultGridReward
-# buscar el directorio test/utils (dos niveles arriba desde este archivo)
+
+# Ensure the test/utils directory is added to sys.path for imports
 _utils_dir = Path(__file__).resolve().parents[1] / 'utils'
 if str(_utils_dir) not in sys.path:
     sys.path.insert(0, str(_utils_dir))
-from reward_debug import explain_and_compute, build_reward_from_config
 
 # Modo de ejecución: True => paso a paso (espera BARRA ESPACIADORA),
 # False => ejecución continua
-STEP_BY_STEP = True
+STEP_BY_STEP = False
 
 
 class _AgentStub:
@@ -54,6 +53,9 @@ def run_test(input_path: Path, output_path: Path):
             reward_fn, agent, env=None, state_tuple=state_tuple, step=STEP_BY_STEP
         )
         rewards.append(reward)
+
+        # Log the reward calculation for debugging
+        print(f"State: {state_tuple}, Action: {agent.action}, Reward: {reward}")
 
     data_frame["reward"] = rewards
     output_path.parent.mkdir(parents=True, exist_ok=True)

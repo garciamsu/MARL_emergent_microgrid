@@ -2,25 +2,23 @@
 Battery reward testing script.
 Calculates rewards using the application's DefaultBatteryReward function.
 """
-from pathlib import Path
+
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 import pandas as pd
-
-# Ensure repository root is on sys.path for `import core.*`
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
+from reward_debug import explain_and_compute, build_reward_from_config
 from core.rewards import DefaultBatteryReward
-# buscar el directorio test/utils (dos niveles arriba desde este archivo)
+
+# Ensure the test/utils directory is added to sys.path for imports
 _utils_dir = Path(__file__).resolve().parents[1] / 'utils'
 if str(_utils_dir) not in sys.path:
     sys.path.insert(0, str(_utils_dir))
-from reward_debug import explain_and_compute, build_reward_from_config
 
 # Modo de ejecución: True => paso a paso (espera BARRA ESPACIADORA),
 # False => ejecución continua
-STEP_BY_STEP = True
+STEP_BY_STEP = False
 
 
 class _AgentStub:
@@ -50,11 +48,18 @@ def run_test(input_path: Path, output_path: Path):
         soc = float(row["battery_soc_idx"]) / float(max_soc_idx)
         agent = _AgentStub(action=int(row["action"]))
         # state_tuple: (soc, demand_idx, total_idx)
-        state_tuple = (soc, int(row["demand_power_idx"]), int(row["total_power_idx"]))
+        state_tuple = (
+            soc,
+            int(row["demand_power_idx"]),
+            int(row["total_power_idx"])
+        )
         reward = explain_and_compute(
             reward_fn, agent, env=None, state_tuple=state_tuple, step=STEP_BY_STEP
         )
         rewards.append(reward)
+
+        # Log the reward calculation for debugging
+        print(f"State: {state_tuple}, Action: {agent.action}, Reward: {reward}")
 
     data_frame["reward"] = rewards
     output_path.parent.mkdir(parents=True, exist_ok=True)

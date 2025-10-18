@@ -28,12 +28,23 @@ def _read_single_key():
     return ch_key
 
 
-def _wait_for_space():
+def _wait_for_space(skip_wait=False):
+    # If caller requested skip, or inner explains are suppressed, return immediately
+    if skip_wait or globals().get('_suppress_inner_waits', False):
+        print("[DEBUG] Skipping wait for space due to test mode.")
+        return True
+
     print("Presiona BARRA ESPACIADORA para continuar, 'q' para salir...", end='', flush=True)
     while True:
         k = _read_single_key()
         if k == ' ':
             print('')
+            # Call any registered callback for space press only if enabled
+            invoke = globals().get('_invoke_on_space_callback', True)
+            if invoke:
+                callback = globals().get('_on_space_callback')
+                if callable(callback):
+                    callback()
             return True
         if k.lower() == 'q':
             print('\nInterrumpido por usuario.')
@@ -136,20 +147,50 @@ def explain_and_compute(reward_fn, agent, env, state_tuple: Tuple, step: bool = 
         for i, val in enumerate(state_tuple):
             print(f"  [{i}]: {val}")
 
+    # Prepare concise summary callback (used when stepping)
+    def _print_summary():
+        val = globals().get('_last_computed_value')
+        if val is None:
+            return
+        print(f"State: {state_tuple}, Action: {getattr(agent, 'action', None)}, Reward: {val}")
+
+    # Ensure callback and invoke flag exist
+    globals()['_on_space_callback'] = None
+    globals()['_invoke_on_space_callback'] = True
+
+    # Disable inner waits (they should not trigger the final summary prompt)
+    if step:
+        globals()['_suppress_inner_waits'] = True
+
     # Dispatch por tipo de reward para replicar la lógica y mostrar pasos
     if cls_name == 'DefaultBatteryReward':
-        return _explain_battery(reward_fn, agent, env, state_tuple, step)
-    if cls_name == 'DefaultGridReward':
-        return _explain_grid(reward_fn, agent, env, state_tuple, step)
-    if cls_name == 'DefaultLoadReward':
-        return _explain_load(reward_fn, agent, env, state_tuple, step)
-    if cls_name == 'DefaultSolarReward' or cls_name == 'DefaultWindReward':
-        return _explain_solar_wind(reward_fn, agent, env, state_tuple, step)
+        val = _explain_battery(reward_fn, agent, env, state_tuple, step)
+    elif cls_name == 'DefaultGridReward':
+        val = _explain_grid(reward_fn, agent, env, state_tuple, step)
+    elif cls_name == 'DefaultLoadReward':
+        val = _explain_load(reward_fn, agent, env, state_tuple, step)
+    elif cls_name == 'DefaultSolarReward' or cls_name == 'DefaultWindReward':
+        val = _explain_solar_wind(reward_fn, agent, env, state_tuple, step)
+    else:
+        # Fallback: usar compute directo si no se reconoce el tipo
+        print("\n--- Tipo de recompensa no reconocido para trazado; usando compute() directo ---")
+        val = reward_fn.compute(agent, env, state_tuple)
+        print(f"Resultado: {val}")
 
-    # Fallback: usar compute directo si no se reconoce el tipo
-    print("\n--- Tipo de recompensa no reconocido para trazado; usando compute() directo ---")
-    val = reward_fn.compute(agent, env, state_tuple)
-    print(f"Resultado: {val}")
+    # store last computed value
+    globals()['_last_computed_value'] = val
+
+    # Print concise result before showing the final prompt (if stepping)
+    if step:
+        # Ensure inner waits were suppressed
+        globals()['_suppress_inner_waits'] = False
+        # show final prompt and concise summary will be triggered by space press
+        globals()['_on_space_callback'] = _print_summary
+        try:
+            _wait_for_space(skip_wait=False)
+        finally:
+            globals()['_on_space_callback'] = None
+
     return val
 
 

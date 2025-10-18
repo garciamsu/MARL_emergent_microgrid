@@ -83,6 +83,7 @@ def generate_reports(input_file: str, output_dir: Path):
     print(f"✅ Reports successfully generated in: {output_dir}")
 
 if __name__ == "__main__":
-    input_file = Path(__file__).parent / 'reports' / 'reward_grid.csv'
-    output_dir = Path(__file__).parent / 'reports'
+    input_file = Path(__file__).parent / 'output' / 'reward_grid.csv'
+    output_dir = Path(__file__).parent / 'output'
+    output_dir.mkdir(exist_ok=True)
     generate_reports(input_file, output_dir)

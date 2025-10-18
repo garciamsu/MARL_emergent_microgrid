@@ -1,10 +1,21 @@
 """
 Grid reward testing script.
-This script evaluates the reward calculation logic for the grid agent.
+Calculates rewards using the application's DefaultGridReward function.
 """
 from pathlib import Path
+import sys
 import pandas as pd
-from core.environment import GridAgent  # Importar la clase desde la aplicación principal
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from core.rewards import DefaultGridReward
+
+
+class _AgentStub:
+    def __init__(self, action: int):
+        self.action = action
 
 
 def run_test(input_path: Path, output_path: Path):
@@ -17,16 +28,20 @@ def run_test(input_path: Path, output_path: Path):
     if not input_path.exists():
         raise FileNotFoundError(f"Input file not found: {input_path}")
 
-    data_frame = pd.read_csv(input_path, delimiter=';')
+    # Grid CSV usa comas
+    data_frame = pd.read_csv(input_path, delimiter=',')
     rewards = []
 
+    reward_fn = DefaultGridReward()
     for _, row in data_frame.iterrows():
-        agent = GridAgent(idx=row["grid_power_idx"], action=row["action"])
-        reward = agent.calculate_reward(
-            renewable_potential_idx=row["renewable_potential_idx"],
-            total_power_idx=row["total_power_idx"],
-            demand_power_idx=row["demand_power_idx"]
+        agent = _AgentStub(action=int(row["action"]))
+        # state_tuple: (soc_idx, demand_idx, total_idx)
+        state_tuple = (
+            int(row["battery_soc_idx"]),
+            int(row["demand_power_idx"]),
+            int(row["total_power_idx"])
         )
+        reward = reward_fn.compute(agent, env=None, state_tuple=state_tuple)
         rewards.append(reward)
 
     data_frame["reward"] = rewards
@@ -36,8 +51,11 @@ def run_test(input_path: Path, output_path: Path):
 
 
 if __name__ == "__main__":
-    input_file = Path(__file__).parent / 'data' / 'Grid_Agent_Reward_Table.csv'
-    output_file = Path(__file__).parent / 'reports' / 'reward_grid.csv'
+    base = Path(__file__).parent / 'input'
+    cand1 = base / 'Grid_Agent_Reward_Table.csv'
+    cand2 = base / 'GridAgent_Reward_Table.csv'
+    input_file = cand1 if cand1.exists() else cand2
+    output_file = Path(__file__).parent / 'output' / 'reward_grid.csv'
 
     try:
         run_test(input_file, output_file)

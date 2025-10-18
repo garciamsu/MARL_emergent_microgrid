@@ -1,10 +1,22 @@
 """
 Load reward testing script.
-This script evaluates the reward calculation logic for the load agent.
+Calculates rewards using the application's DefaultLoadReward function.
 """
 from pathlib import Path
+import sys
 import pandas as pd
-from core.environment import LoadAgent  # Importar la clase desde la aplicación principal
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from core.rewards import DefaultLoadReward
+
+class _AgentStub:
+    def __init__(self, action: int, comfort_threshold: float = 1):
+        self.action = action
+        self.comfort_threshold = comfort_threshold
+
 
 def run_test(input_path: Path, output_path: Path):
     """
@@ -19,13 +31,23 @@ def run_test(input_path: Path, output_path: Path):
     data_frame = pd.read_csv(input_path, delimiter=';')
     rewards = []
 
+    reward_fn = DefaultLoadReward()
+    # Fake env with price attribute for reward function needs
+    class _Env:
+        def __init__(self, price):
+            self.price = price
+
     for _, row in data_frame.iterrows():
-        agent = LoadAgent(idx=row["load_power_idx"], action=row["action"])
-        reward = agent.calculate_reward(
-            renewable_potential_idx=row["renewable_potential_idx"],
-            total_power_idx=row["total_power_idx"],
-            demand_power_idx=row["demand_power_idx"]
+        agent = _AgentStub(action=int(row["action"]))
+        # set a nominal price; not present in CSV, so use 1 as neutral
+        env = _Env(price=1)
+        # state_tuple: (soc_idx, demand_idx, renewable_idx)
+        state_tuple = (
+            int(row["battery_soc_idx"]),
+            int(row.get("demand_power_idx", 0)),
+            int(row["renewable_potential_idx"])
         )
+        reward = reward_fn.compute(agent, env=env, state_tuple=state_tuple)
         rewards.append(reward)
 
     data_frame["reward"] = rewards
@@ -35,8 +57,11 @@ def run_test(input_path: Path, output_path: Path):
 
 
 if __name__ == "__main__":
-    input_file = Path(__file__).parent / 'data' / 'Load_Agent_Reward_Table.csv'
-    output_file = Path(__file__).parent / 'reports' / 'reward_load.csv'
+    base = Path(__file__).parent / 'input'
+    cand1 = base / 'Load_Agent_Reward_Table.csv'
+    cand2 = base / 'LoadAgent_Reward_Table.csv'
+    input_file = cand1 if cand1.exists() else cand2
+    output_file = Path(__file__).parent / 'output' / 'reward_load.csv'
 
     try:
         run_test(input_file, output_file)

@@ -1,10 +1,24 @@
 """
 Battery reward testing script.
-This script evaluates the reward calculation logic for the battery agent.
+Calculates rewards using the application's DefaultBatteryReward function.
 """
 from pathlib import Path
+import sys
 import pandas as pd
-from core.environment import BatteryAgent  # Importar la clase desde la aplicación principal
+
+# Ensure repository root is on sys.path for `import core.*`
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from core.rewards import DefaultBatteryReward
+
+
+class _AgentStub:
+    def __init__(self, action: int, soc_max: float = 1.0):
+        self.action = action
+        self.soc_max = soc_max
+
 
 def run_test(input_path: Path, output_path: Path):
     """
@@ -19,13 +33,16 @@ def run_test(input_path: Path, output_path: Path):
     data_frame = pd.read_csv(input_path, delimiter=';')
     rewards = []
 
+    reward_fn = DefaultBatteryReward()
+    max_soc_idx = max(int(data_frame["battery_soc_idx"].max()), 1)
+
     for _, row in data_frame.iterrows():
-        agent = BatteryAgent(idx=row["battery_soc_idx"], action=row["action"])
-        reward = agent.calculate_reward(
-            renewable_potential_idx=row["renewable_potential_idx"],
-            total_power_idx=row["total_power_idx"],
-            demand_power_idx=row["demand_power_idx"]
-        )
+        # Map discrete soc_idx → continuous soc in [0,1]
+        soc = float(row["battery_soc_idx"]) / float(max_soc_idx)
+        agent = _AgentStub(action=int(row["action"]))
+        # state_tuple: (soc, demand_idx, total_idx)
+        state_tuple = (soc, int(row["demand_power_idx"]), int(row["total_power_idx"]))
+        reward = reward_fn.compute(agent, env=None, state_tuple=state_tuple)
         rewards.append(reward)
 
     data_frame["reward"] = rewards
@@ -35,8 +52,8 @@ def run_test(input_path: Path, output_path: Path):
 
 
 if __name__ == "__main__":
-    input_file = Path(__file__).parent / 'data' / 'Battery_Agent_Reward_Table.csv'
-    output_file = Path(__file__).parent / 'reports' / 'reward_battery.csv'
+    input_file = Path(__file__).parent / 'input' / 'Battery_Agent_Reward_Table.csv'
+    output_file = Path(__file__).parent / 'output' / 'reward_battery.csv'
 
     try:
         run_test(input_file, output_file)

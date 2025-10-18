@@ -39,7 +39,7 @@ def generate_q_table(input_csv_path: str, output_json_path: str):
     print(f"✅ Q-table saved as: {output_json_path}")
 
 if __name__ == "__main__":
-    input_file = Path(__file__).parent / 'reports' / 'reward_load.csv'
-    output_file = Path(__file__).parent / 'reports' / 'load_q_table.json'
+    input_file = Path(__file__).parent / 'output' / 'reward_load.csv'
+    output_file = Path(__file__).parent / 'output' / 'load_q_table.json'
 
     generate_q_table(input_file, output_file)

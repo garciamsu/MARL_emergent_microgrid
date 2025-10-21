@@ -27,12 +27,10 @@ class DefaultSolarReward(RewardFn):
         wi = 1
         delta_abs = abs(renewable_idx - demand_idx)
         if agent.action == 1:
-            if renewable_idx < demand_idx:
-                return self.theta * wi * delta_abs
-            elif renewable_idx > demand_idx:
-                return -self.beta * wi * delta_abs
+            if renewable_idx <= demand_idx:
+                return -self.theta * wi * delta_abs
             else:
-                return self.xi
+                return self.beta * wi * delta_abs
         else:
             if renewable_idx > demand_idx:
                 return self.eta * wi * delta_abs
@@ -52,19 +50,21 @@ class DefaultWindReward(RewardFn):
 
     def compute(self, agent, env, state_tuple):
         wind_idx, demand_idx, renewable_idx = state_tuple
-        wi = (wind_idx / renewable_idx) if renewable_idx != 0 else 1.0
+        # wi = (wind_idx / renewable_idx) if renewable_idx != 0 else 1.0
+        wi = 1
         delta_abs = abs(renewable_idx - demand_idx)
         if agent.action == 1:
             if renewable_idx <= demand_idx:
-                return -self.theta * wi * delta_abs
+                return self.theta * wi * delta_abs
+            elif renewable_idx > demand_idx:
+                return -self.beta * wi * delta_abs
             else:
-                return self.beta * wi * delta_abs
+                return self.xi
         else:
             if renewable_idx > demand_idx:
-                return -self.eta * wi * delta_abs
+                return self.eta * wi * delta_abs
             else:
-                return self.xi * wi
-
+                return -self.xi
 
 @register_reward("DefaultBatteryReward")
 class DefaultBatteryReward(RewardFn):

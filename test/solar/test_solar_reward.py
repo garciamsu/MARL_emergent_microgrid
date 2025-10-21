@@ -14,11 +14,7 @@ from core.rewards import DefaultSolarReward
 _utils_dir = Path(__file__).resolve().parents[1] / 'utils'
 if str(_utils_dir) not in sys.path:
     sys.path.insert(0, str(_utils_dir))
-from reward_debug import explain_and_compute, build_reward_from_config
-
-# Modo de ejecución: True => paso a paso (espera BARRA ESPACIADORA),
-# False => ejecución continua
-STEP_BY_STEP = True
+from reward_debug import build_reward_from_config
 
 
 class _AgentStub:
@@ -37,7 +33,7 @@ def run_test(input_path: Path, output_path: Path):
         raise FileNotFoundError(f"Input file not found: {input_path}")
 
     # Solar CSV usa comas
-    data_frame = pd.read_csv(input_path, delimiter=',')
+    data_frame = pd.read_csv(input_path, delimiter=';')
     rewards = []
 
     reward_fn = build_reward_from_config('solar', DefaultSolarReward)
@@ -45,13 +41,12 @@ def run_test(input_path: Path, output_path: Path):
         agent = _AgentStub(action=int(row["action"]))
         # state_tuple: (solar_idx, demand_idx, renewable_idx)
         state_tuple = (
-            int(row["solar_potential_idx"]),
-            int(row["demand_power_idx"]),
-            int(row["total_power_idx"])  # treat total as renewable aggregate
+            int(row["solar_idx"]),
+            int(row["demand_idx"]),
+            int(row["renewable_idx"])  # treat total as renewable aggregate
         )
-        reward = explain_and_compute(
-            reward_fn, agent, env=None, state_tuple=state_tuple, step=STEP_BY_STEP
-        )
+        # Direct reward calculation
+        reward = reward_fn.compute(agent, env=None, state_tuple=state_tuple)
         rewards.append(reward)
 
         # Log the reward calculation for debugging

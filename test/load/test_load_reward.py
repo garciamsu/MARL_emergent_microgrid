@@ -5,9 +5,11 @@ Calculates rewards using the application's DefaultLoadReward function.
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-import pandas as pd
-from reward_debug import explain_and_compute, build_reward_from_config
+
+# Reordered imports
 from core.rewards import DefaultLoadReward
+import pandas as pd
+from reward_debug import build_reward_from_config
 
 # Ensure the test/utils directory is added to sys.path for imports
 _utils_dir = Path(__file__).resolve().parents[1] / 'utils'
@@ -39,24 +41,17 @@ def run_test(input_path: Path, output_path: Path):
     data_frame = pd.read_csv(input_path, delimiter=';')
     rewards = []
 
+    # Adjusted reward function initialization
     reward_fn = build_reward_from_config('load', DefaultLoadReward)
-    # Fake env with price attribute for reward function needs
-    class _Env:
-        def __init__(self, price):
-            self.price = price
-
     for _, row in data_frame.iterrows():
         agent = _AgentStub(action=int(row["action"]))
-        env = _Env(price=DEFAULT_PRICE)
-        # state_tuple: (soc_idx, demand_idx, renewable_idx)
         state_tuple = (
-            int(row["load_soc_idx"]),
-            int(row["demand_power_idx"]),
+            int(row["soc_idx"]),
+            int(row["demand_idx"]),
             int(row["renewable_potential_idx"])
         )
-        reward = explain_and_compute(
-            reward_fn, agent, env=env, state_tuple=state_tuple, step=STEP_BY_STEP
-        )
+        # Direct reward calculation without explain_and_compute
+        reward = reward_fn.compute(agent, env=None, state_tuple=state_tuple)
         rewards.append(reward)
 
         # Log the reward calculation for debugging

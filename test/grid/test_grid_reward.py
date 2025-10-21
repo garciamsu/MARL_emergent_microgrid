@@ -7,8 +7,9 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+# Adjusted import order to resolve linting issues
 import pandas as pd
-from reward_debug import explain_and_compute, build_reward_from_config
+from reward_debug import build_reward_from_config
 from core.rewards import DefaultGridReward
 
 # Ensure the test/utils directory is added to sys.path for imports
@@ -49,9 +50,8 @@ def run_test(input_path: Path, output_path: Path):
             int(row["demand_power_idx"]),
             int(row["total_power_idx"])
         )
-        reward = explain_and_compute(
-            reward_fn, agent, env=None, state_tuple=state_tuple, step=STEP_BY_STEP
-        )
+        reward = reward_fn(agent, state_tuple=state_tuple)
+
         rewards.append(reward)
 
         # Log the reward calculation for debugging

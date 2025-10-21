@@ -7,8 +7,9 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+# Adjusted import order to resolve linting issues
 import pandas as pd
-from reward_debug import explain_and_compute, build_reward_from_config
+from reward_debug import build_reward_from_config
 from core.rewards import DefaultBatteryReward
 
 # Ensure the test/utils directory is added to sys.path for imports

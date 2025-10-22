@@ -174,7 +174,7 @@ def run_training(config):
             # Reset power accumulators
             env.total_power = 0.0
             env.renewable_power = 0.0
-            env.demand_power = 0.0  # MUST reset to accumulate correctly
+            # env.demand_power = 0.0  # MUST reset to accumulate correctly
 
             # PHASE 1: Update renewable agents (solar, wind)
             for agent in agents.values():
@@ -213,6 +213,7 @@ def run_training(config):
                 step_record[f"potential_{name}"] = getattr(agent, "potential", None)
                 step_record[f"action_{name}"] = getattr(agent, "action", None)
                 step_record[f"power_{name}"] = getattr(agent, "power", 0.0)
+                step_record[f"idx_{name}"] = getattr(agent, "idx", 0)
                 if name.startswith("battery"):
                     step_record[f"soc_{name}"] = getattr(agent, "soc", None)
                     step_record[f"soc_idx_{name}"] = getattr(agent, "idx", None)
@@ -226,6 +227,7 @@ def run_training(config):
                 "env_total_renewable": env.renewable_power,
                 "env_total_power": env.total_power,
                 "env_demand_power": env.demand_power,
+                "env_demand_power_idx": env.demand_power_idx,
                 "env_energy_balance": env.energy_balance,
                 "env_delta_power_idx": env.delta_power_idx,
             })

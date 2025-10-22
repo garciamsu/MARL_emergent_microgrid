@@ -4,6 +4,7 @@ from agents.base_agent import BaseAgent
 from core.registry import register_agent
 from utils.discretization import digitize_clip
 
+
 @register_agent("solar")
 class SolarAgent(BaseAgent):
     """Binary action solar generation agent.
@@ -20,5 +21,6 @@ class SolarAgent(BaseAgent):
     def update_power(self, env):
         """Compute instantaneous solar power from potential and chosen action."""
         self.power = self.potential * self.action
+        self.idx = digitize_clip(self.power, env.power_bins)
 
     # Q-table se inicializa en BaseAgent.initialize_q_table según state_space

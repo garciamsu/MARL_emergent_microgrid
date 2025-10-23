@@ -27,7 +27,7 @@ class DefaultSolarReward(RewardFn):
         wi = 1
         delta_abs = abs(renewable_idx - demand_idx)
         if agent.action == 1:
-            if renewable_idx <= demand_idx:
+            if renewable_idx < demand_idx:
                 return -self.theta * wi * delta_abs
             else:
                 return self.beta * wi * delta_abs

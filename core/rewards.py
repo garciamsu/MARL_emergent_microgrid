@@ -54,12 +54,10 @@ class DefaultWindReward(RewardFn):
         wi = 1
         delta_abs = abs(renewable_idx - demand_idx)
         if agent.action == 1:
-            if renewable_idx <= demand_idx:
-                return self.theta * wi * delta_abs
-            elif renewable_idx > demand_idx:
-                return -self.beta * wi * delta_abs
+            if renewable_idx < demand_idx:
+                return -self.theta * wi * delta_abs
             else:
-                return self.xi
+                return self.beta * wi * delta_abs
         else:
             if renewable_idx > demand_idx:
                 return self.eta * wi * delta_abs
@@ -78,6 +76,7 @@ class DefaultBatteryReward(RewardFn):
         self.xi = xi
 
     def compute(self, agent, env, state_tuple):
+        print(state_tuple)
         soc, demand_idx, total_idx = state_tuple
         delta_p = total_idx - demand_idx
         if agent.action == 2 and delta_p < 0 and soc > 0:

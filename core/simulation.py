@@ -21,6 +21,7 @@ import pandas as pd
 from core.environment import MultiAgentEnv
 from agents import instantiate_agents
 from core.utils import set_global_seed, build_logger
+from utils.discretization import digitize_clip
 
 
 def make_epsilon_scheduler(cfg: dict, episodes: int):

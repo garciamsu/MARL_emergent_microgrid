@@ -30,12 +30,20 @@ class MultiAgentEnv:
         # Load dataset and derive meta info
         self.dataset = self._load_data(csv_filename)
         self.max_steps = len(self.dataset)
-        self.max_value = (
-            self.dataset.drop(columns="price")
+
+        # Excluir columnas no deseadas
+        excluded_columns = ["price", "demand", "Datetime"]
+
+        # Calcular la suma fila por fila, descartando las columnas excluidas
+        row_sums = (
+            self.dataset.drop(columns=excluded_columns)
             .apply(pd.to_numeric, errors="coerce")
-            .max()
-            .max()
+            .sum(axis=1)
         )
+
+        # Obtener el valor máximo de las sumas de filas
+        self.max_value = row_sums.max()
+        print(f"Máximo valor calculado en dataset: {self.max_value}")
 
         self.power_bins = np.linspace(0, self.max_value, self.num_power_bins)
         self.reset()

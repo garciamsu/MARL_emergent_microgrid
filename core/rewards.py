@@ -76,7 +76,7 @@ class DefaultBatteryReward(RewardFn):
         self.xi = xi
 
     def compute(self, agent, env, state_tuple):
-        print(state_tuple)
+        
         soc, demand_idx, total_idx = state_tuple
         delta_p = total_idx - demand_idx
         if agent.action == 2 and delta_p < 0 and soc > 0:

@@ -10,13 +10,13 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 1000
+  episodes: 1
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case1.csv
 
   epsilon:
-    schedule: exponential    # linear | exponential | constant | custom
+    schedule: linear    # linear | exponential | constant | custom
     start: 1.0
     end: 0.01
     decay: 0.997
@@ -118,13 +118,13 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultBatteryReward
-      params: {psi: 1, sigma: 5, nu: 1, beta: 1, xi: 1}
+      params: {psi: 1, sigma: 1, nu: 1, beta: 1, xi: 1}
     state_space:
       - {var: soc,         source: self,    bins: [0,0.2,0.4,0.6,0.8,1.0]}
       - {var: demand,      source: env,     bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
-      capacity_ah: 100
+      capacity_ah: 3
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0

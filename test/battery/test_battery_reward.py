@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # Adjusted import order to resolve linting issues
 import pandas as pd
-from reward_debug import build_reward_from_config
 from core.rewards import DefaultBatteryReward
 
 # Ensure the test/utils directory is added to sys.path for imports
@@ -17,9 +16,11 @@ _utils_dir = Path(__file__).resolve().parents[1] / 'utils'
 if str(_utils_dir) not in sys.path:
     sys.path.insert(0, str(_utils_dir))
 
-# Modo de ejecución: True => paso a paso (espera BARRA ESPACIADORA),
-# False => ejecución continua
-STEP_BY_STEP = False
+# Import debug helpers from test/utils after ensuring the directory is on sys.path
+from reward_debug import build_reward_from_config, explain_and_compute
+
+# NOTE: La lógica de ejecución paso a paso ha sido eliminada; el script
+# siempre ejecuta en modo continuo.
 
 
 class _AgentStub:
@@ -55,7 +56,7 @@ def run_test(input_path: Path, output_path: Path):
             int(row["total_power_idx"])
         )
         reward = explain_and_compute(
-            reward_fn, agent, env=None, state_tuple=state_tuple, step=STEP_BY_STEP
+            reward_fn, agent, env=None, state_tuple=state_tuple
         )
         rewards.append(reward)
 

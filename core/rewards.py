@@ -68,7 +68,7 @@ class DefaultWindReward(RewardFn):
 class DefaultBatteryReward(RewardFn):
     """Replica la lógica de BatteryAgent.calculate_reward."""
 
-    def __init__(self, psi=1.0, sigma=5.0, nu=1.0, beta=1.0, xi=1.0, **kwargs):
+    def __init__(self, psi=1.0, sigma=1.0, nu=1.0, beta=1.0, xi=1.0, **kwargs):
         self.psi = psi
         self.sigma = sigma
         self.nu = nu

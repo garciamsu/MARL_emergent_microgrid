@@ -32,9 +32,7 @@ validation:
 # ==============================================================
 
 discretization:
-  bins_power: 7
-  power_bins: auto
-  power_bins: auto
+  power_bins: 10
 
 # ==============================================================
 # Stability definition

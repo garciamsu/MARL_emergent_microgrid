@@ -175,12 +175,14 @@ def run_training(config):
             # Reset power accumulators
             env.total_power = 0.0
             env.renewable_power = 0.0
+            env.renewable_potential = 0.0
             # env.demand_power = 0.0  # MUST reset to accumulate correctly
 
             # PHASE 1: Update renewable agents (solar, wind)
             for agent in agents.values():
                 if "solar" in agent.name.lower() or "wind" in agent.name.lower():
                     agent.update_power(env)
+                    env.renewable_potential += agent.potential
                     env.renewable_power += agent.power
                     env.total_power += agent.power
 
@@ -223,10 +225,20 @@ def run_training(config):
             env.energy_balance = env.total_power - env.demand_power
             env.delta_power_idx = "surplus" if env.energy_balance >= 0 else "deficit"
 
+            # Update discretized indices    
+            env.renewable_potential_idx = digitize_clip(env.renewable_potential, env.power_bins)
+            env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
+            env.demand_power_idx = digitize_clip(env.demand_power, env.power_bins)
+            env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
+
             # Step log: Append environment globals at the end (preserve insertion order)
             step_record.update({
+                "env_renewable_potential": env.renewable_potential,
+                "env_renewable_potential_idx": env.renewable_potential_idx,
                 "env_total_renewable": env.renewable_power,
+                "env_total_renewable_idx": env.renewable_power_idx,
                 "env_total_power": env.total_power,
+                "env_total_power_idx": env.total_power_idx,
                 "env_demand_power": env.demand_power,
                 "env_demand_power_idx": env.demand_power_idx,
                 "env_energy_balance": env.energy_balance,

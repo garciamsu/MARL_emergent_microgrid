@@ -22,7 +22,7 @@ class MultiAgentEnv:
                 ``discretization.bins_power``.
         """
         csv_filename = config["simulation"]["dataset"]
-        self.num_power_bins = config["discretization"]["bins_power"]
+        self.num_power_bins = config["discretization"]["power_bins"]
         
         # Simulation time step in hours (used for SOC integration)
         self.dt_h = config.get("simulation", {}).get("dt_h", 1.0)

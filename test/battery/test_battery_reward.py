@@ -22,12 +22,10 @@ from reward_debug import build_reward_from_config, explain_and_compute
 # NOTE: La lógica de ejecución paso a paso ha sido eliminada; el script
 # siempre ejecuta en modo continuo.
 
-
 class _AgentStub:
     def __init__(self, action: int, soc_max: float = 1.0):
         self.action = action
         self.soc_max = soc_max
-
 
 def run_test(input_path: Path, output_path: Path):
     """
@@ -43,25 +41,23 @@ def run_test(input_path: Path, output_path: Path):
     rewards = []
 
     reward_fn = build_reward_from_config('battery', DefaultBatteryReward)
-    max_soc_idx = max(int(data_frame["battery_soc_idx"].max()), 1)
 
     for _, row in data_frame.iterrows():
-        # Map discrete soc_idx → continuous soc in [0,1]
-        soc = float(row["battery_soc_idx"]) / float(max_soc_idx)
+        # Map discrete soc_idx
+        soc_idx = float(row["battery_soc_idx"])
         agent = _AgentStub(action=int(row["action"]))
         # state_tuple: (soc, demand_idx, total_idx)
         state_tuple = (
-            soc,
+            soc_idx,
             int(row["demand_power_idx"]),
             int(row["total_power_idx"])
         )
-        reward = explain_and_compute(
-            reward_fn, agent, env=None, state_tuple=state_tuple
-        )
+        # Direct reward calculation
+        reward = reward_fn.compute(agent, env=None, state_tuple=state_tuple)
         rewards.append(reward)
 
         # Log the reward calculation for debugging
-        print(f"State: {state_tuple}, Action: {agent.action}, Reward: {reward}")
+        # print(f"State: {state_tuple}, Action: {agent.action}, Reward: {reward}")
 
     data_frame["reward"] = rewards
     output_path.parent.mkdir(parents=True, exist_ok=True)

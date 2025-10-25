@@ -1,0 +1,3 @@
+timestamp,agent,input_file,steps,mean_balance,IAE,ISE,variability,total_reward,fitness_score
+2025-10-25T03:33:06.165024+00:00,battery,test/battery/output/reward_battery.csv,5145,0.0,11760.0,41160.0,2.8284271247461903,833.0,0.45226263931787597
+2025-10-25T03:33:58.325999+00:00,battery,test/battery/output/reward_battery.csv,5145,0.0,11760.0,41160.0,2.8284271247461903,833.0,0.45226263931787597

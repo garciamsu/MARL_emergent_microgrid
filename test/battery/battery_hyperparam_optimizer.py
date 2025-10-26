@@ -79,8 +79,8 @@ DATASET_FILE = os.path.join(PROJECT_ROOT, "test/battery/output/reward_battery.cs
 OUTPUT_DIR   = os.path.join(PROJECT_ROOT, "test/battery/output/")
 DEFAULT_YAML = os.path.join(PROJECT_ROOT, "configs/default.yaml")
 
-OPTIMIZATION_METHOD = "random_search"  # "random_search" | "bayesian" | "evolutionary"
-MAX_ITERATIONS = 100
+OPTIMIZATION_METHOD = "bayesian"  # "random_search" | "bayesian" | "evolutionary"
+MAX_ITERATIONS = 500
 POP_SIZE = 24
 MUTATION_RATE = 0.2
 CROSSOVER_RATE = 0.7

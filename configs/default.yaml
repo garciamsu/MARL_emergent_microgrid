@@ -10,7 +10,7 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 1
+  episodes: 1000
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case1.csv

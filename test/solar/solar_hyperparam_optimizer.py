@@ -6,8 +6,11 @@ solar_hyperparam_optimizer.py
 Hyperparameter optimizer for SolarAgent reward function.
 """
 
-import os, time, math, random, yaml
-#!/usr/bin/env python3
+import os, sys, time, math, random, yaml
+
+# Add project root to Python path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, PROJECT_ROOT)
 # -*- coding: utf-8 -*-
 """
 solar_hyperparam_optimizer.py
@@ -138,11 +141,11 @@ def normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
 
 
 def load_solar_dataset(csv_path: str) -> pd.DataFrame:
-    """Load the solar state-action CSV used by tests (delimiter=';').
+    """Load the solar state-action CSV used by tests.
 
     Expected columns: solar_idx, demand_idx, renewable_idx, action (reward optional).
     """
-    df = pd.read_csv(csv_path, delimiter=";", encoding="utf-8")
+    df = pd.read_csv(csv_path, delimiter=",", encoding="utf-8")
     required = ["solar_idx", "demand_idx", "renewable_idx", "action"]
     for col in required:
         if col not in df.columns:
@@ -394,8 +397,8 @@ if __name__ == "__main__":
     print("\n=== OPTIMIZATION COMPLETE ===")
     print(f"Execution time: {mins} min {secs:.1f} s")
     for idx, row in best.iterrows():
-        print(f"{idx+1}) psi={row.psi:.3f}, sigma={row.sigma:.3f}, nu={row.nu:.3f}, "
-              f"beta={row.beta:.3f}, xi={row.xi:.3f} | fitness={row.fitness_score:.6f}")
+        print(f"{idx+1}) theta={row.theta:.3f}, beta={row.beta:.3f}, eta={row.eta:.3f}, "
+              f"xi={row.xi:.3f} | fitness={row.fitness_score:.6f}")
     print(f"Results saved to: {log_csv}")
     print(f"Figures saved to: {OUTPUT_DIR}")
 

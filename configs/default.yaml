@@ -10,7 +10,7 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 1000
+  episodes: 1
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case1.csv
@@ -128,6 +128,7 @@ agents:
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
+      initial_soc: 0.5
       p_charge_max: 200
       p_discharge_max: 200
 

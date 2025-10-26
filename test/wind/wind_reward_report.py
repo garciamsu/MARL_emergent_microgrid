@@ -1,6 +1,7 @@
-"""SolarAgent reward report utilities.
+"""WindAgent reward report utilities.
 
-Computes KPIs and generates plots for solar agent state-action CSVs.
+Provides KPI computation, fitness scoring and plotting for wind agent
+state-action CSVs.
 """
 
 import csv
@@ -14,11 +15,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Internal configuration
-AGENT_NAME = "solar"
+AGENT_NAME = "wind"
 OUTPUT_ROOT = "./test"
-INPUT_FILE_PRIMARY = "reward_solar.csv"
+INPUT_FILE_PRIMARY = "reward_wind.csv"
 INPUT_FILE_FALLBACK = (
-    f"{OUTPUT_ROOT}/{AGENT_NAME}/output/reward_solar.csv"
+    f"{OUTPUT_ROOT}/{AGENT_NAME}/output/reward_wind.csv"
 )
 MAKE_PLOTS = True
 WEIGHTS = {
@@ -32,21 +33,12 @@ SCALE_FACTOR_REWARD = 50.0
 
 
 def safe_mkdir(path: Path) -> None:
-    """Create directory if it doesn't exist."""
+    """Create directory if not exists."""
     path.mkdir(parents=True, exist_ok=True)
 
 
-def normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
-    """Normalize a dict of weights so they sum to 1 (or return equal weights)."""
-    total_weight = sum(max(0.0, float(v)) for v in weights.values())
-    if total_weight <= 0:
-        count = len(weights)
-        return {k: 1.0 / count for k in weights.keys()}
-    return {k: float(max(0.0, v)) / total_weight for k, v in weights.items()}
-
-
 def resolve_input_path() -> Path:
-    """Return the CSV path from the script directory or fallback path."""
+    """Resolve input CSV path: prefer script dir, fallback to test output."""
     here = Path(__file__).parent
     primary_path = here / INPUT_FILE_PRIMARY
     if primary_path.exists():
@@ -55,9 +47,9 @@ def resolve_input_path() -> Path:
 
 
 def load_state_action_csv(path: Path) -> pd.DataFrame:
-    """Load and validate the required columns for solar reports.
+    """Load CSV and validate required columns.
 
-    Returns a DataFrame with dP column computed.
+    Expected: total_power_idx, demand_power_idx, action, reward
     """
     data_frame = pd.read_csv(path, encoding="utf-8")
     required = ["total_power_idx", "demand_power_idx", "action", "reward"]
@@ -72,25 +64,29 @@ def load_state_action_csv(path: Path) -> pd.DataFrame:
 
 
 def compute_kpis(data_frame: pd.DataFrame) -> Dict[str, Any]:
-    """Compute KPI statistics from the provided DataFrame."""
+    """Compute KPIs from the DataFrame and return a dict of metrics."""
     d_p = data_frame["dP"].to_numpy(dtype=float)
-    mean_balance = float(np.mean(d_p))
-    iae_mean = float(np.mean(np.abs(d_p)))
-    ise_mean = float(np.mean(np.square(d_p)))
-    variability = float(np.std(d_p, ddof=0))
-    reward_mean = float(np.mean(data_frame["reward"].to_numpy(dtype=float)))
     return {
         "rows": int(len(data_frame)),
-        "mean_balance": mean_balance,
-        "IAE_mean": iae_mean,
-        "ISE_mean": ise_mean,
-        "variability": variability,
-        "reward_mean": reward_mean,
+        "mean_balance": float(np.mean(d_p)),
+        "IAE_mean": float(np.mean(np.abs(d_p))),
+        "ISE_mean": float(np.mean(np.square(d_p))),
+        "variability": float(np.std(d_p, ddof=0)),
+        "reward_mean": float(np.mean(data_frame["reward"].to_numpy(dtype=float))),
     }
 
 
+def normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
+    """Normalize weights or return equal weights if total is zero."""
+    total = sum(max(0.0, float(v)) for v in weights.values())
+    if total <= 0:
+        count = len(weights)
+        return {k: 1.0 / count for k in weights.keys()}
+    return {k: float(max(0.0, v)) / total for k, v in weights.items()}
+
+
 def compute_fitness(kpis: Dict[str, Any], weights: Dict[str, float]) -> float:
-    """Aggregate KPIs into a scalar fitness using normalized weights."""
+    """Combine KPIs into a scalar fitness score using normalized weights."""
     weights_norm = normalize_weights(weights)
     score_balance = 1.0 / (1.0 + abs(float(kpis["mean_balance"])))
     score_iae = 1.0 / (1.0 + float(kpis["IAE_mean"]))
@@ -108,7 +104,7 @@ def compute_fitness(kpis: Dict[str, Any], weights: Dict[str, float]) -> float:
 
 
 def save_per_action_summary(data_frame: pd.DataFrame, out_csv: Path) -> None:
-    """Persist per-action reward statistics to CSV."""
+    """Save per-action reward summary to CSV."""
     grouped = (
         data_frame.groupby("action")["reward"]
         .agg(["mean", "std", "min", "max", "count"])
@@ -118,19 +114,19 @@ def save_per_action_summary(data_frame: pd.DataFrame, out_csv: Path) -> None:
 
 
 def plot_common(data_frame: pd.DataFrame, out_dir: Path) -> None:
-    """Generate basic reward and balance histograms."""
+    """Generate common visualizations for the wind agent."""
     plt.figure(figsize=(9, 5))
     plt.hist(data_frame["reward"].to_numpy(dtype=float), bins=30)
-    plt.title("Reward Distribution (SolarAgent)")
+    plt.title("Reward Distribution (WindAgent)")
     plt.tight_layout()
-    plt.savefig(out_dir / "reward_distribution_solar.png")
+    plt.savefig(out_dir / "reward_distribution_wind.png")
     plt.close()
 
     plt.figure(figsize=(9, 5))
     plt.hist(data_frame["dP"].to_numpy(dtype=float), bins=30)
-    plt.title("Energy Balance dP Distribution (SolarAgent)")
+    plt.title("Energy Balance dP Distribution (WindAgent)")
     plt.tight_layout()
-    plt.savefig(out_dir / "balance_distribution_solar.png")
+    plt.savefig(out_dir / "balance_distribution_wind.png")
     plt.close()
 
 
@@ -141,7 +137,7 @@ def append_to_kpi_log(
     kpis: Dict[str, Any],
     fitness: float,
 ) -> Path:
-    """Append KPIs + fitness to the agent's KPI CSV log."""
+    """Append KPIs + fitness to the agent log CSV file."""
     out_dir = Path(output_root) / agent_name / "output"
     safe_mkdir(out_dir)
     out_csv = out_dir / "kpi_eval.csv"
@@ -167,7 +163,7 @@ def append_to_kpi_log(
 
 
 def main() -> None:
-    """Main entry: resolve input, compute KPIs and optionally generate plots."""
+    """Main: read CSV, compute KPIs and optionally generate plots."""
     input_path = resolve_input_path()
     output_root = Path(OUTPUT_ROOT)
     out_dir = output_root / AGENT_NAME / "output"
@@ -186,7 +182,7 @@ def main() -> None:
         kpis=kpis,
         fitness=fitness,
     )
-    out_action_summary = out_dir / "reward_summary_by_action_solar.csv"
+    out_action_summary = out_dir / "reward_summary_by_action_wind.csv"
     save_per_action_summary(data_frame, out_action_summary)
 
     print("=== KPI SUMMARY (State-Action Grid) ===")
@@ -209,43 +205,12 @@ def main() -> None:
 
     if MAKE_PLOTS:
         plot_common(data_frame, out_dir)
-        # specialized heatmaps if renewable_potential_idx exists
-        if "renewable_potential_idx" in data_frame.columns:
-            for potential in sorted(data_frame["renewable_potential_idx"].unique()):
-                subset = data_frame[data_frame["renewable_potential_idx"] == potential]
-                heatmap_data = subset.pivot_table(
-                    index="total_power_idx",
-                    columns="demand_power_idx",
-                    values="reward",
-                    aggfunc="mean",
-                )
-                plt.figure(figsize=(8, 6))
-                sns.heatmap(
-                    heatmap_data,
-                    annot=False,
-                    fmt=".1f",
-                    cmap="YlGnBu",
-                    cbar_kws={"label": "Reward"},
-                )
-                plt.title(f"Heatmap of Avg Reward (Renewable Potential={potential})")
-                plt.tight_layout()
-                plt.savefig(out_dir / f"heatmap_reward_potential_{potential}.png")
-                plt.close()
-        # rolling mean
-        df_sorted = data_frame.sort_values(by=data_frame.columns.tolist())
-        rolling_mean = df_sorted["reward"].rolling(window=100, min_periods=1).mean()
-        plt.figure(figsize=(10, 6))
-        plt.plot(rolling_mean)
-        plt.title("Rolling Mean of Reward (SolarAgent, Window=100)")
-        plt.tight_layout()
-        plt.savefig(out_dir / "rolling_mean_reward_solar.png")
-        plt.close()
         # action frequency
         plt.figure(figsize=(8, 5))
         sns.countplot(data=data_frame, x="action")
-        plt.title("Action Frequency (SolarAgent)")
+        plt.title("Action Frequency (WindAgent)")
         plt.tight_layout()
-        plt.savefig(out_dir / "action_frequency_solar.png")
+        plt.savefig(out_dir / "action_frequency_wind.png")
         plt.close()
         print(f"[+] Plots saved in: {out_dir}")
 

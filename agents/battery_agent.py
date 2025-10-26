@@ -27,7 +27,18 @@ class BatteryAgent(BaseAgent):
         self.p_discharge_max = limits.get("p_discharge_max", 100.0)  # W (positive when discharging)
 
         # State of charge (continuous [0,1]) and discretization bins
-        self.soc = 0.5
+        # Read initial SOC from kwargs (preferred) or from limits, fallback to 0.5
+        initial_soc = kwargs.get("initial_soc", None)
+        if initial_soc is None:
+            initial_soc = limits.get("initial_soc", 0.5)
+        try:
+            self.soc = float(initial_soc)
+        except (TypeError, ValueError):
+            # In case of malformed config value, fallback to safe default
+            self.soc = 0.5
+        # Ensure SOC within configured bounds
+        self.soc = max(self.soc_min, min(self.soc_max, self.soc))
+
         self.battery_soc_bins = np.linspace(self.soc_min, self.soc_max, num_battery_soc_bins)
         # Initialize discrete index consistent with initial SOC
         self.idx = digitize_clip(self.soc, self.battery_soc_bins)

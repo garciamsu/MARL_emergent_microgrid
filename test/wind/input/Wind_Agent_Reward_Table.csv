@@ -1,4 +1,4 @@
-solar_idx;demand_idx;renewable_idx;action
+wind_idx;demand_idx;renewable_idx;action
 0;0;0;0
 0;0;0;1
 0;0;1;0

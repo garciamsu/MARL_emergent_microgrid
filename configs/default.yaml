@@ -10,7 +10,7 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 5
+  episodes: 500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case1.csv
@@ -84,7 +84,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultSolarReward
-      params: {theta: 1, beta: 3, eta: 1, xi: 0.1}
+      params: {theta: 3, beta: 3, eta: 1, xi: 3}
     state_space:
       - {var: solar_power, source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -111,7 +111,7 @@ agents:
       efficiency: 0.95
 
   battery:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15

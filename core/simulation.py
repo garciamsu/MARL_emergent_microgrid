@@ -147,8 +147,9 @@ def run_training(config):
 
         # 0. Epsilon update (según scheduler configurado)
         epsilon = scheduler(episode, epsilon)
-
+        print(30*"*")
         for index in range(env.max_steps - 1):
+            
             # 1. Discretized state per agent
             state = {
                 name: agent.get_discretized_state(env, index)
@@ -181,7 +182,11 @@ def run_training(config):
             env.total_power = 0.0
             env.renewable_power = 0.0
             env.renewable_potential = 0.0
-            # env.demand_power = 0.0  # MUST reset to accumulate correctly
+            
+            # Update discretized indices    
+            env.renewable_potential_idx = digitize_clip(env.renewable_potential, env.power_bins)
+            env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
+            env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
 
             # PHASE 1: Update renewable agents (solar, wind)
             for agent in agents.values():
@@ -255,7 +260,7 @@ def run_training(config):
                 name: agent.get_discretized_state(env, index + 1)
                 for name, agent in agents.items()
             }
-
+            
             # 5. Reward calculation and Q-table update
             for name, agent in agents.items():
                 state_tuple = state[name]
@@ -266,6 +271,7 @@ def run_training(config):
                     raise RuntimeError(
                         f"El agente {name} no tiene reward_fn configurado. Define 'agents.{agent.name.split('#')[0]}.reward' en el YAML."
                     )
+
                 reward = agent.reward_fn.compute(agent, env, state_tuple)
 
                 # Q-learning update

@@ -22,12 +22,14 @@ class DefaultSolarReward(RewardFn):
         self.xi = xi
 
     def compute(self, agent, env, state_tuple):
-        solar_idx, demand_idx, renewable_idx = state_tuple
 
+        renewable_idx = env.renewable_power_idx
+        demand_idx = env.demand_power_idx
+        solar_idx = agent.idx
         
         delta_abs = max(abs(renewable_idx - demand_idx), 1)
         if agent.action == 1:
-            if renewable_idx <= demand_idx:
+            if renewable_idx < demand_idx:
                 print(f"DEBUG: action={agent.action}, solar_idx={solar_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, reward={-self.theta * delta_abs}")
                 return -self.theta * delta_abs
             else:
@@ -41,7 +43,6 @@ class DefaultSolarReward(RewardFn):
                 print(f"DEBUG: action={agent.action}, solar_idx={solar_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, reward={-self.xi}")
                 return -self.xi
 
-
 @register_reward("DefaultWindReward")
 class DefaultWindReward(RewardFn):
     """Replica la lógica de WindAgent.calculate_reward."""
@@ -53,19 +54,25 @@ class DefaultWindReward(RewardFn):
         self.xi = xi
 
     def compute(self, agent, env, state_tuple):
-        wind_idx, demand_idx, renewable_idx = state_tuple
-        # wi = (wind_idx / renewable_idx) if renewable_idx != 0 else 1.0
-        wi = 1
-        delta_abs = abs(renewable_idx - demand_idx)
+
+        renewable_idx = env.renewable_power_idx
+        demand_idx = env.demand_power_idx
+        wind_idx = agent.idx
+        
+        delta_abs = max(abs(renewable_idx - demand_idx), 1)
         if agent.action == 1:
             if renewable_idx < demand_idx:
-                return -self.theta * wi * delta_abs
+                print(f"DEBUG: action={agent.action}, wind_idx={wind_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, reward={-self.theta * delta_abs}")
+                return -self.theta * delta_abs
             else:
-                return self.beta * wi * delta_abs
+                print(f"DEBUG: action={agent.action}, wind_idx={wind_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, reward={self.beta * delta_abs}")
+                return self.beta * delta_abs
         else:
             if renewable_idx > demand_idx:
-                return self.eta * wi * delta_abs
+                print(f"DEBUG: action={agent.action}, wind_idx={wind_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, reward={self.eta * delta_abs}")
+                return self.eta * delta_abs
             else:
+                print(f"DEBUG: action={agent.action}, wind_idx={wind_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, reward={-self.xi}")
                 return -self.xi
 
 @register_reward("DefaultBatteryReward")

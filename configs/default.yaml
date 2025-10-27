@@ -10,7 +10,7 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 500
+  episodes: 1000
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case1.csv
@@ -77,14 +77,14 @@ metrics:
 agents:
 
   solar:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15
       gamma: 0.95
     reward:
       type: DefaultSolarReward
-      params: {theta: 3, beta: 3, eta: 1, xi: 3}
+      params: {theta: 4, beta: 3, eta: 1, xi: 3}
     state_space:
       - {var: solar_power, source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -94,14 +94,14 @@ agents:
       efficiency: 0.98
 
   wind:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15
       gamma: 0.95
     reward:
       type: DefaultWindReward
-      params: {theta: 1, beta: 3, eta: 1, xi: 0.1}
+      params: {theta: 4, beta: 3, eta: 1, xi: 3}
     state_space:
       - {var: wind_power,  source: local,    bins: auto}
       - {var: demand,      source: env,     bins: auto}

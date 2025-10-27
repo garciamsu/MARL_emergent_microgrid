@@ -104,10 +104,10 @@ WEIGHTS = {
 SCALE_FACTOR_REWARD = 50.0
 
 PARAM_BOUNDS: Dict[str, Tuple[float, float]] = {
-    "theta": (0.1, 2.0),
-    "beta": (0.1, 2.0),
-    "eta": (0.1, 2.0),
-    "xi": (0.1, 2.0),
+    "theta": (0.1, 4.0),
+    "beta": (0.1, 4.0),
+    "eta": (0.1, 4.0),
+    "xi": (0.1, 4.0),
 }
 
 
@@ -335,6 +335,7 @@ def main():
     seed = load_seed_from_yaml(DEFAULT_YAML)
     set_global_seed(seed)
     df = load_solar_dataset(DATASET_FILE)
+
     log_csv = os.path.join(OUTPUT_DIR, "hyperparam_optimization_log.csv")
     if os.path.exists(log_csv):
         ts = pd.Timestamp.now(tz="UTC").strftime("%Y%m%dT%H%M%SZ")

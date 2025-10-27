@@ -10,7 +10,7 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 1000
+  episodes: 5
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case1.csv
@@ -18,7 +18,7 @@ simulation:
   epsilon:
     schedule: linear    # linear | exponential | constant | custom
     start: 1.0
-    end: 0.01
+    end: 0.0
     decay: 0.997
     values: []          # only for custom
 
@@ -94,7 +94,7 @@ agents:
       efficiency: 0.98
 
   wind:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15

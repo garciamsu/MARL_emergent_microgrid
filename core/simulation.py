@@ -53,23 +53,25 @@ def make_epsilon_scheduler(cfg: dict, episodes: int):
     def clip(x: float) -> float:
         return max(min_eps, min(1.0, float(x)))
 
+    # --- LINEAR SCHEDULE ---
     if schedule == "linear":
-        # Si no hay end, usamos min_eps como objetivo
         target = end if end is not None else min_eps
 
+        # pendiente ajustada para terminar EXACTAMENTE en 'end'
+        slope = (target - start) / max(1, (episodes - 1))
+
         def f(t: int, _prev: float) -> float:
-            frac = (t + 1) / max(1, episodes)
-            return clip(start - (start - target) * frac)
+            return clip(start + slope * t)
 
         return f
 
+    # --- EXPONENTIAL SCHEDULE ---
     if schedule == "exponential":
         if decay is None:
             if end is not None and start > 0 and end > 0:
-                # Derivar decay para alcanzar end en 'episodes' pasos
-                decay_eff = (end / start) ** (1.0 / max(1, episodes))
+                decay_eff = (end / start) ** (1.0 / max(1, episodes - 1))
             else:
-                decay_eff = 0.99  # fallback sensato
+                decay_eff = 0.99
         else:
             decay_eff = decay
 
@@ -79,35 +81,34 @@ def make_epsilon_scheduler(cfg: dict, episodes: int):
 
         return f
 
+    # --- CONSTANT SCHEDULE ---
     if schedule == "constant":
         def f(_t: int, _prev: float) -> float:
             return clip(start)
-
         return f
 
+    # --- CUSTOM SCHEDULE ---
     if schedule == "custom":
         series = [clip(v) for v in values]
         if not series:
-            # Si no hay values, caemos a constante en start
             series = [clip(start)] * episodes
         if len(series) < episodes:
-            series = series + [series[-1]] * (episodes - len(series))
+            series += [series[-1]] * (episodes - len(series))
 
         def f(t: int, _prev: float) -> float:
             return series[min(t, len(series) - 1)]
 
         return f
 
-    # Por defecto, lineal
+    # fallback linear
     target = end if end is not None else min_eps
+    slope = (target - start) / max(1, (episodes - 1))
 
     def f(t: int, _prev: float) -> float:
-        frac = (t + 1) / max(1, episodes)
-        return clip(start - (start - target) * frac)
+        return clip(start + slope * t)
 
     return f
 
-EPSILON_MIN = 0
 
 def run_training(config):
     """Execute multi-agent tabular Q-learning.
@@ -144,6 +145,9 @@ def run_training(config):
         env.reset()
         evolution = []
 
+        # 0. Epsilon update (según scheduler configurado)
+        epsilon = scheduler(episode, epsilon)
+
         for index in range(env.max_steps - 1):
             # 1. Discretized state per agent
             state = {
@@ -155,6 +159,7 @@ def run_training(config):
             step_record = {
                 "episode": episode,
                 "step": index,
+                "epsilon": epsilon
             }
 
             # 2. Choose action per agent
@@ -271,8 +276,7 @@ def run_training(config):
 
             evolution.append(step_record)
 
-        # 6. Epsilon update (según scheduler configurado)
-        epsilon = scheduler(episode, epsilon)
+
 
         # 7. Save episode data
         episode_df = pd.DataFrame(evolution)

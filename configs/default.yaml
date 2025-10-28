@@ -10,7 +10,7 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 1000
+  episodes: 500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case1.csv
@@ -94,7 +94,7 @@ agents:
       efficiency: 0.98
 
   wind:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15
@@ -111,7 +111,7 @@ agents:
       efficiency: 0.95
 
   battery:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15
@@ -128,7 +128,7 @@ agents:
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
-      initial_soc: 0.4
+      initial_soc: 0.6
       p_charge_max: 200
       p_discharge_max: 200
 

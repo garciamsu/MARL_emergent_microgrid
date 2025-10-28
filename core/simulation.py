@@ -240,6 +240,7 @@ def run_training(config):
             env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
             env.demand_power_idx = digitize_clip(env.demand_power, env.power_bins)
             env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
+            env.energy_balance_idx = digitize_clip(env.energy_balance, env.power_bins)
 
             # Step log: Append environment globals at the end (preserve insertion order)
             step_record.update({
@@ -253,6 +254,7 @@ def run_training(config):
                 "env_demand_power": env.demand_power,
                 "env_demand_power_idx": env.demand_power_idx,
                 "env_energy_balance": env.energy_balance,
+                "env_energy_balance_idx": env.energy_balance_idx,
                 "env_delta_power_idx": env.delta_power_idx,
             })
 

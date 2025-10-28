@@ -62,6 +62,7 @@ class MultiAgentEnv:
         self.renewable_power_idx = digitize_clip(self.renewable_power, self.power_bins)
         self.demand_power_idx = digitize_clip(self.demand_power, self.power_bins)
         self.total_power_idx = digitize_clip(self.total_power, self.power_bins)
+        self.energy_balance_idx = digitize_clip(self.energy_balance, self.power_bins)
         self.delta_power_idx = "surplus"
 
         self.scale_demand = 1

@@ -126,7 +126,7 @@ class DefaultGridReward(RewardFn):
         elif agent.action == 0 and delta_P <= 0 and soc_idx == 0:
             reward =  -self.nu * self.C_M
         else:
-            reward = -self.xi
+            reward = self.xi
 
         print(f"DEBUG: action={agent.action}, soc_idx={soc_idx}, demand_idx={demand_idx}, total_idx={total_idx}, Cm={self.C_M}, reward={reward}")
 

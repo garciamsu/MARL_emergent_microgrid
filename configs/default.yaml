@@ -10,7 +10,7 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 500
+  episodes: 1000
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case1.csv
@@ -140,14 +140,14 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultGridReward
-      params: {psi: 1, sigma: 2, nu: 2, xi: 0.5}
+      params: {psi: 3, sigma: 5, nu: 5, xi: 6}
     state_space:
       - {var: soc_idx,  source: external, bins: auto}
       - {var: demand,   source: env,      bins: auto}
       - {var: renewable,    source: global,   bins: auto}
     limits:
       p_max: 1000
-      export_allowed: true
+      export_allowed: false
 
   load:
     count: 0

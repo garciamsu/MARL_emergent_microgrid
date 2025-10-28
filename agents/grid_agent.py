@@ -1,5 +1,6 @@
 from agents.base_agent import BaseAgent
 from core.registry import register_agent
+from utils.discretization import digitize_clip
 
 @register_agent("grid")
 class GridAgent(BaseAgent):
@@ -39,3 +40,5 @@ class GridAgent(BaseAgent):
             # Do not import
             self.potential = max(0, current_deficit)
             self.power = 0.0
+            
+        self.idx = digitize_clip(self.power, env.power_bins)

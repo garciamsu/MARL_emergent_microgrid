@@ -38,7 +38,7 @@ PLOT_CONFIG = {
     'panel_3': {
         'title': '(C)',
         'color': '#800080',
-        'left_Y': {'column': 'soc_battery#0', 'label': 'SoC (%)'},
+        'left_Y': {'column': 'soc_battery#0', 'label': 'SoC (0-1)'},
         'right_Y': {'column': 'action_battery#0', 'label': 'State'}
     },
     'panel_4': {

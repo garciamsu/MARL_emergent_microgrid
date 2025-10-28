@@ -124,7 +124,7 @@ agents:
       - {var: demand,      source: env,     bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
-      capacity_ah: 100
+      capacity_ah: 10
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0

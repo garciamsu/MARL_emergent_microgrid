@@ -27,6 +27,5 @@ def main(config_path: str = "configs/default.yaml") -> None:
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
-
 if __name__ == "__main__":  # pragma: no cover
     main()

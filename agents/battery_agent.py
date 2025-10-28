@@ -30,7 +30,7 @@ class BatteryAgent(BaseAgent):
         # Read initial SOC from kwargs (preferred) or from limits, fallback to 0.5
         initial_soc = kwargs.get("initial_soc", None)
         if initial_soc is None:
-            initial_soc = limits.get("initial_soc", 0.5)
+            initial_soc = limits.get("initial_soc", 0.8)
         try:
             self.soc = float(initial_soc)
         except (TypeError, ValueError):

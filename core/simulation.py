@@ -149,7 +149,7 @@ def run_training(config):
         epsilon = scheduler(episode, epsilon)
         print(30*"*")
         for index in range(env.max_steps - 1):
-            
+
             # 1. Discretized state per agent
             state = {
                 name: agent.get_discretized_state(env, index)
@@ -243,6 +243,7 @@ def run_training(config):
 
             # Step log: Append environment globals at the end (preserve insertion order)
             step_record.update({
+                "env_price": env.price,
                 "env_renewable_potential": env.renewable_potential,
                 "env_renewable_potential_idx": env.renewable_potential_idx,
                 "env_total_renewable": env.renewable_power,
@@ -260,7 +261,7 @@ def run_training(config):
                 name: agent.get_discretized_state(env, index + 1)
                 for name, agent in agents.items()
             }
-            
+
             # 5. Reward calculation and Q-table update
             for name, agent in agents.items():
                 state_tuple = state[name]

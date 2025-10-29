@@ -1,4 +1,4 @@
-Datetime;demand;price;solar_power;wind_power
+Datetime;demand;price;solar_power_0;wind_power_0
 2019-11-05 00:00:00;6.8544;14;0;5.1550318254
 2019-11-05 01:00:00;6.5616;9.99;0;3.4028805283
 2019-11-05 02:00:00;6.2676;9.1;0;3.3939623178

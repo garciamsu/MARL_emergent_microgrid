@@ -13,7 +13,7 @@ simulation:
   episodes: 500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
-  dataset: Case1.csv
+  dataset: Case3.csv
 
   epsilon:
     schedule: linear    # linear | exponential | constant | custom

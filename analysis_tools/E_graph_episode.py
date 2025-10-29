@@ -5,6 +5,8 @@ import os
 import numpy as np
 import glob
 import chardet
+import matplotlib.patches as mpatches # <-- Importado para la leyenda del Panel 6
+
 
 # --- CONFIGURACIÓN PRINCIPAL ---
 try:
@@ -27,41 +29,45 @@ AXIS_FONT_WEIGHT = 'bold'
 AXIS_FONT_SIZE = 11
 
 # --- CONFIGURACIÓN DE LOS PANELES ---
+# (Las etiquetas 'label' ahora solo se usarán para la LEYENDA, no para los ejes)
 PLOT_CONFIG = {
     'panel_1': {
         'title': '(A)',
         'color': '#FFA500',
-        'left_Y': {'column': 'potential_solar#0', 'label': 'Potential (kW)'},
-        'right_Y': {'column': 'action_solar#0', 'label': 'State'}
+        'left_Y': {'column': 'potential_solar#0', 'label': 'Potential solar (kW)'},
+        'right_Y': {'column': 'action_solar#0', 'label': 'Solar state'}
     },
     'panel_2': {
         'title': '(B)',
         'color': '#87CEEB',
-        'left_Y': {'column': 'potential_wind#0', 'label': 'Potential (kW)'},
-        'right_Y': {'column': 'action_wind#0', 'label': 'State'}
+        'left_Y': {'column': 'potential_wind#0', 'label': 'Potential wind (kW)'},
+        'right_Y': {'column': 'action_wind#0', 'label': 'Wind state'}
     },
     'panel_3': {
         'title': '(C)',
         'color': '#800080',
         'left_Y': {'column': 'soc_battery#0', 'label': 'SoC (0-1)'},
-        'right_Y': {'column': 'action_battery#0', 'label': 'State'}
+        'right_Y': {'column': 'action_battery#0', 'label': 'Battery state'}
     },
     'panel_4': {
         'title': '(D)',
         'color': '#36454F',
         'left_Y': {'column': 'env_price', 'label': 'Price ($/kWh)'},
-        'right_Y': {'column': 'action_grid#0', 'label': 'State'}
+        'right_Y': {'column': 'action_grid#0', 'label': 'Grid state'}
     },
     'panel_5': {
         'title': '(E)',
         'color': '#FF0000',
-        'left_Y': {'column': 'env_demand_power', 'label': 'Power (kW)'}
+        'left_Y': {'column': 'env_demand_power', 'label': 'Demand (kW)'}
     },
     'panel_6': {
         'title': '(F)',
         'left_Y': {'column': 'env_energy_balance', 'label': 'Energy Balance (kW)'},
         'color_positive': '#28A745', 
-        'color_negative': '#FF0000' 
+        'color_negative': '#FF0000',
+        # Etiquetas para la nueva leyenda del Panel 6
+        'label_positive': 'Surplus (+)',
+        'label_negative': 'Deficit (-)'
     }
 }
 
@@ -103,6 +109,9 @@ def plot_episode_dynamics(base_dir, episode_num, config):
                      fontweight=AXIS_FONT_WEIGHT, fontsize=14)
         ax.grid(True, linestyle='--', alpha=0.6)
 
+        ax_r = None 
+        handles, labels = [], [] # Para la leyenda
+
         # --- Panel izquierdo ---
         if 'left_Y' in panel_config:
             left = panel_config['left_Y']
@@ -119,17 +128,26 @@ def plot_episode_dynamics(base_dir, episode_num, config):
                            width=1.0, 
                            alpha=STATE_FILL_TRANSPARENCY,
                            zorder=3) 
+                    ax.axhline(y=0, color='#28A745', linestyle='-', linewidth=1.5, zorder=5)
                     
-                    # --- MODIFICACIÓN AQUÍ ---
-                    # Cambiado el color de 'black' a '#28A745'
-                    ax.axhline(y=0, color='#28A745', linestyle='-', linewidth=1.5, zorder=5) # <-- MODIFICADO
-
+                    # --- MODIFICACIÓN: Crear leyenda manual para Panel 6 ---
+                    pos_patch = mpatches.Patch(color=panel_config['color_positive'], 
+                                               label=panel_config['label_positive'], 
+                                               alpha=STATE_FILL_TRANSPARENCY)
+                    neg_patch = mpatches.Patch(color=panel_config['color_negative'], 
+                                               label=panel_config['label_negative'], 
+                                               alpha=STATE_FILL_TRANSPARENCY)
+                    handles.extend([pos_patch, neg_patch])
+                    # --- FIN MODIFICACIÓN ---
+                    
                 else:
-                    ax.plot(time_steps, df[col], color=color,
-                            linestyle=POWER_LINE_STYLE, linewidth=POWER_LINE_WIDTH)
+                    line, = ax.plot(time_steps, df[col], color=color,
+                                    linestyle=POWER_LINE_STYLE, linewidth=POWER_LINE_WIDTH,
+                                    label=left['label']) # 'label' para leyenda
+                    handles.append(line)
                 
-                ax.set_ylabel(left['label'], fontweight='bold',
-                              color='black', fontsize=AXIS_FONT_SIZE)
+                # --- MODIFICACIÓN: Etiqueta de eje Y eliminada ---
+                # ax.set_ylabel(left['label'], fontweight='bold', ...) # <-- ELIMINADO
                 ax.tick_params(axis='y', labelcolor='black', labelsize=AXIS_FONT_SIZE)
             else:
                 print(f"⚠️  Columna no encontrada: {col} (Panel {panel_key})")
@@ -140,11 +158,15 @@ def plot_episode_dynamics(base_dir, episode_num, config):
             col = right['column']
             if col in df.columns:
                 ax_r = ax.twinx()
-                ax_r.step(time_steps, df[col], where='post', color=color)
+                line, = ax_r.step(time_steps, df[col], where='post', color=color, 
+                                  label=right['label']) # 'label' para leyenda
+                handles.append(line)
+                
                 ax_r.fill_between(time_steps, df[col], step='post',
                                   color=color, alpha=STATE_FILL_TRANSPARENCY)
-                ax_r.set_ylabel(right['label'], fontweight='bold',
-                                color='black', fontsize=AXIS_FONT_SIZE)
+                
+                # --- MODIFICACIÓN: Etiqueta de eje Y eliminada ---
+                # ax_r.set_ylabel(right['label'], fontweight='bold', ...) # <-- ELIMINADO
                 ax_r.tick_params(axis='y', labelcolor='black', labelsize=AXIS_FONT_SIZE)
                 
                 y_min = min(0, df[col].min())
@@ -157,6 +179,17 @@ def plot_episode_dynamics(base_dir, episode_num, config):
             else:
                 print(f"⚠️  Columna no encontrada: {col} (Panel {panel_key})")
 
+        # --- MODIFICACIÓN: Añadir Leyenda (combinada y reubicada) ---
+        labels = [h.get_label() for h in handles]
+        if handles:
+            ax.legend(handles, labels, 
+                      loc='upper left', 
+                      bbox_to_anchor=(1.02, 1.0), # <-- Reubicada fuera del gráfico
+                      fontsize=AXIS_FONT_SIZE - 1, 
+                      frameon=True, 
+                      shadow=False)
+        # --- FIN MODIFICACIÓN ---
+
         if len(time_steps) <= 50:
             ax.set_xticks(time_steps)
         
@@ -166,8 +199,10 @@ def plot_episode_dynamics(base_dir, episode_num, config):
         ax.set_xlim(time_steps[0], time_steps[-1])
 
 
-    axes[-1].set_xlabel("Time steps", fontweight='bold', fontsize=AXIS_FONT_SIZE)
-    plt.tight_layout(pad=1.0, rect=[0, 0, 1, 0.98])
+    axes[-1].set_xlabel("Time steps [Hour]", fontweight='bold', fontsize=AXIS_FONT_SIZE)
+    
+    # Ajustar layout para dar espacio a la leyenda
+    plt.tight_layout(pad=1.0, rect=[0, 0, 0.85, 0.98]) # <-- Ajustado rect[2] a 0.85
 
     try:
         plt.savefig(OUTPUT_FILENAME, format='svg', dpi=300, bbox_inches='tight')

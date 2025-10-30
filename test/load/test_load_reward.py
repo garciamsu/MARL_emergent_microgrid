@@ -97,6 +97,8 @@ def run_test(input_path: Path, output_path: Path):
         # Log the reward calculation for debugging
         print(f"State: {state_tuple}, Action: {agent.action}, Reward: {reward}")
 
+    data_frame["price"] = DEFAULT_PRICE 
+    data_frame["comfort_threshold"] = agent.comfort_threshold
     data_frame["reward"] = rewards
     output_path.parent.mkdir(parents=True, exist_ok=True)
     data_frame.to_csv(output_path, index=False, encoding='utf-8')
@@ -105,9 +107,8 @@ def run_test(input_path: Path, output_path: Path):
 
 if __name__ == "__main__":
     base = Path(__file__).parent / 'input'
-    cand1 = base / 'Load_Agent_Reward_Table.csv'
-    cand2 = base / 'LoadAgent_Reward_Table.csv'
-    input_file = cand1 if cand1.exists() else cand2
+
+    input_file = base / 'LoadAgent_Reward_Table.csv'
     output_file = Path(__file__).parent / 'output' / 'reward_load.csv'
 
     try:

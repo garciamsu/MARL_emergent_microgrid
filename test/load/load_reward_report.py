@@ -68,8 +68,20 @@ def load_state_action_csv(path: Path) -> pd.DataFrame:
     missing = [c for c in required if c not in data_frame.columns]
     if missing:
         raise ValueError(f"Missing columns in input CSV: {missing}")
-    for col in ["battery_soc_idx", "renewable_potential_idx", "comfort_idx", "action"]:
-        data_frame[col] = pd.to_numeric(data_frame[col], errors="coerce").astype(int)
+    # Convert numeric columns to int when possible. Some CSVs encode
+    # `comfort_idx` as categorical strings (e.g. 'acceptable', 'expensive'),
+    # so handle it separately: keep strings if conversion fails.
+    for col in ["battery_soc_idx", "renewable_potential_idx", "action"]:
+        data_frame[col] = pd.to_numeric(data_frame[col], errors="coerce").fillna(0).astype(int)
+
+    # Handle comfort_idx robustly: try numeric conversion, otherwise keep as string
+    if "comfort_idx" in data_frame.columns:
+        comfort_numeric = pd.to_numeric(data_frame["comfort_idx"], errors="coerce")
+        if comfort_numeric.isna().any():
+            # Keep original as categorical string
+            data_frame["comfort_idx"] = data_frame["comfort_idx"].astype(str)
+        else:
+            data_frame["comfort_idx"] = comfort_numeric.astype(int)
     data_frame["reward"] = pd.to_numeric(data_frame["reward"], errors="coerce")
     if "total_power_idx" in data_frame.columns and "demand_power_idx" in data_frame.columns:
         data_frame["dP"] = (

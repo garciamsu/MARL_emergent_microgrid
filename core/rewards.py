@@ -143,16 +143,15 @@ class DefaultLoadReward(RewardFn):
         self.beta = beta
 
     def compute(self, agent, env, state_tuple):
-        soc_idx, demand_idx, renewable_idx = state_tuple
-        market_cost = env.price
+        soc_idx, demand_idx, renewable_idx, price = state_tuple
 
         print(f"PARAMS: sigma={self.sigma}, psi={self.psi}, nu={self.nu}, beta={self.beta}")
-        print(f"DEBUG: action={agent.action}, soc_idx={soc_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, market_cost={market_cost}, comfort_threshold={getattr(agent, 'comfort_threshold', 0)}")
+        # print(f"DEBUG: action={agent.action}, soc_idx={soc_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, price={price}, comfort_threshold={comfort_threshold}")
 
         if agent.action == 1 and (soc_idx > 0 or renewable_idx > demand_idx):
-            reward = self.sigma * market_cost
-        elif agent.action == 1 and market_cost > getattr(agent, 'comfort_threshold', 0):
-            reward = -self.psi / market_cost if market_cost else -self.psi
+            reward = self.sigma * price
+        elif agent.action == 1 and price > self.comfort_threshold:
+            reward = -self.psi / price if price else -self.psi
         elif agent.action == 0 and (soc_idx > 0 or renewable_idx > demand_idx):
             reward = -self.nu * soc_idx * renewable_idx
         else:

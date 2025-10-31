@@ -86,8 +86,13 @@ def run_test(input_path: Path, output_path: Path):
                 "renewable_idx", 0
             )
         )
+        price = _to_int(
+            row.get(
+                "price", 0
+            )
+        )
 
-        state_tuple = (soc_idx, demand_idx, renewable_idx)
+        state_tuple = (soc_idx, demand_idx, renewable_idx, price, agent.comfort_threshold)
 
         # Compute reward using a small env stub (provides price)
         reward = reward_fn.compute(agent, env=env_stub, state_tuple=state_tuple)
@@ -96,7 +101,7 @@ def run_test(input_path: Path, output_path: Path):
         # Log the reward calculation for debugging
         print(f"State: {state_tuple}, Action: {agent.action}, Reward: {reward}")
 
-    data_frame["price"] = DEFAULT_PRICE 
+    data_frame["price"] = price 
     data_frame["comfort_threshold"] = agent.comfort_threshold
     data_frame["reward"] = rewards
     output_path.parent.mkdir(parents=True, exist_ok=True)

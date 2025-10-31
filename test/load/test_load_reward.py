@@ -79,12 +79,11 @@ def run_test(input_path: Path, output_path: Path):
         # 'comfort_idx' in some CSVs is categorical (e.g. 'acceptable'), so
         # fallback to 0 if it cannot be converted to int.
         demand_idx = _to_int(
-            row.get("demand_idx", row.get("demand_power_idx", 0))
+            row.get("demand_idx", 0)
         )
         renewable_idx = _to_int(
             row.get(
-                "renewable_potential_idx",
-                row.get("renewable_idx", 0),
+                "renewable_idx", 0
             )
         )
 

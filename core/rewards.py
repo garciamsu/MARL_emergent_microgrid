@@ -145,15 +145,22 @@ class DefaultLoadReward(RewardFn):
     def compute(self, agent, env, state_tuple):
         soc_idx, demand_idx, renewable_idx, price = state_tuple
 
-        print(f"PARAMS: sigma={self.sigma}, psi={self.psi}, nu={self.nu}, beta={self.beta}")
-        # print(f"DEBUG: action={agent.action}, soc_idx={soc_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, price={price}, comfort_threshold={comfort_threshold}")
-
+        # 1. PREMIO por usar energía interna/excedente
         if agent.action == 1 and (soc_idx > 0 or renewable_idx > demand_idx):
-            reward = self.sigma * price
+            # Tu Lógica 1 (corregida):
+            reward = self.sigma * max((renewable_idx - demand_idx), 1) * max(soc_idx, 1)
+
+        # 2. CASTIGO por comprar caro
         elif agent.action == 1 and price > self.comfort_threshold:
-            reward = -self.psi / price if price else -self.psi
+            # Tu corrección (multiplicar, no dividir):
+            reward = -self.psi * price
+
+        # 3. CASTIGO por desperdiciar energía interna/excedente
         elif agent.action == 0 and (soc_idx > 0 or renewable_idx > demand_idx):
-            reward = -self.nu * soc_idx * renewable_idx
+            # Tu corrección (simétrica a la Lógica 1):
+            reward = -self.nu * max((renewable_idx - demand_idx), 1) * max(soc_idx, 1)
+
+        # 4. RECOMPENSA NEUTRAL (Apagado correcto O Comprar barato)
         else:
             reward = self.beta
 

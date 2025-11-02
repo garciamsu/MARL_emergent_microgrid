@@ -151,8 +151,9 @@ class DefaultLoadReward(RewardFn):
             reward = self.sigma * max((renewable_idx - demand_idx), 1) * max(soc_idx, 1)
 
         # 2. CASTIGO por comprar caro
-        elif agent.action == 1 and price > self.comfort_threshold:
-            # Tu corrección (multiplicar, no dividir):
+        # Compare market price against the agent's comfort threshold (agent owns this parameter).
+        elif agent.action == 1 and price > getattr(agent, 'comfort_threshold', 1):
+            # Penalize buying when the market price exceeds the agent's comfort threshold
             reward = -self.psi * price
 
         # 3. CASTIGO por desperdiciar energía interna/excedente
@@ -163,5 +164,7 @@ class DefaultLoadReward(RewardFn):
         # 4. RECOMPENSA NEUTRAL (Apagado correcto O Comprar barato)
         else:
             reward = self.beta
+
+        print(f"debug: action={agent.action}, soc_idx={soc_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, price={price}, reward={reward}")
 
         return reward

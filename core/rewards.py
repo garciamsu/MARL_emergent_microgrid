@@ -111,48 +111,48 @@ class DefaultGridReward(RewardFn):
         self.C_M = C_M
 
     def compute(self, agent, env, state_tuple):
-            # --- 1. Obtener Variables de Estado y Entorno ---
-            soc_idx = state_tuple[0]
-            demand_idx = env.demand_power_idx
-            # Corrección: Usar la generación renovable para el déficit
-            renewable_idx = env.renewable_power_idx
-            self.C_M = env.price # Precio del mercado
+        # --- 1. Obtener Variables de Estado y Entorno ---
+        soc_idx = state_tuple[0]
+        demand_idx = env.demand_power_idx
+        # Corrección: Usar la generación renovable para el déficit
+        renewable_idx = env.renewable_power_idx
+        self.C_M = env.price # Precio del mercado
 
-            # --- 2. Calcular Déficit/Excedente Interno (Corrección) ---
-            # (Excedente renovable antes de la acción de la red)
-            delta_P = renewable_idx - demand_idx
+        # --- 2. Calcular Déficit/Excedente Interno (Corrección) ---
+        # (Excedente renovable antes de la acción de la red)
+        delta_P = renewable_idx - demand_idx
 
-            # --- 3. Lógica de Recompensa (Corregida) ---
+        # --- 3. Lógica de Recompensa (Corregida) ---
 
-            # CASO 1: Red ACTÚA (1) + Microred NECESITA energía
-            # (Déficit renovable Y Batería vacía)
-            if agent.action == 1 and delta_P <= 0 and soc_idx == 0:
-                # PREMIO: por cumplir su deber.
-                # (Inversamente proporcional al precio)
-                reward = self.psi / self.C_M if self.C_M > 0 else self.psi
+        # CASO 1: Red ACTÚA (1) + Microred NECESITA energía
+        # (Déficit renovable Y Batería vacía)
+        if agent.action == 1 and delta_P <= 0 and soc_idx == 0:
+            # PREMIO: por cumplir su deber.
+            # (Inversamente proporcional al precio)
+            reward = self.psi / self.C_M if self.C_M > 0 else self.psi
 
-            # CASO 2: Red ACTÚA (1) + Microred NO NECESITA energía
-            # (Excedente renovable O Batería con carga)
-            elif agent.action == 1 and (delta_P > 0 or soc_idx > 0):
-                # CASTIGO: por importar innecesariamente.
-                # (Proporcional al precio)
-                reward = -self.sigma * self.C_M
+        # CASO 2: Red ACTÚA (1) + Microred NO NECESITA energía
+        # (Excedente renovable O Batería con carga)
+        elif agent.action == 1 and (delta_P > 0 or soc_idx > 0):
+            # CASTIGO: por importar innecesariamente.
+            # (Proporcional al precio)
+            reward = -self.sigma * self.C_M
 
-            # CASO 3: Red NO ACTÚA (0) + Microred NECESITA energía
-            # (Déficit renovable Y Batería vacía)
-            elif agent.action == 0 and delta_P <= 0 and soc_idx == 0:
-                # CASTIGO: por fallar en su deber.
-                # (Tu Opción B: Proporcional al déficit)
-                reward = -self.nu * max(abs(delta_P), 1)
+        # CASO 3: Red NO ACTÚA (0) + Microred NECESITA energía
+        # (Déficit renovable Y Batería vacía)
+        elif agent.action == 0 and delta_P <= 0 and soc_idx == 0:
+            # CASTIGO: por fallar en su deber.
+            # (Tu Opción B: Proporcional al déficit)
+            reward = -self.nu * max(abs(delta_P), 1)
 
-            # CASO 4 ("else"): Red NO ACTÚA (0) + Microred NO NECESITA energía
-            # (Excedente renovable O Batería con carga)
-            else:
-                # PREMIO: por inacción correcta.
-                # (Tu fórmula: Proporcional a la energía interna)
-                reward = self.xi * max(delta_P, 1) * max(soc_idx, 1)
+        # CASO 4 ("else"): Red NO ACTÚA (0) + Microred NO NECESITA energía
+        # (Excedente renovable O Batería con carga)
+        else:
+            # PREMIO: por inacción correcta.
+            # (Tu fórmula: Proporcional a la energía interna)
+            reward = self.xi * max(delta_P, 1) * max(soc_idx, 1)
 
-            return reward
+        return reward
 
 @register_reward("DefaultLoadReward")
 class DefaultLoadReward(RewardFn):

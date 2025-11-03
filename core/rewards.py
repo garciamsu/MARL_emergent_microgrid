@@ -31,58 +31,37 @@ class DefaultSolarReward(RewardFn):
         solar_potential_idx = agent.solar_potential_idx 
         
         # --- 2. Calcular Desequilibrio y Magnitud ---
-        # (Asumimos que renewable_idx es el total *DESPUÉS* de la acción)
-        # (Si renewable_idx es ANTES, el cálculo de delta_p cambiaría)
         delta_p = renewable_idx - demand_idx
         delta_abs = max(abs(delta_p), 1)
 
-        # --- 3. Lógica de Recompensa (Corregida) ---
+        # --- 3. Lógica de Recompensa (Estructura Plana) ---
 
-        # === CASOS PARA action == 1 (Suministrar) ===
+        # CASO 1: Suministro Correcto (PREMIO)
+        # (Acción=Suministrar, Tenía potencial)
+        if agent.action == 1 and solar_potential_idx > 0:
+            return self.theta * solar_potential_idx
+        
+        # CASO 2: Suministro Ilógico (CASTIGO)
+        # (Acción=Suministrar, PERO no tenía potencial)
+        # (Solo entra aquí si action==1 Y solar_potential_idx==0)
+        elif agent.action == 1:
+            return -self.sigma 
 
-        if agent.action == 1:
-            # CASO 1.A: Suministro Correcto (PREMIO)
-            # (Acción=Suministrar, Tenía potencial para hacerlo)
-            if solar_potential_idx > 0:
-                # Tu "Opción A": Premio por el esfuerzo/contribución
-                # (Usamos 'self.theta' como el ponderador)
-                return self.theta * solar_potential_idx
-            
-            # CASO 1.B: Suministro Ilógico (CASTIGO)
-            # (Acción=Suministrar, PERO no tenía potencial)
-            else: 
-                # Castigo por una acción ilógica/imposible
-                # (Usamos 'self.sigma' como un nuevo hiperparámetro)
-                return -self.sigma 
-
-        # === CASOS PARA action == 0 (No Suministrar) ===
-
+        # CASO 3: Inacción Correcta (Forzada) (PREMIO)
+        # (Acción=No Suministrar, No tenía potencial)
+        elif agent.action == 0 and solar_potential_idx == 0:
+            return self.eta
+        
+        # CASO 4: Inacción Correcta (Inteligente) (PREMIO)
+        # (Acción=No Suministrar, Tenía potencial, Había excedente)
+        # (Solo entra aquí si action==0, solar_potential_idx>0 Y delta_p>0)
+        elif agent.action == 0 and delta_p > 0:
+            return self.gamma * delta_abs 
+        
+        # CASO 5: Inacción Incorrecta (Fallo) (CASTIGO)
+        # (Único caso restante: Acción=No Suministrar, Tenía potencial, Había déficit)
         else: 
-            # CASO 2.A: Inacción Correcta (Forzada) (PREMIO)
-            # (Acción=No Suministrar, No tenía potencial)
-            if solar_potential_idx == 0:
-                # Tu propuesta: Premio fijo por "inacción correcta forzada"
-                # (Usamos 'self.eta' como el premio fijo)
-                return self.eta
-            
-            # CASO 2.B: Inacción (Inteligente o Incorrecta) (CON POTENCIAL)
-            # (Acción=No Suministrar, PERO sí tenía potencial)
-            else:
-                # En este caso, SÍ importa el estado de la red
-                
-                # CASO 2.B.i: Inacción Correcta (Inteligente) (PREMIO)
-                # (No suministró, había potencial, PERO había excedente)
-                if delta_p > 0:
-                    # Premio por no empeorar el excedente
-                    # (Usamos 'self.gamma' como el ponderador escalado)
-                    return self.gamma * delta_abs 
-                
-                # CASO 2.B.ii: Inacción Incorrecta (Fallo) (CASTIGO)
-                # (No suministró, había potencial, Y había déficit)
-                else: 
-                    # Tu propuesta: Castigo por no ayudar
-                    # (Usamos 'self.xi' como el ponderador escalado)
-                    return -self.xi * delta_abs
+            return -self.xi * delta_abs
 
 @register_reward("DefaultWindReward")
 class DefaultWindReward(RewardFn):
@@ -104,58 +83,37 @@ class DefaultWindReward(RewardFn):
         solar_potential_idx = agent.solar_potential_idx 
         
         # --- 2. Calcular Desequilibrio y Magnitud ---
-        # (Asumimos que renewable_idx es el total *DESPUÉS* de la acción)
-        # (Si renewable_idx es ANTES, el cálculo de delta_p cambiaría)
         delta_p = renewable_idx - demand_idx
         delta_abs = max(abs(delta_p), 1)
 
-        # --- 3. Lógica de Recompensa (Corregida) ---
+        # --- 3. Lógica de Recompensa (Estructura Plana) ---
 
-        # === CASOS PARA action == 1 (Suministrar) ===
+        # CASO 1: Suministro Correcto (PREMIO)
+        # (Acción=Suministrar, Tenía potencial)
+        if agent.action == 1 and solar_potential_idx > 0:
+            return self.theta * solar_potential_idx
+        
+        # CASO 2: Suministro Ilógico (CASTIGO)
+        # (Acción=Suministrar, PERO no tenía potencial)
+        # (Solo entra aquí si action==1 Y solar_potential_idx==0)
+        elif agent.action == 1:
+            return -self.sigma 
 
-        if agent.action == 1:
-            # CASO 1.A: Suministro Correcto (PREMIO)
-            # (Acción=Suministrar, Tenía potencial para hacerlo)
-            if solar_potential_idx > 0:
-                # Tu "Opción A": Premio por el esfuerzo/contribución
-                # (Usamos 'self.theta' como el ponderador)
-                return self.theta * solar_potential_idx
-            
-            # CASO 1.B: Suministro Ilógico (CASTIGO)
-            # (Acción=Suministrar, PERO no tenía potencial)
-            else: 
-                # Castigo por una acción ilógica/imposible
-                # (Usamos 'self.sigma' como un nuevo hiperparámetro)
-                return -self.sigma 
-
-        # === CASOS PARA action == 0 (No Suministrar) ===
-
+        # CASO 3: Inacción Correcta (Forzada) (PREMIO)
+        # (Acción=No Suministrar, No tenía potencial)
+        elif agent.action == 0 and solar_potential_idx == 0:
+            return self.eta
+        
+        # CASO 4: Inacción Correcta (Inteligente) (PREMIO)
+        # (Acción=No Suministrar, Tenía potencial, Había excedente)
+        # (Solo entra aquí si action==0, solar_potential_idx>0 Y delta_p>0)
+        elif agent.action == 0 and delta_p > 0:
+            return self.gamma * delta_abs 
+        
+        # CASO 5: Inacción Incorrecta (Fallo) (CASTIGO)
+        # (Único caso restante: Acción=No Suministrar, Tenía potencial, Había déficit)
         else: 
-            # CASO 2.A: Inacción Correcta (Forzada) (PREMIO)
-            # (Acción=No Suministrar, No tenía potencial)
-            if solar_potential_idx == 0:
-                # Tu propuesta: Premio fijo por "inacción correcta forzada"
-                # (Usamos 'self.eta' como el premio fijo)
-                return self.eta
-            
-            # CASO 2.B: Inacción (Inteligente o Incorrecta) (CON POTENCIAL)
-            # (Acción=No Suministrar, PERO sí tenía potencial)
-            else:
-                # En este caso, SÍ importa el estado de la red
-                
-                # CASO 2.B.i: Inacción Correcta (Inteligente) (PREMIO)
-                # (No suministró, había potencial, PERO había excedente)
-                if delta_p > 0:
-                    # Premio por no empeorar el excedente
-                    # (Usamos 'self.gamma' como el ponderador escalado)
-                    return self.gamma * delta_abs 
-                
-                # CASO 2.B.ii: Inacción Incorrecta (Fallo) (CASTIGO)
-                # (No suministró, había potencial, Y había déficit)
-                else: 
-                    # Tu propuesta: Castigo por no ayudar
-                    # (Usamos 'self.xi' como el ponderador escalado)
-                    return -self.xi * delta_abs
+            return -self.xi * delta_abs
 
 
 @register_reward("DefaultBatteryReward")

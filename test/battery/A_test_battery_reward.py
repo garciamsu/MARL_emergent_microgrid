@@ -27,6 +27,16 @@ class _AgentStub:
         self.action = action
         self.soc_max = soc_max
 
+
+class _EnvStub:
+    """Minimal environment stub that provides the attributes expected by
+    DefaultBatteryReward.compute: `renewable_power_idx` and `demand_power_idx`.
+    """
+
+    def __init__(self, renewable_power_idx: int, demand_power_idx: int):
+        self.renewable_power_idx = renewable_power_idx
+        self.demand_power_idx = demand_power_idx
+
 def run_test(input_path: Path, output_path: Path):
     """
     Runs the reward calculation test for the battery agent using input data.
@@ -50,10 +60,15 @@ def run_test(input_path: Path, output_path: Path):
         state_tuple = (
             soc_idx,
             int(row["demand_power_idx"]),
-            int(row["total_power_idx"])
+            int(row["renewable_idx"])
+        )
+        # Construir un stub de entorno con los índices relevantes desde el CSV
+        env = _EnvStub(
+            renewable_power_idx=int(row.get("renewable_idx", row.get("renewable_idx", 0))),
+            demand_power_idx=int(row.get("demand_power_idx", row.get("demand_idx", 0)))
         )
         # Direct reward calculation
-        reward = reward_fn.compute(agent, env=None, state_tuple=state_tuple)
+        reward = reward_fn.compute(agent, env=env, state_tuple=state_tuple)
         rewards.append(reward)
 
         # Log the reward calculation for debugging

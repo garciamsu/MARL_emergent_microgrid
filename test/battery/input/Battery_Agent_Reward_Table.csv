@@ -1,4 +1,4 @@
-total_power_idx;demand_power_idx;battery_soc_idx;action;reward
+renewable_idx;demand_power_idx;battery_soc_idx;action;reward
 0;0;0;0;0
 0;0;0;1;0
 0;0;0;2;0

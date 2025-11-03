@@ -22,6 +22,18 @@ class _AgentStub:
         self.action = action
 
 
+class _EnvStub:
+    """Stub minimal del entorno para pruebas de recompensas.
+
+    Proporciona los atributos que `DefaultSolarReward.compute` espera:
+    `renewable_power_idx` y `demand_power_idx`.
+    """
+
+    def __init__(self, renewable_power_idx: int, demand_power_idx: int):
+        self.renewable_power_idx = renewable_power_idx
+        self.demand_power_idx = demand_power_idx
+
+
 def run_test(input_path: Path, output_path: Path):
     """
     Runs the reward calculation test for the solar agent using input data.
@@ -45,8 +57,10 @@ def run_test(input_path: Path, output_path: Path):
             int(row["demand_idx"]),
             int(row["renewable_idx"])  # treat total as renewable aggregate
         )
-        # Direct reward calculation
-        reward = reward_fn.compute(agent, env=None, state_tuple=state_tuple)
+        # Construir un stub de entorno con los índices del CSV y calcular la recompensa
+        env = _EnvStub(renewable_power_idx=int(row["renewable_idx"]),
+                       demand_power_idx=int(row["demand_idx"]))
+        reward = reward_fn.compute(agent, env=env, state_tuple=state_tuple)
         rewards.append(reward)
 
         # Log the reward calculation for debugging

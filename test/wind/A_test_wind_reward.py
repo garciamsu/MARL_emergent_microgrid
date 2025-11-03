@@ -21,6 +21,14 @@ class _AgentStub:
     def __init__(self, action: int):
         self.action = action
 
+class _EnvStub:
+    """Minimal environment stub that provides the attributes expected by
+    DefaultWindReward.compute: `renewable_power_idx` and `demand_power_idx`.
+    """
+
+    def __init__(self, renewable_power_idx: int, demand_power_idx: int):
+        self.renewable_power_idx = renewable_power_idx
+        self.demand_power_idx = demand_power_idx
 
 def run_test(input_path: Path, output_path: Path):
     """Run the wind reward computation using an input CSV and save the output.
@@ -43,7 +51,12 @@ def run_test(input_path: Path, output_path: Path):
             int(row.get("demand_idx", row.get("demand_power_idx", 0))),
             int(row.get("renewable_potential_idx", 0)),
         )
-        reward = reward_fn.compute(agent, env=None, state_tuple=state_tuple)
+        # Construir un stub de entorno con los índices relevantes desde el CSV
+        env = _EnvStub(
+            renewable_power_idx=int(row.get("renewable_potential_idx", row.get("renewable_idx", 0))),
+            demand_power_idx=int(row.get("demand_idx", row.get("demand_power_idx", 0)))
+        )
+        reward = reward_fn.compute(agent, env=env, state_tuple=state_tuple)
         rewards.append(reward)
         print(f"State: {state_tuple}, Action: {agent.action}, Reward: {reward}")
 

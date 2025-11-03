@@ -15,10 +15,11 @@ class RewardFn:
 class DefaultSolarReward(RewardFn):
     """Replica la lógica de SolarAgent.calculate_reward."""
 
-    def __init__(self, theta=1.0, beta=1.0, eta=1.0, xi=1.0, **kwargs):
+    def __init__(self, theta=1.0, beta=1.0, eta=1.0, nu=1.0, xi=1.0, **kwargs):
         self.theta = theta
         self.beta = beta
         self.eta = eta
+        self.nu = nu
         self.xi = xi
 
     def compute(self, agent, env, state_tuple):
@@ -28,7 +29,7 @@ class DefaultSolarReward(RewardFn):
         demand_idx = env.demand_power_idx
         
         # La contribución potencial de ESTE agente
-        solar_potential_idx = agent.solar_potential_idx 
+        solar_potential_idx = state_tuple[0] 
         
         # --- 2. Calcular Desequilibrio y Magnitud ---
         delta_p = renewable_idx - demand_idx
@@ -45,7 +46,7 @@ class DefaultSolarReward(RewardFn):
         # (Acción=Suministrar, PERO no tenía potencial)
         # (Solo entra aquí si action==1 Y solar_potential_idx==0)
         elif agent.action == 1:
-            return -self.sigma 
+            return -self.beta 
 
         # CASO 3: Inacción Correcta (Forzada) (PREMIO)
         # (Acción=No Suministrar, No tenía potencial)
@@ -56,7 +57,7 @@ class DefaultSolarReward(RewardFn):
         # (Acción=No Suministrar, Tenía potencial, Había excedente)
         # (Solo entra aquí si action==0, solar_potential_idx>0 Y delta_p>0)
         elif agent.action == 0 and delta_p > 0:
-            return self.gamma * delta_abs 
+            return self.nu * delta_abs 
         
         # CASO 5: Inacción Incorrecta (Fallo) (CASTIGO)
         # (Único caso restante: Acción=No Suministrar, Tenía potencial, Había déficit)
@@ -67,10 +68,11 @@ class DefaultSolarReward(RewardFn):
 class DefaultWindReward(RewardFn):
     """Replica la lógica de WindAgent.calculate_reward."""
 
-    def __init__(self, theta=1.0, beta=1.0, eta=1.0, xi=1.0, **kwargs):
+    def __init__(self, theta=1.0, beta=1.0, eta=1.0, nu=1.0, xi=1.0, **kwargs):
         self.theta = theta
         self.beta = beta
         self.eta = eta
+        self.nu = nu
         self.xi = xi
 
     def compute(self, agent, env, state_tuple):
@@ -80,41 +82,40 @@ class DefaultWindReward(RewardFn):
         demand_idx = env.demand_power_idx
         
         # La contribución potencial de ESTE agente
-        solar_potential_idx = agent.solar_potential_idx 
+        wind_potential_idx = state_tuple[0]  
         
         # --- 2. Calcular Desequilibrio y Magnitud ---
         delta_p = renewable_idx - demand_idx
         delta_abs = max(abs(delta_p), 1)
 
         # --- 3. Lógica de Recompensa (Estructura Plana) ---
-
+        
         # CASO 1: Suministro Correcto (PREMIO)
         # (Acción=Suministrar, Tenía potencial)
-        if agent.action == 1 and solar_potential_idx > 0:
-            return self.theta * solar_potential_idx
-        
+        if agent.action == 1 and wind_potential_idx > 0:
+            return self.theta * wind_potential_idx
+
         # CASO 2: Suministro Ilógico (CASTIGO)
         # (Acción=Suministrar, PERO no tenía potencial)
-        # (Solo entra aquí si action==1 Y solar_potential_idx==0)
+        # (Solo entra aquí si action==1 Y wind_potential_idx==0)
         elif agent.action == 1:
-            return -self.sigma 
+            return -self.beta 
 
         # CASO 3: Inacción Correcta (Forzada) (PREMIO)
         # (Acción=No Suministrar, No tenía potencial)
-        elif agent.action == 0 and solar_potential_idx == 0:
+        elif agent.action == 0 and wind_potential_idx == 0:
             return self.eta
         
         # CASO 4: Inacción Correcta (Inteligente) (PREMIO)
         # (Acción=No Suministrar, Tenía potencial, Había excedente)
-        # (Solo entra aquí si action==0, solar_potential_idx>0 Y delta_p>0)
+        # (Solo entra aquí si action==0, wind_potential_idx>0 Y delta_p>0)
         elif agent.action == 0 and delta_p > 0:
-            return self.gamma * delta_abs 
+            return self.nu * delta_abs 
         
         # CASO 5: Inacción Incorrecta (Fallo) (CASTIGO)
         # (Único caso restante: Acción=No Suministrar, Tenía potencial, Había déficit)
         else: 
             return -self.xi * delta_abs
-
 
 @register_reward("DefaultBatteryReward")
 class DefaultBatteryReward(RewardFn):

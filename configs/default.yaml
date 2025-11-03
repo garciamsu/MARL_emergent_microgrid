@@ -84,7 +84,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultSolarReward
-      params: {theta: 4, beta: 3, eta: 1, xi: 3}
+      params: {theta: 1, beta: 1, eta: 1, nu: 1, xi: 1}
     state_space:
       - {var: solar_power, source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -94,16 +94,16 @@ agents:
       efficiency: 0.98
 
   wind:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15
       gamma: 0.95
     reward:
       type: DefaultWindReward
-      params: {theta: 4, beta: 3, eta: 1, xi: 3}
+      params: {theta: 1, beta: 1, eta: 1, nu: 1, xi: 1}
     state_space:
-      - {var: wind_power,  source: local,    bins: auto}
+      - {var: wind_power,  source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
@@ -111,7 +111,7 @@ agents:
       efficiency: 0.95
 
   battery:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15
@@ -133,7 +133,7 @@ agents:
       p_discharge_max: 200
 
   grid:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15

@@ -27,6 +27,17 @@ class _AgentStub:
         self.action = action
 
 
+class _EnvStub:
+    """Minimal environment stub that provides attributes expected by
+    DefaultGridReward.compute: `renewable_power_idx`, `demand_power_idx` and `price`.
+    """
+
+    def __init__(self, renewable_power_idx: int, demand_power_idx: int, price: float = 1.0):
+        self.renewable_power_idx = renewable_power_idx
+        self.demand_power_idx = demand_power_idx
+        self.price = price
+
+
 def run_test(input_path: Path, output_path: Path):
     """
     Runs the reward calculation test for the grid agent using input data.
@@ -37,8 +48,8 @@ def run_test(input_path: Path, output_path: Path):
     if not input_path.exists():
         raise FileNotFoundError(f"Input file not found: {input_path}")
 
-    # Grid CSV usa comas
-    data_frame = pd.read_csv(input_path, delimiter=',')
+    # Grid CSV original usa punto y coma como separador
+    data_frame = pd.read_csv(input_path, delimiter=';')
     rewards = []
 
     reward_fn = build_reward_from_config('grid', DefaultGridReward)
@@ -48,9 +59,16 @@ def run_test(input_path: Path, output_path: Path):
         state_tuple = (
             int(row["battery_soc_idx"]),
             int(row["demand_power_idx"]),
-            int(row["total_power_idx"])
+            int(row["renewable_idx"])
         )
-        reward = reward_fn(agent, state_tuple=state_tuple)
+        # Construir un stub de entorno con los índices relevantes desde el CSV
+        env = _EnvStub(
+            renewable_power_idx=int(row.get("renewable_idx", row.get("renewable_potential_idx", 0))),
+            demand_power_idx=int(row.get("demand_power_idx", row.get("demand_idx", 0))),
+            price=float(row.get("price", 1.0)),
+        )
+
+        reward = reward_fn.compute(agent, env=env, state_tuple=state_tuple)
 
         rewards.append(reward)
 

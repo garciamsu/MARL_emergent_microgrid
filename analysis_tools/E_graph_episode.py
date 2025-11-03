@@ -18,7 +18,7 @@ except NameError:
 # 🔧 Corrección: el CSV está un nivel arriba de analysis_tools/
 BASE_DIRECTORY = os.path.join(SCRIPT_DIR, "..", "results", "evolution")
 
-EPISODE_TO_PLOT = 499
+EPISODE_TO_PLOT = 999
 OUTPUT_FILENAME = os.path.join(SCRIPT_DIR, "episode_dynamics.svg")
 
 # --- PARÁMETROS DE ESTILO ---

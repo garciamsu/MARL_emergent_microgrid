@@ -65,10 +65,10 @@ OUTPUT_DIR = os.path.join(PROJECT_ROOT, "test/solar/output/")
 DEFAULT_YAML = os.path.join(PROJECT_ROOT, "configs/default.yaml")
 
 # Método de optimización: "random_search" | "bayesian" | "evolutionary"
-OPTIMIZATION_METHOD = "bayesian"
+OPTIMIZATION_METHOD = "random_search"
 
 # Configuración de la optimización
-MAX_ITERATIONS = 5000
+MAX_ITERATIONS = 500
 POP_SIZE = 24
 MUTATION_RATE = 0.2
 CROSSOVER_RATE = 0.7

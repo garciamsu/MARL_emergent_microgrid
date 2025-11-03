@@ -115,8 +115,13 @@ def run_test(input_path: Path, output_path: Path):
 
 if __name__ == "__main__":
     base = Path(__file__).parent / 'input'
-
-    input_file = base / 'LoadAgent_Reward_Table.csv'
+    # Estandarizar: intentar 'Agent_Reward_Table.csv' primero, con retrocompatibilidad
+    candidates = [
+        base / 'Agent_Reward_Table.csv',
+        base / 'Load_Agent_Reward_Table.csv',
+        base / 'LoadAgent_Reward_Table.csv',
+    ]
+    input_file = next((c for c in candidates if c.exists()), candidates[0])
     output_file = Path(__file__).parent / 'output' / 'reward_load.csv'
 
     try:

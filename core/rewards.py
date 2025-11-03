@@ -40,29 +40,31 @@ class DefaultSolarReward(RewardFn):
         # CASO 1: Suministro Correcto (PREMIO)
         # (Acción=Suministrar, Tenía potencial)
         if agent.action == 1 and solar_potential_idx > 0:
-            return self.theta * solar_potential_idx
+            reward =  self.theta * solar_potential_idx
         
         # CASO 2: Suministro Ilógico (CASTIGO)
         # (Acción=Suministrar, PERO no tenía potencial)
         # (Solo entra aquí si action==1 Y solar_potential_idx==0)
         elif agent.action == 1:
-            return -self.beta 
+            reward =  -self.beta 
 
         # CASO 3: Inacción Correcta (Forzada) (PREMIO)
         # (Acción=No Suministrar, No tenía potencial)
         elif agent.action == 0 and solar_potential_idx == 0:
-            return self.eta
+            reward =  self.eta
         
         # CASO 4: Inacción Correcta (Inteligente) (PREMIO)
         # (Acción=No Suministrar, Tenía potencial, Había excedente)
         # (Solo entra aquí si action==0, solar_potential_idx>0 Y delta_p>0)
         elif agent.action == 0 and delta_p > 0:
-            return self.nu * delta_abs 
+            reward =  self.nu * delta_abs 
         
         # CASO 5: Inacción Incorrecta (Fallo) (CASTIGO)
         # (Único caso restante: Acción=No Suministrar, Tenía potencial, Había déficit)
         else: 
-            return -self.xi * delta_abs
+            reward =  -self.xi * delta_abs
+
+        return reward
 
 @register_reward("DefaultWindReward")
 class DefaultWindReward(RewardFn):
@@ -93,29 +95,31 @@ class DefaultWindReward(RewardFn):
         # CASO 1: Suministro Correcto (PREMIO)
         # (Acción=Suministrar, Tenía potencial)
         if agent.action == 1 and wind_potential_idx > 0:
-            return self.theta * wind_potential_idx
+            reward =  self.theta * wind_potential_idx
 
         # CASO 2: Suministro Ilógico (CASTIGO)
         # (Acción=Suministrar, PERO no tenía potencial)
         # (Solo entra aquí si action==1 Y wind_potential_idx==0)
         elif agent.action == 1:
-            return -self.beta 
+            reward =  -self.beta 
 
         # CASO 3: Inacción Correcta (Forzada) (PREMIO)
         # (Acción=No Suministrar, No tenía potencial)
         elif agent.action == 0 and wind_potential_idx == 0:
-            return self.eta
+            reward =  self.eta
         
         # CASO 4: Inacción Correcta (Inteligente) (PREMIO)
         # (Acción=No Suministrar, Tenía potencial, Había excedente)
-        # (Solo entra aquí si action==0, wind_potential_idx>0 Y delta_p>0)
+        # (Solo entra aquí si action==0, wind_potential_idx>0 Y delta_pº>0)
         elif agent.action == 0 and delta_p > 0:
-            return self.nu * delta_abs 
+            reward =  self.nu * delta_abs 
         
         # CASO 5: Inacción Incorrecta (Fallo) (CASTIGO)
         # (Único caso restante: Acción=No Suministrar, Tenía potencial, Había déficit)
         else: 
-            return -self.xi * delta_abs
+            reward = -self.xi * delta_abs
+
+        return reward
 
 @register_reward("DefaultBatteryReward")
 class DefaultBatteryReward(RewardFn):
@@ -147,37 +151,39 @@ class DefaultBatteryReward(RewardFn):
         # (Acción=Descargar, Hay Déficit, Batería tiene carga)
         if agent.action == 2 and delta_p < 0 and soc > 0:
             # Premio por suplir la demanda
-            return self.psi * abs(delta_p) * soc
+            reward = self.psi * abs(delta_p) * soc
 
         # CASO 2: Descarga Incorrecta (CASTIGO)
         # (Acción=Descargar, PERO hay Excedente O Batería vacía)
         elif agent.action == 2 and (delta_p >= 0 or soc == 0):
             # Castigo fijo por acción ilógica o innecesaria
-            return -self.sigma
+            reward = -self.sigma
 
         # CASO 3: Carga Correcta (PREMIO)
         # (Acción=Cargar, Hay Excedente)
         elif agent.action == 1 and delta_p > 0:
             # Premio por almacenar excedente (escala con espacio vacío)
-            return self.nu * delta_p * (agent.soc_max - soc)
+            reward = self.nu * delta_p * (agent.soc_max - soc)
 
         # CASO 4: Carga Incorrecta (CASTIGO)
         # (Acción=Cargar, PERO hay Déficit)
         elif agent.action == 1 and delta_p <= 0:
             # Castigo por empeorar el déficit
-            return -self.beta * abs(delta_p)
+            reward = -self.beta * abs(delta_p)
 
         # CASO 5: Inacción Incorrecta (CASTIGO)
         # (Acción=Inactivo, PERO hay Desequilibrio)
         elif agent.action == 0 and abs(delta_p) > 0:
             # Castigo por no actuar (cargar o descargar)
-            return -self.xi * abs(delta_p)
+            reward = -self.xi * abs(delta_p)
 
         # CASO 6 ("else"): Inacción Correcta (PREMIO)
         # (Acción=Inactivo, Hay Equilibrio perfecto)
         else:
             # Tu corrección: Premio por inacción correcta
-            return self.mu
+            reward = self.mu
+        
+        return reward
 
 
 @register_reward("DefaultGridReward")

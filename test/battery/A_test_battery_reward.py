@@ -53,19 +53,34 @@ def run_test(input_path: Path, output_path: Path):
     reward_fn = build_reward_from_config('battery', DefaultBatteryReward)
 
     for _, row in data_frame.iterrows():
-        # Map discrete soc_idx
-        soc_idx = float(row["battery_soc_idx"])
-        agent = _AgentStub(action=int(row["action"]))
+        # Map discrete soc_idx con tolerancia a nombres alternativos
+        def _to_num(v, default=0):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return float(default)
+
+        def _to_int(v, default=0):
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                try:
+                    return int(float(v))
+                except (TypeError, ValueError):
+                    return int(default)
+
+        soc_idx = _to_num(row.get("soc_idx", row.get("battery_soc_idx", row.get("soc", 0))))
+        agent = _AgentStub(action=_to_int(row.get("action", 0)))
         # state_tuple: (soc, demand_idx, total_idx)
         state_tuple = (
             soc_idx,
-            int(row["demand_power_idx"]),
-            int(row["renewable_idx"])
+            _to_int(row.get("demand_power_idx", row.get("demand_idx", 0))),
+            _to_int(row.get("renewable_idx", row.get("total_power_idx", row.get("renewable_potential_idx", 0))))
         )
         # Construir un stub de entorno con los índices relevantes desde el CSV
         env = _EnvStub(
-            renewable_power_idx=int(row.get("renewable_idx", row.get("renewable_idx", 0))),
-            demand_power_idx=int(row.get("demand_power_idx", row.get("demand_idx", 0)))
+            renewable_power_idx=_to_int(row.get("renewable_idx", row.get("renewable_potential_idx", row.get("total_power_idx", 0)))),
+            demand_power_idx=_to_int(row.get("demand_power_idx", row.get("demand_idx", 0)))
         )
         # Direct reward calculation
         reward = reward_fn.compute(agent, env=env, state_tuple=state_tuple)
@@ -81,7 +96,14 @@ def run_test(input_path: Path, output_path: Path):
 
 
 if __name__ == "__main__":
-    input_file = Path(__file__).parent / 'input' / 'Battery_Agent_Reward_Table.csv'
+    base = Path(__file__).parent / 'input'
+    # Estructura estandarizada: preferir 'Agent_Reward_Table.csv', con retrocompatibilidad
+    candidates = [
+        base / 'Agent_Reward_Table.csv',
+        base / 'Battery_Agent_Reward_Table.csv',
+        base / 'BatteryAgent_Reward_Table.csv',
+    ]
+    input_file = next((c for c in candidates if c.exists()), candidates[0])
     output_file = Path(__file__).parent / 'output' / 'reward_battery.csv'
 
     try:

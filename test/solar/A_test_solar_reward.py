@@ -50,16 +50,27 @@ def run_test(input_path: Path, output_path: Path):
 
     reward_fn = build_reward_from_config('solar', DefaultSolarReward)
     for _, row in data_frame.iterrows():
-        agent = _AgentStub(action=int(row["action"]))
+        def _to_int(v, default=0):
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                try:
+                    return int(float(v))
+                except (TypeError, ValueError):
+                    return int(default)
+
+        agent = _AgentStub(action=_to_int(row.get("action", 0)))
         # state_tuple: (solar_idx, demand_idx, renewable_idx)
         state_tuple = (
-            int(row["solar_idx"]),
-            int(row["demand_idx"]),
-            int(row["renewable_idx"])  # treat total as renewable aggregate
+            _to_int(row.get("solar_idx", row.get("solar_potential_idx", 0))),
+            _to_int(row.get("demand_idx", row.get("demand_power_idx", 0))),
+            _to_int(row.get("renewable_idx", row.get("renewable_potential_idx", row.get("total_power_idx", 0))))
         )
         # Construir un stub de entorno con los índices del CSV y calcular la recompensa
-        env = _EnvStub(renewable_power_idx=int(row["renewable_idx"]),
-                       demand_power_idx=int(row["demand_idx"]))
+        env = _EnvStub(
+            renewable_power_idx=_to_int(row.get("renewable_idx", row.get("renewable_potential_idx", row.get("total_power_idx", 0)))),
+            demand_power_idx=_to_int(row.get("demand_idx", row.get("demand_power_idx", 0)))
+        )
         reward = reward_fn.compute(agent, env=env, state_tuple=state_tuple)
         rewards.append(reward)
 
@@ -73,7 +84,14 @@ def run_test(input_path: Path, output_path: Path):
 
 
 if __name__ == "__main__":
-    input_file = Path(__file__).parent / 'input' / 'Solar_Agent_Reward_Table.csv'
+    base = Path(__file__).parent / 'input'
+    # Estandarizar: intentar 'Agent_Reward_Table.csv' primero, con retrocompatibilidad
+    candidates = [
+        base / 'Agent_Reward_Table.csv',
+        base / 'Solar_Agent_Reward_Table.csv',
+        base / 'SolarAgent_Reward_Table.csv',
+    ]
+    input_file = next((c for c in candidates if c.exists()), candidates[0])
     output_file = Path(__file__).parent / 'output' / 'reward_solar.csv'
 
     try:

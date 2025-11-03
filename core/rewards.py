@@ -71,32 +71,63 @@ class DefaultWindReward(RewardFn):
 class DefaultBatteryReward(RewardFn):
     """Replica la lógica de BatteryAgent.calculate_reward."""
 
-    def __init__(self, psi=1.0, sigma=1.0, nu=1.0, beta=1.0, xi=1.0, **kwargs):
+    def __init__(self, psi=1.0, sigma=1.0, nu=1.0, beta=1.0, xi=1.0,  mu=1.0, **kwargs):
         self.psi = psi
         self.sigma = sigma
         self.nu = nu
         self.beta = beta
         self.xi = xi
+        self.mu = mu
 
     def compute(self, agent, env, state_tuple):
 
-        soc, demand_idx, total_idx = state_tuple
-        delta_p = total_idx - demand_idx
+        # --- 1. Obtener Variables de Estado y Entorno ---
+        soc, demand_idx, _ = state_tuple # total_idx no se usa
 
-        print(f"DEBUG: action={agent.action}, soc={soc}, demand_idx={demand_idx}, total_idx={total_idx}, delta_p={delta_p}")
-        agent.soc_max = 4
+        # Corrección: Definir el desequilibrio ANTES de la acción de la batería
+        renewable_idx = env.renewable_power_idx
+        delta_p = renewable_idx - demand_idx
+
+        # Asegurar que soc_max esté definido
+        agent.soc_max = 4 # O el valor real
+
+        # --- 3. Lógica de Recompensa (Corregida) ---
+
+        # CASO 1: Descarga Correcta (PREMIO)
+        # (Acción=Descargar, Hay Déficit, Batería tiene carga)
         if agent.action == 2 and delta_p < 0 and soc > 0:
+            # Premio por suplir la demanda
             return self.psi * abs(delta_p) * soc
+
+        # CASO 2: Descarga Incorrecta (CASTIGO)
+        # (Acción=Descargar, PERO hay Excedente O Batería vacía)
         elif agent.action == 2 and (delta_p >= 0 or soc == 0):
+            # Castigo fijo por acción ilógica o innecesaria
             return -self.sigma
+
+        # CASO 3: Carga Correcta (PREMIO)
+        # (Acción=Cargar, Hay Excedente)
         elif agent.action == 1 and delta_p > 0:
+            # Premio por almacenar excedente (escala con espacio vacío)
             return self.nu * delta_p * (agent.soc_max - soc)
+
+        # CASO 4: Carga Incorrecta (CASTIGO)
+        # (Acción=Cargar, PERO hay Déficit)
         elif agent.action == 1 and delta_p <= 0:
+            # Castigo por empeorar el déficit
             return -self.beta * abs(delta_p)
+
+        # CASO 5: Inacción Incorrecta (CASTIGO)
+        # (Acción=Inactivo, PERO hay Desequilibrio)
         elif agent.action == 0 and abs(delta_p) > 0:
+            # Castigo por no actuar (cargar o descargar)
             return -self.xi * abs(delta_p)
+
+        # CASO 6 ("else"): Inacción Correcta (PREMIO)
+        # (Acción=Inactivo, Hay Equilibrio perfecto)
         else:
-            return 0.0
+            # Tu corrección: Premio por inacción correcta
+            return self.mu
 
 
 @register_reward("DefaultGridReward")

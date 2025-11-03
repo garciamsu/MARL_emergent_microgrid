@@ -118,7 +118,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultBatteryReward
-      params: {psi: 3.823, sigma: 1.015, nu: 3.743, beta: 1.730, xi: 0.591}
+      params: {psi: 3.823, sigma: 1.015, nu: 3.743, beta: 1.730, xi: 0.591, mu: 0.1}
     state_space:
       - {var: soc,         source: self,    bins: [0,0.2,0.4,0.6,0.8,1.0]}
       - {var: demand,      source: env,     bins: auto}

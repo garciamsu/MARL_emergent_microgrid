@@ -104,11 +104,10 @@ def run_test(input_path: Path, output_path: Path):
         prices.append(price)
 
         # Log the reward calculation for debugging
-        # print(f"State: {state_tuple}, Action: {agent.action}, Reward: {reward}")
+        print(f"State: {state_tuple}, Action: {agent.action}, Reward: {reward}")
 
     data_frame["price"] = prices
     data_frame["reward"] = rewards
-    print(data_frame)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     data_frame.to_csv(output_path, index=False, encoding='utf-8')
     print(f"Load reward test completed. Results saved to: {output_path}")

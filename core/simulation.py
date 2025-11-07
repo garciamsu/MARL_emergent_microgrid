@@ -145,16 +145,29 @@ def run_training(config):
     for episode in range(num_episodes):
         env.reset()
 
+        # Flag: último episodio
+        is_last_episode = (episode == num_episodes - 1)
+
         # Per-episode demand scaling (fixed or random) from config
         demand_cfg = config.get("simulation", {}).get("demand_scale", {}) or {}
         demand_mode = str(demand_cfg.get("mode", "fixed")).lower()
         if demand_mode == "random":
+            # Por defecto, muestrear aleatoriamente entre min y max
             dmin = float(demand_cfg.get("min", 0.8))
             dmax = float(demand_cfg.get("max", 1.2))
             if dmax < dmin:
                 dmin, dmax = dmax, dmin
             sampled = float(np.random.uniform(dmin, dmax))
             env.scale_demand = max(0.01, sampled)
+
+            # En el último episodio, desactivar aleatoriedad y usar valor fijo
+            if is_last_episode:
+                dfixed = float(demand_cfg.get("fixed", 1.0))
+                env.scale_demand = max(0.01, dfixed)
+                try:
+                    logger.info("[Override último episodio] demand_scale: usando fijo=%.4f", env.scale_demand)
+                except Exception:
+                    pass
         else:
             dfixed = float(demand_cfg.get("fixed", 1.0))
             env.scale_demand = max(0.01, dfixed)
@@ -166,6 +179,7 @@ def run_training(config):
         soc_min_cfg = float(limits_cfg.get("soc_min", 0.0))
         soc_max_cfg = float(limits_cfg.get("soc_max", 1.0))
         initial_soc_spec = limits_cfg.get("initial_soc", 0.0)
+        has_initial_soc_key = "initial_soc" in limits_cfg
         init_soc_min = float(limits_cfg.get("initial_soc_min", 0.2))
         init_soc_max = float(limits_cfg.get("initial_soc_max", 0.8))
         if init_soc_max < init_soc_min:
@@ -173,10 +187,9 @@ def run_training(config):
 
         for a_name, a in agents.items():
             if "battery" in a_name.lower():
-                if initial_soc_mode == "random":
-                    val = float(np.random.uniform(init_soc_min, init_soc_max))
-                else:
-                    spec = initial_soc_spec
+                # Modo efectivo: en el último episodio forzar uso de valor fijo si estaba en random
+                if initial_soc_mode == "random" and is_last_episode:
+                    spec = initial_soc_spec if has_initial_soc_key else 0.5
                     if isinstance(spec, (list, tuple)):
                         try:
                             idx = int(a_name.split('#')[1]) if '#' in a_name else 0
@@ -189,6 +202,27 @@ def run_training(config):
                             val = 0.5
                     else:
                         val = float(spec)
+                    try:
+                        logger.info("[Override último episodio] %s.initial_soc=%.4f", a_name, val)
+                    except Exception:
+                        pass
+                else:
+                    if initial_soc_mode == "random":
+                        val = float(np.random.uniform(init_soc_min, init_soc_max))
+                    else:
+                        spec = initial_soc_spec
+                        if isinstance(spec, (list, tuple)):
+                            try:
+                                idx = int(a_name.split('#')[1]) if '#' in a_name else 0
+                            except Exception:
+                                idx = 0
+                            if len(spec) > 0:
+                                pick_idx = min(max(idx, 0), len(spec) - 1)
+                                val = float(spec[pick_idx])
+                            else:
+                                val = 0.5
+                        else:
+                            val = float(spec)
                 # Clip to configured battery limits
                 a.soc = max(soc_min_cfg, min(soc_max_cfg, val))
                 # Update discrete index according to battery bins

@@ -18,6 +18,7 @@ Limitations / Future work:
 """
 
 import pandas as pd
+import numpy as np
 from core.environment import MultiAgentEnv
 from agents import instantiate_agents
 from core.utils import set_global_seed, build_logger
@@ -143,6 +144,57 @@ def run_training(config):
 
     for episode in range(num_episodes):
         env.reset()
+
+        # Per-episode demand scaling (fixed or random) from config
+        demand_cfg = config.get("simulation", {}).get("demand_scale", {}) or {}
+        demand_mode = str(demand_cfg.get("mode", "fixed")).lower()
+        if demand_mode == "random":
+            dmin = float(demand_cfg.get("min", 0.8))
+            dmax = float(demand_cfg.get("max", 1.2))
+            if dmax < dmin:
+                dmin, dmax = dmax, dmin
+            sampled = float(np.random.uniform(dmin, dmax))
+            env.scale_demand = max(0.01, sampled)
+        else:
+            dfixed = float(demand_cfg.get("fixed", 1.0))
+            env.scale_demand = max(0.01, dfixed)
+
+        # Per-episode battery initial SOC setup (fixed/list or random)
+        battery_cfg = (config.get("agents", {}).get("battery", {}) or {})
+        limits_cfg = battery_cfg.get("limits", {}) or {}
+        initial_soc_mode = str(limits_cfg.get("initial_soc_mode", "fixed")).lower()
+        soc_min_cfg = float(limits_cfg.get("soc_min", 0.0))
+        soc_max_cfg = float(limits_cfg.get("soc_max", 1.0))
+        initial_soc_spec = limits_cfg.get("initial_soc", 0.0)
+        init_soc_min = float(limits_cfg.get("initial_soc_min", 0.2))
+        init_soc_max = float(limits_cfg.get("initial_soc_max", 0.8))
+        if init_soc_max < init_soc_min:
+            init_soc_min, init_soc_max = init_soc_max, init_soc_min
+
+        for a_name, a in agents.items():
+            if "battery" in a_name.lower():
+                if initial_soc_mode == "random":
+                    val = float(np.random.uniform(init_soc_min, init_soc_max))
+                else:
+                    spec = initial_soc_spec
+                    if isinstance(spec, (list, tuple)):
+                        try:
+                            idx = int(a_name.split('#')[1]) if '#' in a_name else 0
+                        except Exception:
+                            idx = 0
+                        if len(spec) > 0:
+                            pick_idx = min(max(idx, 0), len(spec) - 1)
+                            val = float(spec[pick_idx])
+                        else:
+                            val = 0.5
+                    else:
+                        val = float(spec)
+                # Clip to configured battery limits
+                a.soc = max(soc_min_cfg, min(soc_max_cfg, val))
+                # Update discrete index according to battery bins
+                if hasattr(a, "battery_soc_bins"):
+                    a.idx = digitize_clip(a.soc, a.battery_soc_bins)
+
         evolution = []
 
         # 0. Epsilon update (según scheduler configurado)

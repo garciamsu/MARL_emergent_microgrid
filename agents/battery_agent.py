@@ -1,3 +1,8 @@
+"""Battery agent implementing simple charge/discharge logic.
+
+Supports initial SOC configured as a single float or a list per battery index.
+"""
+
 import numpy as np
 from agents.base_agent import BaseAgent
 from core.registry import register_agent
@@ -14,7 +19,15 @@ class BatteryAgent(BaseAgent):
         2 -> discharge
     """
 
-    def __init__(self, env,  name="battery",capacity_ah=3, num_battery_soc_bins=5, state_space=None, **kwargs):
+    def __init__(
+        self,
+        env,
+        name: str = "battery",
+        capacity_ah: float = 3,
+        num_battery_soc_bins: int = 5,
+        state_space=None,
+        **kwargs,
+    ):
         super().__init__(env, name, [0, 1, 2], state_space=state_space, **kwargs)
 
         # Limits and electrical parameters
@@ -27,12 +40,28 @@ class BatteryAgent(BaseAgent):
         self.p_discharge_max = limits.get("p_discharge_max", 100.0)  # W (positive when discharging)
 
         # State of charge (continuous [0,1]) and discretization bins
-        # Read initial SOC from kwargs (preferred) or from limits, fallback to 0.5
-        initial_soc = kwargs.get("initial_soc", None)
-        if initial_soc is None:
-            initial_soc = limits.get("initial_soc", 0.8)
+        # Read initial SOC from kwargs (preferred) or from limits, with support for list-per-battery
+        initial_soc_cfg = kwargs.get("initial_soc", None)
+        if initial_soc_cfg is None:
+            initial_soc_cfg = limits.get("initial_soc", 0.8)
+
+        # If initial_soc is a list, pick based on the battery index in the agent name
+        if isinstance(initial_soc_cfg, (list, tuple)):
+            try:
+                idx = int(self.name.split('#')[1]) if '#' in self.name else 0
+            except Exception:
+                idx = 0
+            if len(initial_soc_cfg) == 0:
+                initial_soc_value = 0.5
+            else:
+                # If idx out of range, use last value
+                pick_idx = min(idx, len(initial_soc_cfg) - 1)
+                initial_soc_value = initial_soc_cfg[pick_idx]
+        else:
+            initial_soc_value = initial_soc_cfg
+
         try:
-            self.soc = float(initial_soc)
+            self.soc = float(initial_soc_value)
         except (TypeError, ValueError):
             # In case of malformed config value, fallback to safe default
             self.soc = 0.5
@@ -105,11 +134,11 @@ class BatteryAgent(BaseAgent):
         env.soc_idx = self.idx
 
     def update_soc(
-            self,
-            power_w: float,
-            dt_h: float = 1.0,
-            nominal_voltage: float = 48.0  # default value in volts
-        ) -> None:
+        self,
+        power_w: float,
+        dt_h: float = 1.0,
+        nominal_voltage: float = 48.0,
+    ) -> None:
         """
         Updates the battery's state of charge (SOC).
 

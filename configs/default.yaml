@@ -15,6 +15,13 @@ simulation:
   seed: 42
   dataset: Case1.csv
 
+  # Demand scaling per episode. If not provided, defaults to fixed=1.0
+  demand_scale:
+    mode: random        # fixed | random
+    fixed: 1.0         # used when mode=fixed
+    min: 0.3           # used when mode=random (uniform U[min,max])
+    max: 2.0
+
   epsilon:
     schedule: linear    # linear | exponential | constant | custom
     start: 1.0
@@ -128,7 +135,17 @@ agents:
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
+      # Initial SOC can be a single float (applies to all batteries)
+      # or a list of floats (applied per battery index in order).
+      # Additionally, per-episode behavior is controlled by the following keys:
+      # - initial_soc_mode: fixed | random
+      #   * fixed  -> uses initial_soc (float or list)
+      #   * random -> samples U[initial_soc_min, initial_soc_max] independently per battery
+      # Defaults keep backward compatibility (fixed at 0.0)
       initial_soc: 0.0
+      initial_soc_mode: fixed
+      initial_soc_min: 0.2
+      initial_soc_max: 0.8
       p_charge_max: 200
       p_discharge_max: 200
 

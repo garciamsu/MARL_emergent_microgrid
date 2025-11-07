@@ -143,6 +143,89 @@ for cfg in configs/exp_*.yaml; do python main.py --config "$cfg"; done
 
 ---
 
+## Configuraciones por episodio: demanda y SOC inicial
+
+Estas opciones permiten variar por episodio la demanda y el estado de carga inicial de las baterías, manteniendo compatibilidad si no se configuran (valores fijos por defecto).
+
+### Escalado de demanda por episodio
+
+Bloque en `simulation.demand_scale`:
+
+```yaml
+simulation:
+  demand_scale:
+    mode: fixed        # fixed | random
+    fixed: 1.0         # usado cuando mode=fixed (por defecto)
+    min: 0.8           # usado cuando mode=random (muestreo uniforme U[min,max])
+    max: 1.2
+```
+
+- Si `mode=fixed` (por defecto), la demanda del dataset se multiplica por `fixed` (1.0 = sin cambios).
+- Si `mode=random`, en cada episodio se toma `scale_demand ~ U[min,max]` con un mínimo forzado de 0.01 para evitar valores no físicos.
+- La aleatoriedad es determinista bajo `simulation.seed`.
+
+### SOC inicial de baterías por episodio
+
+Claves en `agents.battery.limits`:
+
+```yaml
+agents:
+  battery:
+    limits:
+      initial_soc: 0.0         # float (todas las baterías) o lista por índice, p.ej. [0.1, 0.3]
+      initial_soc_mode: fixed  # fixed | random (por defecto fixed)
+      initial_soc_min: 0.2     # usado cuando mode=random
+      initial_soc_max: 0.8
+      soc_min: 0.0             # límites de recorte efectivos
+      soc_max: 1.0
+```
+
+- Con `initial_soc_mode=fixed`, se usa `initial_soc` tal cual:
+  - Si es un número, aplica a todas las baterías.
+  - Si es una lista, se aplica por índice: `battery#0` toma el primer valor, `battery#1` el segundo, etc. Si hay menos valores que baterías, se reutiliza el último.
+- Con `initial_soc_mode=random`, en cada episodio cada batería toma su propio valor independiente `U[initial_soc_min, initial_soc_max]`.
+- Siempre se recorta a `[soc_min, soc_max]`.
+- Si `agents.battery.count = 0`, no se aplica nada.
+
+Ejemplos rápidos:
+
+```yaml
+# Demanda fija (por defecto)
+simulation:
+  demand_scale:
+    mode: fixed
+    fixed: 1.0
+
+# Demanda aleatoria por episodio
+simulation:
+  demand_scale:
+    mode: random
+    min: 0.9
+    max: 1.1
+
+# SOC inicial fijo por lista (dos baterías)
+agents:
+  battery:
+    count: 2
+    limits:
+      initial_soc_mode: fixed
+      initial_soc: [0.2, 0.6]
+
+# SOC inicial aleatorio por episodio y por batería
+agents:
+  battery:
+    limits:
+      initial_soc_mode: random
+      initial_soc_min: 0.3
+      initial_soc_max: 0.7
+```
+
+Notas:
+- No se añaden columnas ni logs nuevos; la compatibilidad de exportaciones se mantiene.
+- Cambiar estas opciones no altera la estructura de recompensas ni el orden de actualización de agentes.
+
+---
+
 ## Logging y Reproducibilidad
 
 - Semilla global: `simulation.seed` (controla Python, NumPy y Torch si disponible).

@@ -143,9 +143,9 @@ agents:
       #   * random -> samples U[initial_soc_min, initial_soc_max] independently per battery
       # Defaults keep backward compatibility (fixed at 0.0)
       initial_soc: 0.0
-      initial_soc_mode: fixed
-      initial_soc_min: 0.2
-      initial_soc_max: 0.8
+      initial_soc_mode: random
+      initial_soc_min: 0.0
+      initial_soc_max: 1.0
       p_charge_max: 200
       p_discharge_max: 200
 

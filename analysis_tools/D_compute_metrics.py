@@ -2,218 +2,202 @@
 """
 D_compute_metrics.py
 
-Calcula métricas operativas y de aprendizaje a partir de los episodios.
-Imprime resumen en consola con PASS/FAIL según umbrales de configs/default.yaml.
+Calcula métricas operativas y de aprendizaje cuando el entrenamiento ha
+finalizado, usando el último episodio disponible en results/evolution/.
+
+Métricas calculadas (en columnas separadas):
+- MEAN/VAR/IAE/ISE para env_energy_balance y env_energy_balance_idx (VAR muestral)
+- Penetración por energía (renovables y red) filtrando por acciones
+- Penetración por tiempo (renovables y red) basada en acciones
+
+Imprime una tabla resumida y guarda un CSV con los resultados.
 """
 
 import os
 import sys
 from pathlib import Path
+import re
+import glob
+import numpy as np
 import pandas as pd
 
 # Añadir raíz al path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from analysis_tools.metrics import (
-    compute_energy_balance_metrics,
-    compute_penetration_metrics,
-    compute_cumulative_rewards
-)
-from analysis_tools.utils import load_episode_csvs
 from configs.loader import load_config
 
 
-def compute_metrics_all_episodes(pattern: str = "results/evolution/episode_*.csv"):
+def _find_latest_episode_file(pattern: str = "results/evolution/episode_*.csv") -> tuple[str, int]:
+    """Devuelve la ruta y el número del último episodio (número más alto).
+    Si hay empates, se usa el de timestamp más reciente.
     """
-    Calcula métricas para todos los episodios.
-    
-    Args:
-        pattern: Patrón glob para buscar episodios.
-    
-    Returns:
-        DataFrame con métricas por episodio.
-    """
-    import glob
-    import re
-    
-    files = sorted(glob.glob(pattern))
-    
+    files = glob.glob(pattern)
     if not files:
-        print(f"⚠️  No se encontraron episodios en {pattern}")
-        return pd.DataFrame()
-    
-    all_metrics = []
-    
-    for file_path in files:
-        ep_match = re.search(r"episode_(\d+)\.csv", file_path)
-        if not ep_match:
-            continue
-        
-        ep_num = int(ep_match.group(1))
-        
-        try:
-            df = pd.read_csv(file_path)
-        except Exception as e:
-            print(f"⚠️  Error cargando {file_path}: {e}")
-            continue
-        
-        # Métricas del episodio
-        metrics = {"episode": ep_num}
-        
-        # Balance energético
-        metrics.update(compute_energy_balance_metrics(df))
-        
-        # Penetraciones
-        metrics.update(compute_penetration_metrics(df))
-        
-        # Recompensas acumuladas
-        metrics.update(compute_cumulative_rewards(df))
-        
-        all_metrics.append(metrics)
-    
-    return pd.DataFrame(all_metrics)
+        return "", -1
+
+    def key_fn(path_str):
+        match = re.search(r"episode_(\d+)\.csv", path_str)
+        num = int(match.group(1)) if match else -1
+        return (num, os.path.getmtime(path_str))
+
+    latest = max(files, key=key_fn)
+    match = re.search(r"episode_(\d+)\.csv", latest)
+    ep_num = int(match.group(1)) if match else -1
+    return latest, ep_num
 
 
-def evaluate_thresholds(df_metrics: pd.DataFrame, thresholds: dict) -> dict:
+def _series_metrics(series: pd.Series) -> dict:
+    """Calcula MEAN, VAR (ddof=1), IAE, ISE para una serie numérica."""
+    arr = series.to_numpy(dtype=float)
+    n_samples = arr.size
+    mean = float(np.mean(arr)) if n_samples else 0.0
+    var = float(np.var(arr, ddof=1)) if n_samples > 1 else 0.0
+    iae = float(np.sum(np.abs(arr))) if n_samples else 0.0
+    ise = float(np.sum(arr ** 2)) if n_samples else 0.0
+    return {"MEAN": mean, "VAR": var, "IAE": iae, "ISE": ise}
+
+
+def _penetrations_with_actions(frame: pd.DataFrame) -> dict:
+    """Calcula penetraciones por energía y tiempo usando filtros por acción.
+
+    - Renovables (energía): sum_t min(solar_t + wind_t, demand_t) solo si
+      (action_solar != 0 o action_wind != 0) dividido por sum_t demand_t.
+    - Red (energía): sum_t max(grid_t, 0) solo si (action_grid != 0)
+      dividido por sum_t demand_t.
+    - Renovables (tiempo): fracción de pasos con (action_solar != 0 o action_wind != 0).
+    - Red (tiempo): fracción de pasos con (action_grid != 0).
     """
-    Evalúa métricas contra umbrales y retorna PASS/FAIL.
-    
-    Args:
-        df_metrics: DataFrame con métricas por episodio.
-        thresholds: Diccionario de umbrales desde config.
-    
-    Returns:
-        Diccionario con resultados de evaluación.
-    """
-    # Promedios globales
-    mean_metrics = df_metrics.mean(numeric_only=True)
-    
-    results = {}
-    
-    # IAE
-    iae_threshold = thresholds.get("IAE", float("inf"))
-    results["IAE"] = {
-        "value": mean_metrics.get("IAE", 0),
-        "threshold": iae_threshold,
-        "pass": mean_metrics.get("IAE", 0) <= iae_threshold
+    demand = frame.get("env_demand_power", pd.Series(dtype=float)).astype(float)
+    solar = frame.get("power_solar#0", pd.Series(dtype=float)).astype(float)
+    wind = frame.get("power_wind#0", pd.Series(dtype=float)).astype(float)
+    grid = frame.get("power_grid#0", pd.Series(dtype=float)).astype(float)
+
+    a_solar = frame.get("action_solar#0", pd.Series(dtype=float)).fillna(0)
+    a_wind = frame.get("action_wind#0", pd.Series(dtype=float)).fillna(0)
+    a_grid = frame.get("action_grid#0", pd.Series(dtype=float)).fillna(0)
+
+    use_re = (a_solar != 0) | (a_wind != 0)
+    use_grid = a_grid != 0
+
+    re_power = (solar + wind).clip(lower=0)
+    effective_re = np.minimum(re_power, demand)
+
+    demand_sum = float(demand.sum())
+    n_steps = len(frame)
+
+    if demand_sum <= 0:
+        ren_energy_pen = 0.0
+        grid_energy_pen = 0.0
+    else:
+        ren_energy_pen = float(effective_re[use_re].sum() / demand_sum)
+        grid_energy_pen = float(grid.clip(lower=0)[use_grid].sum() / demand_sum)
+
+    ren_time_pen = float(use_re.mean()) if n_steps > 0 else 0.0
+    grid_time_pen = float(use_grid.mean()) if n_steps > 0 else 0.0
+
+    return {
+        "Renewable_Penetration_energy": ren_energy_pen,
+        "Grid_Penetration_energy": grid_energy_pen,
+        "Renewable_Penetration_time": ren_time_pen,
+        "Grid_Penetration_time": grid_time_pen,
     }
-    
-    # ISE
-    ise_threshold = thresholds.get("ISE", float("inf"))
-    results["ISE"] = {
-        "value": mean_metrics.get("ISE", 0),
-        "threshold": ise_threshold,
-        "pass": mean_metrics.get("ISE", 0) <= ise_threshold
-    }
-    
-    # Variability
-    var_threshold = thresholds.get("Variability", float("inf"))
-    results["Variability"] = {
-        "value": mean_metrics.get("Variability", 0),
-        "threshold": var_threshold,
-        "pass": mean_metrics.get("Variability", 0) <= var_threshold
-    }
-    
-    # Renewable Penetration (mínimo)
-    re_min = thresholds.get("Renewable_Penetration_min", 0)
-    results["Renewable_Penetration"] = {
-        "value": mean_metrics.get("Renewable_Penetration", 0),
-        "threshold": f">= {re_min}",
-        "pass": mean_metrics.get("Renewable_Penetration", 0) >= re_min
-    }
-    
-    # Grid Penetration (máximo)
-    grid_max = thresholds.get("Grid_Penetration_max", float("inf"))
-    results["Grid_Penetration"] = {
-        "value": mean_metrics.get("Grid_Penetration", 0),
-        "threshold": f"<= {grid_max}",
-        "pass": mean_metrics.get("Grid_Penetration", 0) <= grid_max
-    }
-    
-    # Cumulative Reward Total (mínimo)
-    reward_min = thresholds.get("Cumulative_Reward_min", -float("inf"))
-    results["Cumulative_Reward_Total"] = {
-        "value": mean_metrics.get("total_reward_all", 0),
-        "threshold": f">= {reward_min}",
-        "pass": mean_metrics.get("total_reward_all", 0) >= reward_min
-    }
-    
-    return results
+
+
+def _format_table(metrics_row: dict) -> pd.DataFrame:
+    """Convierte el diccionario de métricas a una tabla ordenada para impresión."""
+    ordered = [
+        ("episode", metrics_row.get("episode")),
+        ("n_steps", metrics_row.get("n_steps")),
+        ("balance_MEAN", metrics_row.get("balance_MEAN")),
+        ("balance_VAR", metrics_row.get("balance_VAR")),
+        ("balance_IAE", metrics_row.get("balance_IAE")),
+        ("balance_ISE", metrics_row.get("balance_ISE")),
+        ("balance_idx_MEAN", metrics_row.get("balance_idx_MEAN")),
+        ("balance_idx_VAR", metrics_row.get("balance_idx_VAR")),
+        ("balance_idx_IAE", metrics_row.get("balance_idx_IAE")),
+        ("balance_idx_ISE", metrics_row.get("balance_idx_ISE")),
+        ("Renewable_Penetration_energy", metrics_row.get("Renewable_Penetration_energy")),
+        ("Grid_Penetration_energy", metrics_row.get("Grid_Penetration_energy")),
+        ("Renewable_Penetration_time", metrics_row.get("Renewable_Penetration_time")),
+        ("Grid_Penetration_time", metrics_row.get("Grid_Penetration_time")),
+    ]
+    table_df = pd.DataFrame(ordered, columns=["Metric", "Value"])
+    return table_df
 
 
 def main():
     """Punto de entrada principal."""
-    print("="*80)
-    print("📊 D_compute_metrics.py - Calcular Métricas")
-    print("="*80)
-    
-    # Cargar configuración
+    print("=" * 80)
+    print("📊 D_compute_metrics.py - Métricas del último episodio")
+    print("=" * 80)
+
+    # Cargar configuración (por si se requiere en el futuro)
     try:
-        config = load_config()
-    except Exception as e:
-        print(f"\n❌ ERROR cargando configuración: {e}")
+        _ = load_config()
+    except Exception as exc:
+        print(f"\n⚠️ Advertencia al cargar configuración (no bloqueante): {exc}")
+
+    # Localizar último episodio
+    latest_path, ep_num = _find_latest_episode_file()
+    if not latest_path or ep_num < 0:
+        print("\n❌ No se encontraron episodios en results/evolution/.")
+        print("   Ejecuta primero analysis_tools/B_run_training.py o main.py")
         sys.exit(1)
-    
-    # Umbrales (placeholder: agregar a default.yaml si se desea)
-    thresholds = config.get("analysis", {}).get("thresholds", {
-        "IAE": 10000,
-        "ISE": 50000,
-        "Variability": 500,
-        "Renewable_Penetration_min": 0.3,
-        "Grid_Penetration_max": 0.7,
-        "Cumulative_Reward_min": -5000,
-    })
-    
-    print(f"\n📋 Umbrales configurados:")
-    for key, val in thresholds.items():
-        print(f"   {key}: {val}")
-    
-    # Calcular métricas
-    print(f"\n🔄 Calculando métricas de todos los episodios...")
-    
+
+    print(f"\n🗂️  Usando episodio más reciente: episode_{ep_num}.csv")
+    print(f"    Ruta: {latest_path}")
+
+    # Cargar episodio
     try:
-        df_metrics = compute_metrics_all_episodes()
-    except Exception as e:
-        print(f"\n❌ ERROR calculando métricas: {e}")
+        episode_df = pd.read_csv(latest_path)
+    except Exception as exc:
+        print(f"\n❌ Error leyendo {latest_path}: {exc}")
         sys.exit(1)
-    
-    if df_metrics.empty:
-        print(f"\n⚠️  No se encontraron episodios para analizar.")
-        print("   Ejecuta primero B_run_training.py.")
-        sys.exit(1)
-    
-    print(f"✅ Métricas calculadas para {len(df_metrics)} episodios.")
-    
-    # Evaluar contra umbrales
-    results = evaluate_thresholds(df_metrics, thresholds)
-    
-    # Imprimir resumen
-    print("\n" + "="*80)
-    print("📈 RESUMEN DE MÉTRICAS (Promedios)")
-    print("="*80)
-    
-    for metric_name, data in results.items():
-        status = "✅ PASS" if data["pass"] else "❌ FAIL"
-        print(f"\n{metric_name}:")
-        print(f"   Valor: {data['value']:.4f}")
-        print(f"   Umbral: {data['threshold']}")
-        print(f"   Estado: {status}")
-    
-    # Recompensas por agente
-    print("\n" + "="*80)
-    print("🏆 RECOMPENSAS POR AGENTE (Promedio)")
-    print("="*80)
-    
-    reward_cols = [c for c in df_metrics.columns if c.startswith("total_reward_") and c != "total_reward_all"]
-    for col in sorted(reward_cols):
-        agent_name = col.replace("total_reward_", "")
-        mean_reward = df_metrics[col].mean()
-        print(f"   {agent_name.capitalize()}: {mean_reward:.2f}")
-    
-    print("\n" + "="*80)
-    print("✅ Cálculo de métricas completado.")
-    print("   Siguiente paso: E_plot_metrics.py")
-    print("="*80)
+
+    # Métricas de balance (continuo e índice)
+    n_steps = len(episode_df)
+    bal = episode_df.get("env_energy_balance", pd.Series(dtype=float))
+    bal_idx = episode_df.get("env_energy_balance_idx", pd.Series(dtype=float))
+
+    m_bal = _series_metrics(bal)
+    m_idx = _series_metrics(bal_idx)
+
+    # Penetraciones con acciones
+    pens = _penetrations_with_actions(episode_df)
+
+    metrics_row = {
+        "episode": ep_num,
+        "n_steps": n_steps,
+        "balance_MEAN": m_bal["MEAN"],
+        "balance_VAR": m_bal["VAR"],
+        "balance_IAE": m_bal["IAE"],
+        "balance_ISE": m_bal["ISE"],
+        "balance_idx_MEAN": m_idx["MEAN"],
+        "balance_idx_VAR": m_idx["VAR"],
+        "balance_idx_IAE": m_idx["IAE"],
+        "balance_idx_ISE": m_idx["ISE"],
+        **pens,
+    }
+
+    table = _format_table(metrics_row)
+
+    # Imprimir tabla
+    print("\n" + "-" * 80)
+    print("Tabla de métricas (último episodio)")
+    print("-" * 80)
+    with pd.option_context("display.max_rows", None, "display.max_colwidth", 40):
+        print(table.to_string(index=False, header=["Métrica", "Valor"]))
+
+    # Guardar CSV con resultados
+    out_dir = Path("results/metrics")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"metrics_episode_{ep_num}.csv"
+    pd.DataFrame([metrics_row]).to_csv(out_path, index=False)
+
+    print("\n" + "=" * 80)
+    print("✅ Cálculo de métricas completado y guardado.")
+    print(f"   Archivo: {out_path}")
+    print("=" * 80)
 
 
 if __name__ == "__main__":

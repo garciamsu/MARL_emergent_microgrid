@@ -173,7 +173,7 @@ class DefaultBatteryReward(RewardFn):
 
         # CASO 5: Inacción Incorrecta (CASTIGO)
         # (Acción=Inactivo, PERO hay Desequilibrio)
-        elif agent.action == 0 and abs(delta_p) > 0:
+        elif agent.action == 0 and soc > 0:
             # Castigo por no actuar (cargar o descargar)
             reward = -self.xi * abs(delta_p)
 

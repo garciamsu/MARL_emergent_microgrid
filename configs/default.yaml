@@ -10,17 +10,18 @@ offline_run: null  # set run_id if mode=offline
 # ==============================================================
 
 simulation:
-  episodes: 500
+  episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
-  dataset: Case2.csv
+  dataset: Case2_v2.csv
 
-  # Demand scaling per episode. If not provided, defaults to fixed=1.0
+  # Demand scaling per episode. DEPRECATED: Now using direct demand from dataset.
+  # Kept for backward compatibility but ignored in random 24h window mode.
   demand_scale:
-    mode: random        # fixed | random
-    fixed: 1.0         # used when mode=fixed
-    min: 0.3           # used when mode=random (uniform U[min,max])
-    max: 2.0
+    mode: fixed         # fixed | random (use 'fixed' to disable artificial scaling)
+    fixed: 1.0          # no scaling applied
+    min: 1.0
+    max: 1.0
 
   epsilon:
     schedule: linear    # linear | exponential | constant | custom
@@ -97,7 +98,7 @@ agents:
       - {var: demand,      source: env,     bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
-      p_max: 500
+      p_max: 6000
       efficiency: 0.98
 
   wind:
@@ -114,7 +115,7 @@ agents:
       - {var: demand,      source: env,     bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
-      p_max: 300
+      p_max: 4000
       efficiency: 0.95
 
   battery:
@@ -131,23 +132,16 @@ agents:
       - {var: demand,      source: env,     bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
-      capacity_ah: 10
+      capacity_ah: 208
       v_nom: 48
-      soc_min: 0.0
-      soc_max: 1.0
-      # Initial SOC can be a single float (applies to all batteries)
-      # or a list of floats (applied per battery index in order).
-      # Additionally, per-episode behavior is controlled by the following keys:
-      # - initial_soc_mode: fixed | random
-      #   * fixed  -> uses initial_soc (float or list)
-      #   * random -> samples U[initial_soc_min, initial_soc_max] independently per battery
-      # Defaults keep backward compatibility (fixed at 0.0)
-      initial_soc: 0.0
-      initial_soc_mode: random
-      initial_soc_min: 0.0
-      initial_soc_max: 1.0
-      p_charge_max: 200
-      p_discharge_max: 200
+      soc_min: 0.1
+      soc_max: 0.9
+      # Initial SOC is now ALWAYS random per episode (as per mandatory changes)
+      # Random initial SOC sampled from U[initial_soc_min, initial_soc_max]
+      initial_soc_min: 0.1
+      initial_soc_max: 0.9
+      p_charge_max: 3000
+      p_discharge_max: 3000
 
   grid:
     count: 1
@@ -163,7 +157,7 @@ agents:
       - {var: demand,   source: env,      bins: auto}
       - {var: renewable,    source: global,   bins: auto}
     limits:
-      p_max: 1000
+      p_max: 15000
       export_allowed: false
 
   load:

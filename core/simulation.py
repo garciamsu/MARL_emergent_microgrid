@@ -143,88 +143,48 @@ def run_training(config):
     dt_h = config.get("simulation", {}).get("dt_h", 1.0)
 
     for episode in range(num_episodes):
-        env.reset()
-
-        # Flag: último episodio
-        is_last_episode = (episode == num_episodes - 1)
-
-        # Per-episode demand scaling (fixed or random) from config
-        demand_cfg = config.get("simulation", {}).get("demand_scale", {}) or {}
-        demand_mode = str(demand_cfg.get("mode", "fixed")).lower()
-        if demand_mode == "random":
-            # Por defecto, muestrear aleatoriamente entre min y max
-            dmin = float(demand_cfg.get("min", 0.8))
-            dmax = float(demand_cfg.get("max", 1.2))
-            if dmax < dmin:
-                dmin, dmax = dmax, dmin
-            sampled = float(np.random.uniform(dmin, dmax))
-            env.scale_demand = max(0.01, sampled)
-
-            # En el último episodio, desactivar aleatoriedad y usar valor fijo
-            if is_last_episode:
-                dfixed = float(demand_cfg.get("fixed", 1.0))
-                env.scale_demand = max(0.01, dfixed)
-                try:
-                    logger.info("[Override último episodio] demand_scale: usando fijo=%.4f", env.scale_demand)
-                except Exception:
-                    pass
+        # ==============================================
+        # 1. Select random 24-hour contiguous window
+        # ==============================================
+        full_dataset_length = len(env.full_dataset)
+        if full_dataset_length >= 24:
+            start = np.random.randint(0, full_dataset_length - 24)
+            episode_data = env.full_dataset.iloc[start:start + 24].copy()
         else:
-            dfixed = float(demand_cfg.get("fixed", 1.0))
-            env.scale_demand = max(0.01, dfixed)
-
-        # Per-episode battery initial SOC setup (fixed/list or random)
-        battery_cfg = (config.get("agents", {}).get("battery", {}) or {})
+            # Fallback: if dataset is shorter than 24 hours, use full dataset
+            episode_data = env.full_dataset.copy()
+            logger.warning("Dataset shorter than 24 hours. Using full dataset for episode %d.", episode)
+        
+        # ==============================================
+        # 2. Generate random initial SOC for battery
+        # ==============================================
+        battery_cfg = config.get("agents", {}).get("battery", {}) or {}
         limits_cfg = battery_cfg.get("limits", {}) or {}
-        initial_soc_mode = str(limits_cfg.get("initial_soc_mode", "fixed")).lower()
-        soc_min_cfg = float(limits_cfg.get("soc_min", 0.0))
-        soc_max_cfg = float(limits_cfg.get("soc_max", 1.0))
-        initial_soc_spec = limits_cfg.get("initial_soc", 0.0)
-        has_initial_soc_key = "initial_soc" in limits_cfg
-        init_soc_min = float(limits_cfg.get("initial_soc_min", 0.2))
-        init_soc_max = float(limits_cfg.get("initial_soc_max", 0.8))
+        init_soc_min = float(limits_cfg.get("initial_soc_min", 0.1))
+        init_soc_max = float(limits_cfg.get("initial_soc_max", 0.9))
+        
+        # Ensure valid range
         if init_soc_max < init_soc_min:
             init_soc_min, init_soc_max = init_soc_max, init_soc_min
-
+        
+        # Generate random initial SOC
+        initial_soc = np.random.uniform(init_soc_min, init_soc_max)
+        
+        # ==============================================
+        # 3. Reset environment with episode data and initial SOC
+        # ==============================================
+        env.reset(episode_data, initial_soc)
+        
+        # ==============================================
+        # 4. Set initial SOC for all battery agents
+        # ==============================================
+        soc_min_cfg = float(limits_cfg.get("soc_min", 0.0))
+        soc_max_cfg = float(limits_cfg.get("soc_max", 1.0))
+        
         for a_name, a in agents.items():
             if "battery" in a_name.lower():
-                # Modo efectivo: en el último episodio forzar uso de valor fijo si estaba en random
-                if initial_soc_mode == "random" and is_last_episode:
-                    spec = initial_soc_spec if has_initial_soc_key else 0.5
-                    if isinstance(spec, (list, tuple)):
-                        try:
-                            idx = int(a_name.split('#')[1]) if '#' in a_name else 0
-                        except Exception:
-                            idx = 0
-                        if len(spec) > 0:
-                            pick_idx = min(max(idx, 0), len(spec) - 1)
-                            val = float(spec[pick_idx])
-                        else:
-                            val = 0.5
-                    else:
-                        val = float(spec)
-                    try:
-                        logger.info("[Override último episodio] %s.initial_soc=%.4f", a_name, val)
-                    except Exception:
-                        pass
-                else:
-                    if initial_soc_mode == "random":
-                        val = float(np.random.uniform(init_soc_min, init_soc_max))
-                    else:
-                        spec = initial_soc_spec
-                        if isinstance(spec, (list, tuple)):
-                            try:
-                                idx = int(a_name.split('#')[1]) if '#' in a_name else 0
-                            except Exception:
-                                idx = 0
-                            if len(spec) > 0:
-                                pick_idx = min(max(idx, 0), len(spec) - 1)
-                                val = float(spec[pick_idx])
-                            else:
-                                val = 0.5
-                        else:
-                            val = float(spec)
                 # Clip to configured battery limits
-                a.soc = max(soc_min_cfg, min(soc_max_cfg, val))
+                a.soc = max(soc_min_cfg, min(soc_max_cfg, initial_soc))
                 # Update discrete index according to battery bins
                 if hasattr(a, "battery_soc_bins"):
                     a.idx = digitize_clip(a.soc, a.battery_soc_bins)
@@ -256,8 +216,9 @@ def run_training(config):
             # 3. Environment update based on agent actions
             # Sequential update order: Renewables → Load → Battery → Grid
 
-            # Load base demand and price from dataset
-            base_demand_from_dataset = env.dataset.iloc[index]["demand"] * env.scale_demand
+            # Load base demand and price from episode data (24h window)
+            data_source = env.episode_data if env.episode_data is not None else env.dataset
+            base_demand_from_dataset = data_source.iloc[index]["demand"]
             env.get_dataset("demand", index)
             env.get_dataset("price", index)
             
@@ -377,7 +338,7 @@ def run_training(config):
         episode_df = pd.DataFrame(evolution)
         episode_df.to_csv(f"results/evolution/episode_{episode}.csv", index=False)
         results.append(episode_df)
-
-    logger.info("Episode %d/%d completed | epsilon=%.3f", episode + 1, num_episodes, epsilon)
+        
+        logger.info("Episode %d/%d completed | epsilon=%.3f", episode + 1, num_episodes, epsilon)
 
     return agents, results

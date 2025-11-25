@@ -46,10 +46,37 @@ class MultiAgentEnv:
         print(f"Máximo valor calculado en dataset: {self.max_value}")
 
         self.power_bins = np.linspace(0, self.max_value, self.num_power_bins)
+        
+        # Store full dataset for random window selection
+        self.full_dataset = self.dataset.copy()
+        
+        # Initialize with full dataset (will be replaced per episode)
+        self.episode_data = None
+        self.current_step = 0
         self.reset()
 
-    def reset(self) -> None:
-        """Reset continuous and discretized attributes for a new episode."""
+    def reset(self, episode_data=None, initial_soc=None) -> None:
+        """Reset continuous and discretized attributes for a new episode.
+        
+        Args:
+            episode_data (pd.DataFrame, optional): 24-hour contiguous window from dataset.
+                If None, uses full dataset (for backward compatibility).
+            initial_soc (float, optional): Initial SOC for battery agent(s).
+                If None, battery agents maintain their configured initial SOC.
+        """
+        # Update episode data if provided
+        if episode_data is not None:
+            self.episode_data = episode_data
+            self.max_steps = len(episode_data)
+        else:
+            # Fallback to full dataset for backward compatibility
+            self.episode_data = self.full_dataset
+            self.max_steps = len(self.full_dataset)
+        
+        # Reset step counter
+        self.current_step = 0
+        
+        # Reset continuous variables
         self.renewable_potential = 0
         self.renewable_power = 0
         self.demand_power = 0
@@ -58,6 +85,7 @@ class MultiAgentEnv:
         self.energy_balance = 0
         self.soc_idx = 0
 
+        # Reset discretized indices
         self.renewable_potential_idx = digitize_clip(self.renewable_potential, self.power_bins)
         self.renewable_power_idx = digitize_clip(self.renewable_power, self.power_bins)
         self.demand_power_idx = digitize_clip(self.demand_power, self.power_bins)
@@ -83,8 +111,14 @@ class MultiAgentEnv:
         return df
 
     def get_dataset(self, field: str, index: int) -> int:
-        """Return discretized value for ``field`` at ``index`` updating env if needed."""
-        row = self.dataset.iloc[index]
+        """Return discretized value for ``field`` at ``index`` updating env if needed.
+        
+        Uses episode_data if available (from random 24h window), otherwise falls back to full dataset.
+        """
+        # Use episode_data if available, otherwise fall back to full dataset
+        data_source = self.episode_data if self.episode_data is not None else self.dataset
+        row = data_source.iloc[index]
+        
         if field == "demand":
             self.demand_power = row[field] * self.scale_demand
             self.demand_power_idx = digitize_clip(self.demand_power, self.power_bins)

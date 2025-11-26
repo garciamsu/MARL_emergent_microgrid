@@ -18,7 +18,33 @@ except NameError:
 # 🔧 Corrección: el CSV está un nivel arriba de analysis_tools/
 BASE_DIRECTORY = os.path.join(SCRIPT_DIR, "..", "results", "evolution")
 
-EPISODE_TO_PLOT = 499
+# Dynamic episode selection: find the latest episode file
+def get_latest_episode_number(base_dir):
+    """Find the episode number with the highest value in the directory."""
+    pattern = os.path.join(base_dir, "episode_*.csv")
+    files = glob.glob(pattern)
+    
+    if not files:
+        print("⚠️  No se encontraron archivos episode_*.csv")
+        return None
+    
+    episode_numbers = []
+    for file in files:
+        basename = os.path.basename(file)
+        try:
+            # Extract number from "episode_123.csv"
+            num_str = basename.replace("episode_", "").replace(".csv", "")
+            episode_numbers.append(int(num_str))
+        except ValueError:
+            continue
+    
+    if not episode_numbers:
+        print("⚠️  No se pudieron extraer números de episodio")
+        return None
+    
+    return max(episode_numbers)
+
+EPISODE_TO_PLOT = get_latest_episode_number(BASE_DIRECTORY) or 0
 OUTPUT_FILENAME = os.path.join(SCRIPT_DIR, "episode_dynamics.svg")
 
 # --- PARÁMETROS DE ESTILO ---
@@ -253,5 +279,8 @@ if __name__ == "__main__":
     output_dir = os.path.dirname(OUTPUT_FILENAME)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+    
+    print(f"🔍 Episodio seleccionado automáticamente: {EPISODE_TO_PLOT}")
+    print(f"📂 Directorio base: {BASE_DIRECTORY}")
         
     plot_episode_dynamics(BASE_DIRECTORY, EPISODE_TO_PLOT, PLOT_CONFIG)

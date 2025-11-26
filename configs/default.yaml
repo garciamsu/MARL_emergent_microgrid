@@ -90,7 +90,7 @@ metrics:
 agents:
 
   solar:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15
@@ -107,7 +107,7 @@ agents:
       efficiency: 0.98
 
   wind:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15
@@ -124,7 +124,7 @@ agents:
       efficiency: 0.95
 
   battery:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15

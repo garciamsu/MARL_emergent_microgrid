@@ -14,6 +14,11 @@ simulation:
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
   dataset: Case2_v2.csv
+  
+  # Power unit conversion factor (kW/kWh to W/Wh)
+  # Applied to: solar_power_*, wind_power_*, demand columns
+  # Excludes: price, Datetime columns
+  power_scale_factor: 1000.0
 
   # Demand scaling per episode. DEPRECATED: Now using direct demand from dataset.
   # Kept for backward compatibility but ignored in random 24h window mode.

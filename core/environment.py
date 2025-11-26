@@ -23,6 +23,9 @@ class MultiAgentEnv:
         """
         csv_filename = config["simulation"]["dataset"]
         self.num_power_bins = config["discretization"]["power_bins"]
+        
+        # Power scaling factor from configuration (kW/kWh to W/Wh)
+        self.power_scale_factor = config["simulation"].get("power_scale_factor", 1000.0)
 
         # Simulation time step in hours (used for SOC integration)
         self.dt_h = config.get("simulation", {}).get("dt_h", 1.0)
@@ -97,9 +100,20 @@ class MultiAgentEnv:
         self.state = None
 
     def _load_data(self, filename: str, offsets: dict | None = None) -> pd.DataFrame:
-        """Load dataset CSV and apply optional per-column offsets."""
+        """Load dataset CSV and apply optional per-column offsets.
+        
+        Power values are scaled from kW/kWh to Watts (W/Wh) using power_scale_factor.
+        Scaling is applied to columns containing 'power' or matching 'demand'.
+        """
         file_path = os.path.join(os.getcwd(), "assets", "datasets", filename)
         df = pd.read_csv(file_path, sep="[;,]", engine="python")
+
+        # Scale power values from kW/kWh to Watts using configured factor
+        for col in df.columns:
+            # Scale all power columns except price and datetime
+            if col not in ["price", "Datetime", "datetime"]:
+                if "power" in col.lower() or col.lower() == "demand":
+                    df[col] = df[col] * self.power_scale_factor
 
         if offsets:
             for col, offset_value in offsets.items():

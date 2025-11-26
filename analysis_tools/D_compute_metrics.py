@@ -66,20 +66,39 @@ def _penetrations_with_actions(frame: pd.DataFrame) -> dict:
       dividido por sum_t demand_t.
     - Renovables (tiempo): fracción de pasos con (action_solar != 0 o action_wind != 0).
     - Red (tiempo): fracción de pasos con (action_grid != 0).
+    
+    If individual agent columns are not present, uses aggregated columns.
     """
     demand = frame.get("env_demand_power", pd.Series(dtype=float)).astype(float)
-    solar = frame.get("power_solar#0", pd.Series(dtype=float)).astype(float)
-    wind = frame.get("power_wind#0", pd.Series(dtype=float)).astype(float)
-    grid = frame.get("power_grid#0", pd.Series(dtype=float)).astype(float)
+    
+    # Check if individual agent columns exist
+    has_individual_agents = "power_solar#0" in frame.columns or "power_wind#0" in frame.columns
+    
+    if has_individual_agents:
+        # Use individual agent data
+        solar = frame.get("power_solar#0", pd.Series(dtype=float)).astype(float)
+        wind = frame.get("power_wind#0", pd.Series(dtype=float)).astype(float)
+        grid = frame.get("power_grid#0", pd.Series(dtype=float)).astype(float)
 
-    a_solar = frame.get("action_solar#0", pd.Series(dtype=float)).fillna(0)
-    a_wind = frame.get("action_wind#0", pd.Series(dtype=float)).fillna(0)
-    a_grid = frame.get("action_grid#0", pd.Series(dtype=float)).fillna(0)
+        a_solar = frame.get("action_solar#0", pd.Series(dtype=float)).fillna(0)
+        a_wind = frame.get("action_wind#0", pd.Series(dtype=float)).fillna(0)
+        a_grid = frame.get("action_grid#0", pd.Series(dtype=float)).fillna(0)
 
-    use_re = (a_solar != 0) | (a_wind != 0)
-    use_grid = a_grid != 0
+        use_re = (a_solar != 0) | (a_wind != 0)
+        use_grid = (a_grid != 0)
 
-    re_power = (solar + wind).clip(lower=0)
+        re_power = (solar + wind).clip(lower=0)
+    else:
+        # Use aggregated data when individual agents are not present
+        re_power = frame.get("env_total_renewable", pd.Series(dtype=float)).astype(float)
+        grid = frame.get("power_grid#0", pd.Series(dtype=float)).astype(float)
+        
+        a_grid = frame.get("action_grid#0", pd.Series(dtype=float)).fillna(0)
+        
+        # Assume renewables are used when total_renewable > 0
+        use_re = (re_power > 0)
+        use_grid = (a_grid != 0)
+    
     effective_re = np.minimum(re_power, demand)
 
     demand_sum = float(demand.sum())
@@ -89,8 +108,9 @@ def _penetrations_with_actions(frame: pd.DataFrame) -> dict:
         ren_energy_pen = 0.0
         grid_energy_pen = 0.0
     else:
-        ren_energy_pen = float(effective_re[use_re].sum() / demand_sum)
-        grid_energy_pen = float(grid.clip(lower=0)[use_grid].sum() / demand_sum)
+        # Use .values to avoid index alignment issues
+        ren_energy_pen = float(effective_re.values[use_re.values].sum() / demand_sum)
+        grid_energy_pen = float(grid.clip(lower=0).values[use_grid.values].sum() / demand_sum)
 
     ren_time_pen = float(use_re.mean()) if n_steps > 0 else 0.0
     grid_time_pen = float(use_grid.mean()) if n_steps > 0 else 0.0

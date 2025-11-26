@@ -12,7 +12,7 @@ offline_run: null  # set run_id if mode=offline
 simulation:
   episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
-  seed: 42
+  seed: 24
   dataset: Case2_v2.csv
   
   # Power unit conversion factor (kW/kWh to W/Wh)

@@ -12,7 +12,7 @@ offline_run: null  # set run_id if mode=offline
 simulation:
   episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
-  seed: 42
+  seed: 20
   dataset: Case2_v2.csv
   
   # Power unit conversion factor (kW/kWh to W/Wh)
@@ -156,7 +156,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultGridReward
-      params: {psi: 1.196, sigma: 4.820, nu: 0.160, xi: 4.852}
+      params: {psi: 1, sigma: 0.5, nu: 2, xi: 0.2}
     state_space:
       - {var: soc_idx,  source: external, bins: auto}
       - {var: demand,   source: env,      bins: auto}

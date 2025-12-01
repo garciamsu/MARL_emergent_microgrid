@@ -1,6 +1,77 @@
 """High-level training loop for the multi-agent microgrid.
 
-The current implementation performs an episodic tabular Q-learning procedure
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    main()if __name__ == "__main__":    print("\n" + "="*80)            sys.exit(1)        traceback.print_exc()        import traceback        print(f"\n❌ ERROR: {e}")    except Exception as e:                        print(f"\n❌ Metadata file NOT found")        else:                                print(f"   Windows used more than once: {len(repeated_windows)}")                repeated_windows = non_summary[non_summary['frequency'] > 1]                                print(f"   Average frequency: {non_summary['frequency'].mean():.2f}")                print(f"   Min frequency: {non_summary['frequency'].min()}")                print(f"   Max frequency: {non_summary['frequency'].max()}")                print(f"   Unique windows: {len(non_summary)}")                print(f"\n\n📊 Statistics:")            if len(non_summary) > 0:            non_summary = window_frequency[window_frequency['window_start_index'] != 'SUMMARY']            # Statistics                        print(window_frequency.head(15).to_string(index=False))            print(f"   Showing windows sorted by frequency (most used first):")            print(f"\n\n📈 Window Frequency Analysis Sheet:")                        print(episode_details.head(10).to_string(index=False))            print(f"   Total episodes: {len(episode_details)}")            print(f"\n📊 Episode Details Sheet:")                        window_frequency = pd.read_excel(metadata_path, sheet_name='Window Frequency', engine='openpyxl')            episode_details = pd.read_excel(metadata_path, sheet_name='Episode Details', engine='openpyxl')            # Read both sheets                        print(f"\n✅ Metadata file created: {metadata_path}")        if metadata_path.exists():        metadata_path = Path("results/logs/episode_metadata.xlsx")                print("\n✅ Training completed!")                agents, results = run_training(config)    try:        print(f"   Dataset: {config['simulation']['dataset']}\n")    print(f"\n📋 Running {config['simulation']['episodes']} episodes")        config['simulation']['episodes'] = 20  # Test with 20 episodes    original_episodes = config['simulation']['episodes']    config = load_config()        print("="*80)    print("🧪 Testing Window Frequency Analysis")    print("="*80)def main():from core.simulation import run_trainingfrom configs.loader import load_configsys.path.insert(0, str(Path(__file__).parent))import pandas as pdfrom pathlib import Pathimport sysThe current implementation performs an episodic tabular Q-learning procedure
 over a fixed historical dataset (no stochastic environment transitions beyond
 what the dataset provides). Each agent:
 
@@ -19,6 +90,7 @@ Limitations / Future work:
 
 import pandas as pd
 import numpy as np
+import os
 from core.environment import MultiAgentEnv
 from agents import instantiate_agents
 from core.utils import set_global_seed, build_logger
@@ -141,6 +213,9 @@ def run_training(config):
     results = []
     # Simulation time step in hours (used for SOC integration)
     dt_h = config.get("simulation", {}).get("dt_h", 1.0)
+    
+    # Track episode metadata (window and initial SOC)
+    episode_metadata = []
 
     for episode in range(num_episodes):
         # ==============================================
@@ -174,6 +249,14 @@ def run_training(config):
         # 3. Reset environment with episode data and initial SOC
         # ==============================================
         env.reset(episode_data, initial_soc)
+        
+        # Record episode metadata
+        episode_metadata.append({
+            "episode": episode,
+            "window_start_index": start if full_dataset_length >= 24 else 0,
+            "window_end_index": (start + 24) if full_dataset_length >= 24 else full_dataset_length,
+            "initial_soc": initial_soc
+        })
         
         # ==============================================
         # 4. Set initial SOC for all battery agents
@@ -340,5 +423,42 @@ def run_training(config):
         results.append(episode_df)
         
         logger.info("Episode %d/%d completed | epsilon=%.3f", episode + 1, num_episodes, epsilon)
+
+    # Save episode metadata to Excel with frequency analysis
+    metadata_df = pd.DataFrame(episode_metadata)
+    os.makedirs("results/logs", exist_ok=True)
+    metadata_excel_path = "results/logs/episode_metadata.xlsx"
+    
+    # Create frequency analysis of windows
+    window_frequency = metadata_df.groupby(['window_start_index', 'window_end_index']).agg(
+        frequency=('episode', 'count'),
+        episodes=('episode', lambda x: ', '.join(map(str, sorted(x))))
+    ).reset_index()
+    window_frequency = window_frequency.sort_values('frequency', ascending=False).reset_index(drop=True)
+    
+    # Calculate statistics
+    total_episodes = len(metadata_df)
+    unique_windows = len(window_frequency)
+    max_frequency = window_frequency['frequency'].max()
+    min_frequency = window_frequency['frequency'].min()
+    avg_frequency = window_frequency['frequency'].mean()
+    
+    # Add summary row
+    summary_data = {
+        'window_start_index': ['SUMMARY'],
+        'window_end_index': [''],
+        'frequency': [f'Total Episodes: {total_episodes}'],
+        'episodes': [f'Unique Windows: {unique_windows}, Max Freq: {max_frequency}, Min Freq: {min_frequency}, Avg Freq: {avg_frequency:.2f}']
+    }
+    summary_df = pd.DataFrame(summary_data)
+    window_frequency_with_summary = pd.concat([window_frequency, summary_df], ignore_index=True)
+    
+    # Write to Excel with multiple sheets
+    with pd.ExcelWriter(metadata_excel_path, engine='openpyxl') as writer:
+        metadata_df.to_excel(writer, sheet_name='Episode Details', index=False)
+        window_frequency_with_summary.to_excel(writer, sheet_name='Window Frequency', index=False)
+    
+    logger.info("Episode metadata saved to %s", metadata_excel_path)
+    logger.info("Window frequency analysis: %d unique windows used across %d episodes", unique_windows, total_episodes)
 
     return agents, results

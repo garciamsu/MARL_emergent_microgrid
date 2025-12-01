@@ -1,0 +1,22 @@
+2025-11-30 22:11:08 | INFO | Episode 1/20 completed | epsilon=1.000
+2025-11-30 22:11:08 | INFO | Episode 2/20 completed | epsilon=0.947
+2025-11-30 22:11:08 | INFO | Episode 3/20 completed | epsilon=0.895
+2025-11-30 22:11:08 | INFO | Episode 4/20 completed | epsilon=0.842
+2025-11-30 22:11:08 | INFO | Episode 5/20 completed | epsilon=0.789
+2025-11-30 22:11:08 | INFO | Episode 6/20 completed | epsilon=0.737
+2025-11-30 22:11:08 | INFO | Episode 7/20 completed | epsilon=0.684
+2025-11-30 22:11:08 | INFO | Episode 8/20 completed | epsilon=0.632
+2025-11-30 22:11:08 | INFO | Episode 9/20 completed | epsilon=0.579
+2025-11-30 22:11:08 | INFO | Episode 10/20 completed | epsilon=0.526
+2025-11-30 22:11:08 | INFO | Episode 11/20 completed | epsilon=0.474
+2025-11-30 22:11:09 | INFO | Episode 12/20 completed | epsilon=0.421
+2025-11-30 22:11:09 | INFO | Episode 13/20 completed | epsilon=0.368
+2025-11-30 22:11:09 | INFO | Episode 14/20 completed | epsilon=0.316
+2025-11-30 22:11:09 | INFO | Episode 15/20 completed | epsilon=0.263
+2025-11-30 22:11:09 | INFO | Episode 16/20 completed | epsilon=0.211
+2025-11-30 22:11:09 | INFO | Episode 17/20 completed | epsilon=0.158
+2025-11-30 22:11:09 | INFO | Episode 18/20 completed | epsilon=0.105
+2025-11-30 22:11:09 | INFO | Episode 19/20 completed | epsilon=0.053
+2025-11-30 22:11:09 | INFO | Episode 20/20 completed | epsilon=0.000
+2025-11-30 22:11:09 | INFO | Episode metadata saved to results/logs/episode_metadata.xlsx
+2025-11-30 22:11:09 | INFO | Window frequency analysis: 20 unique windows used across 20 episodes

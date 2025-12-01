@@ -120,7 +120,7 @@ def main():
     
     print("\n📁 Results available in:")
     print("   - results/evolution/     (episode CSVs)")
-    print("   - results/logs/          (training logs)")
+    print("   - results/logs/          (training logs + episode_metadata.xlsx)")
     print("   - results/metrics/       (metrics Excel)")
     print("   - results/plots/         (visualizations)")
     print("\n" + "="*80)

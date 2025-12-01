@@ -156,7 +156,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultGridReward
-      params: {psi: 1, sigma: 0.5, nu: 2, xi: 0.2}
+      params: {psi: 1, sigma: 0.3, nu: 1.5, xi: 0.15}
     state_space:
       - {var: soc_idx,  source: external, bins: auto}
       - {var: demand,   source: env,      bins: auto}

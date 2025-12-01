@@ -137,7 +137,7 @@ agents:
       - {var: demand,      source: env,     bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
-      capacity_ah: 840
+      capacity_ah: 880
       v_nom: 48
       soc_min: 0.1
       soc_max: 0.9
@@ -145,8 +145,8 @@ agents:
       # Random initial SOC sampled from U[initial_soc_min, initial_soc_max]
       initial_soc_min: 0.1
       initial_soc_max: 0.9
-      p_charge_max: 10000
-      p_discharge_max: 10000
+      p_charge_max: 15000
+      p_discharge_max: 15000
 
   grid:
     count: 1

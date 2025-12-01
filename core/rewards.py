@@ -188,56 +188,58 @@ class DefaultBatteryReward(RewardFn):
 
 @register_reward("DefaultGridReward")
 class DefaultGridReward(RewardFn):
-    """Replica la lógica de GridAgent.calculate_reward."""
+    """Simple, stable Grid reward using:
+       - discretized indices (renewable_idx, demand_idx, soc_idx)
+       - binary SOC interpretation (soc_idx == 0 => battery empty)
+       - hyperparameters psi, sigma, nu, xi controlling all magnitudes.
+    """
 
     def __init__(self, psi=1.0, sigma=1.0, nu=1.0, xi=1.0, C_M=1.0, **kwargs):
-        self.psi = psi
-        self.sigma = sigma
-        self.nu = nu
-        self.xi = xi
-        self.C_M = C_M
+        self.psi = psi     # reward: import when deficit + battery empty
+        self.sigma = sigma # penalty: import without need
+        self.nu = nu       # penalty: idle with deficit + battery empty
+        self.xi = xi       # reward: idle when no deficit
+        self.C_M = C_M     # (kept for compatibility but NOT used to scale reward)
 
     def compute(self, agent, env, state_tuple):
-        # --- 1. Obtener Variables de Estado y Entorno ---
+        # --- 1. Variables de estado en forma de índices discretizados ---
         soc_idx = state_tuple[0]
         demand_idx = env.demand_power_idx
-        # Corrección: Usar la generación renovable para el déficit
         renewable_idx = env.renewable_power_idx
-        self.C_M = env.price # Precio del mercado
+        
+        # SOC binario
+        battery_empty = (soc_idx == 0)
 
-        # --- 2. Calcular Déficit/Excedente Interno (Corrección) ---
-        # (Excedente renovable antes de la acción de la red)
-        delta_P = renewable_idx - demand_idx
+        # Deficit en espacio de índices
+        # deficit_idx > 0 significa: demanda > renovables
+        deficit_idx = (demand_idx - renewable_idx)
+        has_deficit = (deficit_idx > 0)
 
-        # --- 3. Lógica de Recompensa (Corregida) ---
+        # ----------------------------------------------------------
+        # NUEVA LÓGICA SIMPLE (versión A), usando hiperparámetros:
+        # psi   → premio por importar cuando es necesario
+        # sigma → castigo por importar sin necesidad
+        # nu    → castigo por idle cuando hay déficit + bateria vacía
+        # xi    → premio por idle cuando NO hay déficit
+        # ----------------------------------------------------------
 
-        # CASO 1: Red ACTÚA (1) + Microred NECESITA energía
-        # (Déficit renovable Y Batería vacía)
-        if agent.action == 1 and delta_P <= 0 and soc_idx == 0:
-            # PREMIO: por cumplir su deber.
-            # (Inversamente proporcional al precio)
-            reward = self.psi / self.C_M if self.C_M > 0 else self.psi
+        # CASO 1: Grid actúa (importa)
+        if agent.action == 1:
+            if has_deficit and battery_empty:
+                # Importación necesaria → premio controlado por psi
+                reward = self.psi
+            else:
+                # Importa sin necesidad → castigo controlado por sigma
+                reward = -self.sigma
 
-        # CASO 2: Red ACTÚA (1) + Microred NO NECESITA energía
-        # (Excedente renovable O Batería con carga)
-        elif agent.action == 1 and (delta_P > 0 or soc_idx > 0):
-            # CASTIGO: por importar innecesariamente.
-            # (Proporcional al precio)
-            reward = -self.sigma * self.C_M
-
-        # CASO 3: Red NO ACTÚA (0) + Microred NECESITA energía
-        # (Déficit renovable Y Batería vacía)
-        elif agent.action == 0 and delta_P <= 0 and soc_idx == 0:
-            # CASTIGO: por fallar en su deber.
-            # (Tu Opción B: Proporcional al déficit)
-            reward = -self.nu * max(abs(delta_P), 1)
-
-        # CASO 4 ("else"): Red NO ACTÚA (0) + Microred NO NECESITA energía
-        # (Excedente renovable O Batería con carga)
+        # CASO 2: Grid idle
         else:
-            # PREMIO: por inacción correcta.
-            # (Tu fórmula: Proporcional a la energía interna)
-            reward = self.xi * max(delta_P, 1) * max(soc_idx, 1)
+            if has_deficit and battery_empty:
+                # Inacción crítica → castigo controlado por nu
+                reward = -self.nu
+            else:
+                # Idle correcto → premio controlado por xi
+                reward = self.xi
 
         return reward
 

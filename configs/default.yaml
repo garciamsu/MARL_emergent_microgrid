@@ -13,7 +13,7 @@ simulation:
   episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 42
-  dataset: Case2_v2.csv
+  dataset: Case3.csv
   
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
@@ -181,5 +181,5 @@ agents:
       - {var: renewable,        source: global,    bins: auto}
       - {var: price,            source: env,       bins: auto}
     limits:
-      p_load: 10
-      comfort_threshold: 5
+      p_load: 100
+      comfort_threshold: 64

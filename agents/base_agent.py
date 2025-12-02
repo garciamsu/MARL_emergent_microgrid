@@ -121,6 +121,7 @@ class BaseAgent:
         - bins es lista/tupla/ndarray -> len(bins)
         - bins == 'auto' o ausente -> len(env.power_bins)
         - Caso especial SOC: si var in {'soc','soc_idx'} y existe self.battery_soc_bins -> len(self.battery_soc_bins)
+        - Caso especial price: si var == 'price' -> len(env.price_bins)
         Construye el producto cartesiano de los rangos y crea entradas con 0.0.
         """
         dims = []
@@ -132,6 +133,9 @@ class BaseAgent:
             # Caso especial SOC
             if var in {"soc", "soc_idx"} and hasattr(self, "battery_soc_bins"):
                 cardinality = len(self.battery_soc_bins)
+            # Caso especial price
+            elif var == "price":
+                cardinality = len(getattr(env, "price_bins", [])) or 1
             else:
                 if isinstance(bins_decl, (list, tuple)):
                     cardinality = len(bins_decl)

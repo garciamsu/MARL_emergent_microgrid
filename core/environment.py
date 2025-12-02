@@ -23,6 +23,7 @@ class MultiAgentEnv:
         """
         csv_filename = config["simulation"]["dataset"]
         self.num_power_bins = config["discretization"]["power_bins"]
+        self.num_price_bins = config["discretization"].get("price_bins", 5)
         
         # Power scaling factor from configuration (kW/kWh to W/Wh)
         self.power_scale_factor = config["simulation"].get("power_scale_factor", 1000.0)
@@ -39,7 +40,7 @@ class MultiAgentEnv:
 
         # Calcular la suma fila por fila, descartando las columnas excluidas
         row_sums = (
-            self.dataset.drop(columns=excluded_columns)
+            self.dataset.drop(columns=excluded_columns, errors='ignore')
             .apply(pd.to_numeric, errors="coerce")
             .sum(axis=1)
         )
@@ -49,6 +50,14 @@ class MultiAgentEnv:
         print(f"Máximo valor calculado en dataset: {self.max_value}")
 
         self.power_bins = np.linspace(0, self.max_value, self.num_power_bins)
+        
+        # Create price bins if price column exists
+        if "price" in self.dataset.columns:
+            price_min = self.dataset["price"].min()
+            price_max = self.dataset["price"].max()
+            self.price_bins = np.linspace(price_min, price_max, self.num_price_bins)
+        else:
+            self.price_bins = np.linspace(0, 1, self.num_price_bins)  # Default bins
         
         # Store full dataset for random window selection
         self.full_dataset = self.dataset.copy()
@@ -137,8 +146,12 @@ class MultiAgentEnv:
             self.demand_power = row[field] * self.scale_demand
             self.demand_power_idx = digitize_clip(self.demand_power, self.power_bins)
             self.price = row["price"]
-
-        return digitize_clip(row[field], self.power_bins)
+        
+        # Use appropriate bins based on field type
+        if field == "price":
+            return digitize_clip(row[field], self.price_bins)
+        else:
+            return digitize_clip(row[field], self.power_bins)
 
     def get_value(self, var: str) -> int:
         """Return discretized index for a known global variable name."""

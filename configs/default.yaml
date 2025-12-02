@@ -46,6 +46,7 @@ validation:
 
 discretization:
   power_bins: 10
+  price_bins: 5  # Number of bins for price discretization
 
 # ==============================================================
 # Stability definition
@@ -166,7 +167,7 @@ agents:
       export_allowed: false
 
   load:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15
@@ -178,7 +179,7 @@ agents:
       - {var: soc_idx,          source: external,  bins: auto}
       - {var: demand,           source: env,       bins: auto}
       - {var: renewable,        source: global,    bins: auto}
-      - {var: price,            source: local,     bins: auto}
+      - {var: price,            source: env,       bins: auto}
     limits:
       p_load: 10
       comfort_threshold: 5

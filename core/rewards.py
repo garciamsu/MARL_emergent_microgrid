@@ -245,67 +245,37 @@ class DefaultGridReward(RewardFn):
 
 @register_reward("DefaultLoadReward")
 class DefaultLoadReward(RewardFn):
-    """
-    Load agent reward using the original multiplicative formulation
-    without normalization. Uses demand_idx, renewable_idx and soc_idx
-    exactly as discretized by the environment.
+    """Replica la lógica de LoadAgent.calculate_reward."""
 
-    p_load is NOT used in the reward (only in the energy balance model).
-    comfort_threshold is a REAL price threshold from YAML, not discretized.
-    """
-
-    def __init__(self, sigma=1.0, psi=1.0, nu=1.0, beta=0.0, **kwargs):
-        self.sigma = sigma   # reward scale for good consumption
-        self.psi   = psi     # reward/penalty scale for shedding/consuming badly
-        self.nu    = nu      # penalty scale for wasting internal energy
-        self.beta  = beta    # neutral baseline
+    def __init__(self, sigma=1.0, psi=1.0, nu=1.0, beta=-0.1, **kwargs):
+        self.sigma = sigma
+        self.psi = psi
+        self.nu = nu
+        self.beta = beta
 
     def compute(self, agent, env, state_tuple):
-        # State tuple structure:
-        # soc_idx, demand_idx, renewable_idx, price
         soc_idx, demand_idx, renewable_idx, price = state_tuple
 
-        # Comfort threshold is REAL (from YAML)
-        comfort_th = getattr(agent, "comfort_threshold", 5.0)
+        # 1. PREMIO por usar energía interna/excedente
+        if agent.action == 1 and (soc_idx > 0 or renewable_idx > demand_idx):
+            # Tu Lógica 1 (corregida):
+            reward = self.sigma * max((renewable_idx - demand_idx), 1) * max(soc_idx, 1)
 
-        # Simple surplus/deficit in index space (NO normalization)
-        surplus = max(renewable_idx - demand_idx, 0)
-        deficit = max(demand_idx - renewable_idx, 0)
+        # 2. CASTIGO por comprar caro
+        # Compare market price against the agent's comfort threshold (agent owns this parameter).
+        elif agent.action == 1 and price > getattr(agent, 'comfort_threshold', 1):
+            # Penalize buying when the market price exceeds the agent's comfort threshold
+            reward = -self.psi * price
 
-        price_low  = price <= comfort_th
-        price_high = price >  comfort_th
+        # 3. CASTIGO por desperdiciar energía interna/excedente
+        elif agent.action == 0 and (soc_idx > 0 or renewable_idx > demand_idx):
+            # Tu corrección (simétrica a la Lógica 1):
+            reward = -self.nu * max((renewable_idx - demand_idx), 1) * max(soc_idx, 1)
 
-        # ------------------------------------------------
-        # ACTION = 1 → Consume load
-        # ------------------------------------------------
-        if agent.action == 1:
-
-            # GOOD → Consume when there is internal/excess renewable energy AND price is acceptable
-            if (surplus > 0 or soc_idx > 0) and price_low:
-                reward = self.sigma * max(surplus, 1) * max(soc_idx, 1)
-
-            # BAD → Consume during deficit and expensive energy
-            elif deficit > 0 and price_high:
-                reward = -(self.psi * max(deficit, 1))
-
-            # Ambiguous case
-            else:
-                reward = self.beta
-
-        # ------------------------------------------------
-        # ACTION = 0 → Shed load (no consumption)
-        # ------------------------------------------------
+        # 4. RECOMPENSA NEUTRAL (Apagado correcto O Comprar barato)
         else:
-            # GOOD → shed load during deficit and expensive price
-            if deficit > 0 and price_high:
-                reward = self.psi * max(deficit, 1)
+            reward = self.beta
 
-            # BAD → waste internal/excess energy
-            elif (surplus > 0 or soc_idx > 0) and price_low:
-                reward = -(self.nu * max(surplus, 1) * max(soc_idx, 1))
-
-            # Neutral case
-            else:
-                reward = self.beta
+        print(f"debug: action={agent.action}, soc_idx={soc_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, price={price}, reward={reward}")
 
         return reward

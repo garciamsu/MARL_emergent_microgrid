@@ -1,0 +1,10 @@
+2025-12-03 07:23:01 | INFO | Episode 1/5 completed | epsilon=1.000
+2025-12-03 07:23:01 | INFO | Episode 2/5 completed | epsilon=0.750
+2025-12-03 07:23:01 | INFO | Episode 3/5 completed | epsilon=0.500
+2025-12-03 07:23:01 | INFO | Episode 4/5 completed | epsilon=0.250
+2025-12-03 07:23:01 | INFO | FINAL EPISODE: Using predefined window [5120:5144]
+2025-12-03 07:23:01 | INFO | FINAL EPISODE: Using fixed initial SOC = 0.500
+2025-12-03 07:23:01 | INFO | FINAL EPISODE: Setting epsilon = 0.0 (pure exploitation)
+2025-12-03 07:23:01 | INFO | Episode 5/5 completed | epsilon=0.000
+2025-12-03 07:23:01 | INFO | Episode metadata saved to results/logs/episode_metadata.xlsx
+2025-12-03 07:23:01 | INFO | Window frequency analysis: 5 unique windows used across 5 episodes

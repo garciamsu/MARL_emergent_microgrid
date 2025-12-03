@@ -41,6 +41,20 @@ validation:
   epsilon: 0.0
 
 # ==============================================================
+# Final episode evaluation (last episode uses predefined window)
+# ==============================================================
+
+final_episode:
+  # Predefined time window (indices in the dataset)
+  # The last training episode will use this specific window
+  # Window size can be any length (not restricted to 24 hours)
+  start_index: 5120
+  end_index: 5168  # Example: 48 hours (5168 - 5120 = 48)
+  
+  # Fixed initial SOC for battery in final episode
+  initial_soc: 0.5
+
+# ==============================================================
 # Discretization parameters
 # ==============================================================
 
@@ -219,4 +233,4 @@ agents:
       #   3. Market price is acceptable (price < comfort_threshold)
       # Load should be ON when: (surplus OR soc_high) AND price_acceptable
       # Load should be OFF when: price_expensive AND no_internal_energy
-      comfort_threshold: 25
+      comfort_threshold: 20

@@ -163,7 +163,7 @@ agents:
       - {var: demand,   source: env,      bins: auto}
       - {var: renewable,    source: global,   bins: auto}
     limits:
-      p_max: 15000
+      p_max: 25000
       export_allowed: false
 
   load:

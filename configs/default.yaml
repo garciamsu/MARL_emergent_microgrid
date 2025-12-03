@@ -12,9 +12,9 @@ offline_run: null  # set run_id if mode=offline
 simulation:
   episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
-  seed: 42
-  dataset: Case3.csv
-  
+  seed: 1324           # random seed for reproducibility
+  dataset: Case3_v2.csv
+
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
   # Excludes: price, Datetime columns
@@ -174,7 +174,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultLoadReward
-      params: {sigma: 4.083, psi: 4.742, nu: 4.931, beta: 1.014}
+      params: {sigma: 1, psi: 1, nu: 1, beta: 0}
     state_space:
       - {var: soc_idx,          source: external,  bins: auto}
       - {var: demand,           source: env,       bins: auto}

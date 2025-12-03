@@ -247,7 +247,7 @@ class DefaultGridReward(RewardFn):
 class DefaultLoadReward(RewardFn):
     """Replica la lógica de LoadAgent.calculate_reward."""
 
-    def __init__(self, sigma=1.0, psi=1.0, nu=1.0, beta=0.1, **kwargs):
+    def __init__(self, sigma=1.0, psi=1.0, nu=1.0, beta=0.0, **kwargs):
         self.sigma = sigma
         self.psi = psi
         self.nu = nu
@@ -259,7 +259,7 @@ class DefaultLoadReward(RewardFn):
 
         surplus = (renewable_idx > demand_idx)
         expensive = (price > getattr(agent, "comfort_threshold", 1.0))
-        internal = (soc_idx > 0 or surplus)
+        internal = (soc_idx > 1 or surplus)
 
         # ================================
         #   REWARD SIMPLE SIN ANIDACIÓN
@@ -278,12 +278,5 @@ class DefaultLoadReward(RewardFn):
 
         else:
             reward = self.beta              # zona neutra
-
-        print(
-            f"[DefaultLoadReward] action={action}, soc_idx={soc_idx}, "
-            f"demand_idx={demand_idx}, renewable_idx={renewable_idx}, "
-            f"price={price}, surplus={surplus}, expensive={expensive}, "
-            f"reward={reward}"
-        )
 
         return reward

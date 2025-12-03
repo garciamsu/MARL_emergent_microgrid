@@ -247,7 +247,7 @@ class DefaultGridReward(RewardFn):
 class DefaultLoadReward(RewardFn):
     """Replica la lógica de LoadAgent.calculate_reward."""
 
-    def __init__(self, sigma=1.0, psi=1.0, nu=1.0, beta=-0.1, **kwargs):
+    def __init__(self, sigma=1.0, psi=1.0, nu=1.0, beta=0.1, **kwargs):
         self.sigma = sigma
         self.psi = psi
         self.nu = nu
@@ -255,27 +255,35 @@ class DefaultLoadReward(RewardFn):
 
     def compute(self, agent, env, state_tuple):
         soc_idx, demand_idx, renewable_idx, price = state_tuple
+        action = agent.action  # 1 = ON, 0 = OFF
 
-        # 1. PREMIO por usar energía interna/excedente
-        if agent.action == 1 and (soc_idx > 0 or renewable_idx > demand_idx):
-            # Tu Lógica 1 (corregida):
-            reward = self.sigma * max((renewable_idx - demand_idx), 1) * max(soc_idx, 1)
+        surplus = (renewable_idx > demand_idx)
+        expensive = (price > getattr(agent, "comfort_threshold", 1.0))
+        internal = (soc_idx > 0 or surplus)
 
-        # 2. CASTIGO por comprar caro
-        # Compare market price against the agent's comfort threshold (agent owns this parameter).
-        elif agent.action == 1 and price > getattr(agent, 'comfort_threshold', 1):
-            # Penalize buying when the market price exceeds the agent's comfort threshold
-            reward = -self.psi * price
+        # ================================
+        #   REWARD SIMPLE SIN ANIDACIÓN
+        # ================================
+        if action == 1 and internal:
+            reward = self.sigma             # encender con energía interna → correcto
 
-        # 3. CASTIGO por desperdiciar energía interna/excedente
-        elif agent.action == 0 and (soc_idx > 0 or renewable_idx > demand_idx):
-            # Tu corrección (simétrica a la Lógica 1):
-            reward = -self.nu * max((renewable_idx - demand_idx), 1) * max(soc_idx, 1)
+        elif action == 1 and expensive:
+            reward = -self.psi              # encender caro sin interno → incorrecto
 
-        # 4. RECOMPENSA NEUTRAL (Apagado correcto O Comprar barato)
+        elif action == 0 and internal:
+            reward = -self.nu               # apagar con SOC/excedente → oportunidad perdida
+
+        elif action == 0 and expensive:
+            reward = self.sigma             # apagar caro → comportamiento racional
+
         else:
-            reward = self.beta
+            reward = self.beta              # zona neutra
 
-        print(f"debug: action={agent.action}, soc_idx={soc_idx}, demand_idx={demand_idx}, renewable_idx={renewable_idx}, price={price}, reward={reward}")
+        print(
+            f"[DefaultLoadReward] action={action}, soc_idx={soc_idx}, "
+            f"demand_idx={demand_idx}, renewable_idx={renewable_idx}, "
+            f"price={price}, surplus={surplus}, expensive={expensive}, "
+            f"reward={reward}"
+        )
 
         return reward

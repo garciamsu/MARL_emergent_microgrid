@@ -84,7 +84,8 @@ PLOT_CONFIG = {
     'panel_5': {
         'title': '(E)',
         'color': '#FF0000',
-        'left_Y': {'column': 'env_demand_power', 'label': 'Demand (kW)'}
+        'left_Y': {'column': 'env_demand_power', 'label': 'Demand (kW)'},
+        'right_Y': {'column': 'action_load#0', 'label': 'Load state'}
     },
     'panel_6': {
         'title': '(F)',

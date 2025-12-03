@@ -181,5 +181,5 @@ agents:
       - {var: renewable,        source: global,    bins: auto}
       - {var: price,            source: env,       bins: auto}
     limits:
-      p_load: 100
-      comfort_threshold: 64
+      p_load: 3000
+      comfort_threshold: 100

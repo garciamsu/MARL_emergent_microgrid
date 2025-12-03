@@ -88,6 +88,11 @@ class MultiAgentEnv:
         # Reset step counter
         self.current_step = 0
         
+        # Store initial SOC for battery agents to use
+        # This will be picked up by simulation.py when setting battery SOC
+        if initial_soc is not None:
+            self.initial_soc = initial_soc
+        
         # Reset continuous variables
         self.renewable_potential = 0
         self.renewable_power = 0

@@ -323,10 +323,66 @@ def run_training(config):
                 # Update discrete index according to battery bins
                 if hasattr(a, "battery_soc_bins"):
                     a.idx = digitize_clip(a.soc, a.battery_soc_bins)
+                
+                # Verification log
+                if is_final_episode:
+                    logger.info(
+                        "✅ FINAL EPISODE - Battery SOC initialized: %.3f (idx=%d)",
+                        a.soc, a.idx
+                    )
+                    if abs(a.soc - initial_soc) > 0.001:
+                        logger.warning(
+                            "⚠️  SOC mismatch! Expected %.3f, got %.3f",
+                            initial_soc, a.soc
+                        )
+                else:
+                    logger.debug(
+                        "Episode %d - Battery SOC initialized: %.3f (idx=%d)",
+                        episode, a.soc, a.idx
+                    )
 
         evolution = []
 
-        # 0. Epsilon update
+        # 0. Record initial state (step -1) to capture initial SOC before any actions
+        initial_state_record = {
+            "episode": episode,
+            "step": -1,
+            "epsilon": 0.0
+        }
+        
+        # Add initial agent states (especially battery SOC)
+        for name, agent in agents.items():
+            initial_state_record[f"action_{name}"] = None
+            initial_state_record[f"power_{name}"] = 0.0
+            initial_state_record[f"potential_{name}"] = None
+            initial_state_record[f"idx_{name}"] = getattr(agent, "idx", 0)
+            if name.startswith("battery"):
+                initial_state_record[f"soc_{name}"] = agent.soc
+                initial_state_record[f"soc_idx_{name}"] = agent.idx
+        
+        # Add initial environment states
+        initial_state_record.update({
+            "env_price": 0.0,
+            "env_renewable_potential": 0.0,
+            "env_renewable_potential_idx": 0,
+            "env_total_renewable": 0.0,
+            "env_total_renewable_idx": 0,
+            "env_total_power": 0.0,
+            "env_total_power_idx": 0,
+            "env_demand_power": 0.0,
+            "env_demand_power_idx": 0,
+            "env_energy_balance": 0.0,
+            "env_energy_balance_idx": 0,
+            "env_delta_power_idx": "surplus",
+        })
+        
+        # Add rewards (all zero at initial state)
+        for name in agents.keys():
+            initial_state_record[f"reward_{name}"] = 0.0
+        
+        evolution.append(initial_state_record)
+
+        # 1. Epsilon update
         if is_final_episode:
             # FINAL EPISODE: Pure exploitation (epsilon = 0)
             epsilon = 0.0

@@ -13,7 +13,7 @@ simulation:
   episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 1324           # random seed for reproducibility
-  dataset: Case3_v2.csv
+  dataset: Case2_v2.csv
 
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
@@ -49,7 +49,7 @@ final_episode:
   # The last training episode will use this specific window
   # Window size can be any length (not restricted to 24 hours)
   start_index: 5120
-  end_index: 5168  # Example: 48 hours (5168 - 5120 = 48)
+  end_index: 5192  # Example: 72 hours (5192 - 5120 = 72)
   
   # Fixed initial SOC for battery in final episode
   initial_soc: 0.5
@@ -233,4 +233,4 @@ agents:
       #   3. Market price is acceptable (price < comfort_threshold)
       # Load should be ON when: (surplus OR soc_high) AND price_acceptable
       # Load should be OFF when: price_expensive AND no_internal_energy
-      comfort_threshold: 20
+      comfort_threshold: 21

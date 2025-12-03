@@ -247,20 +247,25 @@ class DefaultGridReward(RewardFn):
 class DefaultLoadReward(RewardFn):
     """Replica la lógica de LoadAgent.calculate_reward."""
 
-    def __init__(self, sigma=1.0, psi=1.0, nu=1.0, beta=0.0, **kwargs):
+    def __init__(self, sigma=1.0, psi=1.0, nu=1.0, beta=-1.0, **kwargs):
         self.sigma = sigma
         self.psi = psi
         self.nu = nu
         self.beta = beta
 
     def compute(self, agent, env, state_tuple):
-        soc_idx, demand_idx, renewable_idx, price = state_tuple
+        soc_idx, demand_idx, renewable_idx, price_idx = state_tuple
         action = agent.action  # 1 = ON, 0 = OFF
 
+        # Access REAL continuous price from environment, not discretized index
+        real_price = env.price
+        
         surplus = (renewable_idx > demand_idx)
-        expensive = (price > getattr(agent, "comfort_threshold", 1.0))
+        expensive = (real_price > getattr(agent, "comfort_threshold", 1.0))
         internal = (soc_idx > 1 or surplus)
-
+        
+        print("DEBUG LoadReward:", "renewable_idx: ", renewable_idx, "demand_idx: ", demand_idx, "price_idx: ", price_idx, "real_price: ", real_price, "comfort_threshold: ", getattr(agent, "comfort_threshold"), "soc_idx: ", soc_idx)
+        
         # ================================
         #   REWARD SIMPLE SIN ANIDACIÓN
         # ================================

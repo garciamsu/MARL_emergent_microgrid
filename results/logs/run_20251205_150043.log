@@ -1,0 +1,13 @@
+2025-12-05 15:00:43 | INFO | Episode 1/10 completed | epsilon=1.000
+2025-12-05 15:00:43 | INFO | Episode 2/10 completed | epsilon=0.889
+2025-12-05 15:00:43 | INFO | Episode 3/10 completed | epsilon=0.778
+2025-12-05 15:00:43 | INFO | Episode 4/10 completed | epsilon=0.667
+2025-12-05 15:00:43 | INFO | Episode 5/10 completed | epsilon=0.556
+2025-12-05 15:00:43 | INFO | Episode 6/10 completed | epsilon=0.444
+2025-12-05 15:00:43 | INFO | Episode 7/10 completed | epsilon=0.333
+2025-12-05 15:00:43 | INFO | Episode 8/10 completed | epsilon=0.222
+2025-12-05 15:00:43 | INFO | Episode 9/10 completed | epsilon=0.111
+2025-12-05 15:00:43 | INFO | Episode 10/10 completed | epsilon=0.000
+2025-12-05 15:00:43 | INFO | Episode metadata saved to results/logs/episode_metadata.xlsx
+2025-12-05 15:00:43 | INFO | Window frequency analysis: 10 unique windows used across 10 episodes
+2025-12-05 15:00:43 | INFO | Episode rewards saved to results/logs/episode_rewards.csv and results/logs/episode_rewards.xlsx

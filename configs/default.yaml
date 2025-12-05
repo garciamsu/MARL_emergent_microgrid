@@ -13,7 +13,7 @@ simulation:
   episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 1324           # random seed for reproducibility
-  dataset: Case2_v2.csv
+  dataset: training_v1.csv
 
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
@@ -39,20 +39,6 @@ validation:
   enabled: true
   episodes: 20
   epsilon: 0.0
-
-# ==============================================================
-# Final episode evaluation (last episode uses predefined window)
-# ==============================================================
-
-final_episode:
-  # Predefined time window (indices in the dataset)
-  # The last training episode will use this specific window
-  # Window size can be any length (not restricted to 24 hours)
-  start_index: 5120
-  end_index: 5192  # Example: 72 hours (5192 - 5120 = 72)
-  
-  # Fixed initial SOC for battery in final episode
-  initial_soc: 0.5
 
 # ==============================================================
 # Discretization parameters

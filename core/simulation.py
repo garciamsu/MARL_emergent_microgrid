@@ -222,69 +222,36 @@ def run_training(config):
     episode_rewards = {name: [] for name in agents.keys()}
 
     for episode in range(num_episodes):
-        # Check if this is the final episode (last one)
-        is_final_episode = (episode == num_episodes - 1)
-        
         # ==============================================
-        # 1. Select 24-hour contiguous window
+        # 1. Select 24-hour contiguous random window
         # ==============================================
         full_dataset_length = len(env.full_dataset)
         
-        if is_final_episode:
-            # FINAL EPISODE: Use predefined window from config
-            final_cfg = config.get("final_episode", {})
-            start = int(final_cfg.get("start_index", 0))
-            end = int(final_cfg.get("end_index", 24))
-            
-            # Validate indices are within dataset bounds
-            if start < 0:
-                logger.warning("Final episode start_index < 0. Setting to 0.")
-                start = 0
-            
-            if end > full_dataset_length:
-                logger.warning("Final episode end_index > dataset length. Setting to %d.", full_dataset_length)
-                end = full_dataset_length
-            
-            if start >= end:
-                logger.warning("Final episode start_index >= end_index. Using default [0:24].")
-                start = 0
-                end = min(24, full_dataset_length)
-            
-            episode_data = env.full_dataset.iloc[start:end].copy()
-            window_size = end - start
-            logger.info("FINAL EPISODE: Using predefined window [%d:%d] (%d hours)", start, end, window_size)
+        # Random 24-hour window for all episodes
+        if full_dataset_length >= 24:
+            start = np.random.randint(0, full_dataset_length - 24)
+            episode_data = env.full_dataset.iloc[start:start + 24].copy()
         else:
-            # TRAINING EPISODES: Random 24-hour window
-            if full_dataset_length >= 24:
-                start = np.random.randint(0, full_dataset_length - 24)
-                episode_data = env.full_dataset.iloc[start:start + 24].copy()
-            else:
-                # Fallback: if dataset is shorter than 24 hours, use full dataset
-                episode_data = env.full_dataset.copy()
-                logger.warning("Dataset shorter than 24 hours. Using full dataset for episode %d.", episode)
+            # Fallback: if dataset is shorter than 24 hours, use full dataset
+            episode_data = env.full_dataset.copy()
+            logger.warning("Dataset shorter than 24 hours. Using full dataset for episode %d.", episode)
         
         # ==============================================
-        # 2. Generate initial SOC for battery
+        # 2. Generate random initial SOC for battery
         # ==============================================
         battery_cfg = config.get("agents", {}).get("battery", {}) or {}
         limits_cfg = battery_cfg.get("limits", {}) or {}
         
-        if is_final_episode:
-            # FINAL EPISODE: Use fixed initial SOC from config
-            final_cfg = config.get("final_episode", {})
-            initial_soc = float(final_cfg.get("initial_soc", 0.5))
-            logger.info("FINAL EPISODE: Using fixed initial SOC = %.3f", initial_soc)
-        else:
-            # TRAINING EPISODES: Random initial SOC
-            init_soc_min = float(limits_cfg.get("initial_soc_min", 0.1))
-            init_soc_max = float(limits_cfg.get("initial_soc_max", 0.9))
-            
-            # Ensure valid range
-            if init_soc_max < init_soc_min:
-                init_soc_min, init_soc_max = init_soc_max, init_soc_min
-            
-            # Generate random initial SOC
-            initial_soc = np.random.uniform(init_soc_min, init_soc_max)
+        # Random initial SOC for all episodes
+        init_soc_min = float(limits_cfg.get("initial_soc_min", 0.1))
+        init_soc_max = float(limits_cfg.get("initial_soc_max", 0.9))
+        
+        # Ensure valid range
+        if init_soc_max < init_soc_min:
+            init_soc_min, init_soc_max = init_soc_max, init_soc_min
+        
+        # Generate random initial SOC
+        initial_soc = np.random.uniform(init_soc_min, init_soc_max)
         
         # ==============================================
         # 3. Reset environment with episode data and initial SOC
@@ -292,12 +259,7 @@ def run_training(config):
         env.reset(episode_data, initial_soc)
         
         # Record episode metadata
-        if is_final_episode:
-            # For final episode, use actual end index
-            recorded_start = start
-            recorded_end = end
-        elif full_dataset_length >= 24:
-            # For training episodes with valid window
+        if full_dataset_length >= 24:
             recorded_start = start
             recorded_end = start + 24
         else:
@@ -310,8 +272,7 @@ def run_training(config):
             "window_start_index": recorded_start,
             "window_end_index": recorded_end,
             "window_size": recorded_end - recorded_start,
-            "initial_soc": initial_soc,
-            "is_final_episode": is_final_episode
+            "initial_soc": initial_soc
         })
         
         # ==============================================
@@ -329,21 +290,10 @@ def run_training(config):
                     a.idx = digitize_clip(a.soc, a.battery_soc_bins)
                 
                 # Verification log
-                if is_final_episode:
-                    logger.info(
-                        "✅ FINAL EPISODE - Battery SOC initialized: %.3f (idx=%d)",
-                        a.soc, a.idx
-                    )
-                    if abs(a.soc - initial_soc) > 0.001:
-                        logger.warning(
-                            "⚠️  SOC mismatch! Expected %.3f, got %.3f",
-                            initial_soc, a.soc
-                        )
-                else:
-                    logger.debug(
-                        "Episode %d - Battery SOC initialized: %.3f (idx=%d)",
-                        episode, a.soc, a.idx
-                    )
+                logger.debug(
+                    "Episode %d - Battery SOC initialized: %.3f (idx=%d)",
+                    episode, a.soc, a.idx
+                )
 
         evolution = []
 
@@ -390,17 +340,11 @@ def run_training(config):
         
         evolution.append(initial_state_record)
 
-        # 1. Epsilon update
-        if is_final_episode:
-            # FINAL EPISODE: Pure exploitation (epsilon = 0)
-            epsilon = 0.0
-            logger.info("FINAL EPISODE: Setting epsilon = 0.0 (pure exploitation)")
-        else:
-            # TRAINING EPISODES: Use scheduler
-            epsilon = scheduler(episode, epsilon)
+        # 1. Epsilon update using scheduler
+        epsilon = scheduler(episode, epsilon)
         print(30*"*")
         # Use actual episode data length, stop before last index for next_state calculation
-        episode_steps = len(episode_data) - 1 if is_final_episode else env.max_steps - 1
+        episode_steps = env.max_steps - 1
         for index in range(episode_steps):
 
             # 1. Discretized state per agent
@@ -535,9 +479,8 @@ def run_training(config):
                 # Accumulate timestep reward into episode reward
                 current_episode_reward[name] += timestep_reward
 
-                # Q-learning update (skip in final episode for pure evaluation)
-                if not is_final_episode:
-                    agent.update_q_table(state_tuple, agent.action, timestep_reward, next_state_tuple)
+                # Q-learning update
+                agent.update_q_table(state_tuple, agent.action, timestep_reward, next_state_tuple)
 
                 # Log per-agent timestep reward
                 step_record[f"reward_{name}"] = timestep_reward

@@ -216,6 +216,10 @@ def run_training(config):
     
     # Track episode metadata (window and initial SOC)
     episode_metadata = []
+    
+    # Track episode rewards: one entry per episode
+    # Dictionary format: {agent_name: [episode_0_reward, episode_1_reward, ...]}
+    episode_rewards = {name: [] for name in agents.keys()}
 
     for episode in range(num_episodes):
         # Check if this is the final episode (last one)
@@ -342,6 +346,10 @@ def run_training(config):
                     )
 
         evolution = []
+
+        # Initialize episode reward accumulator for each agent
+        # This tracks the sum of timestep rewards ONLY for the current episode
+        current_episode_reward = {name: 0.0 for name in agents.keys()}
 
         # 0. Record initial state (step -1) to capture initial SOC before any actions
         initial_state_record = {
@@ -521,14 +529,18 @@ def run_training(config):
                         f"El agente {name} no tiene reward_fn configurado. Define 'agents.{agent.name.split('#')[0]}.reward' en el YAML."
                     )
 
-                reward = agent.reward_fn.compute(agent, env, state_tuple)
+                # Compute timestep reward
+                timestep_reward = agent.reward_fn.compute(agent, env, state_tuple)
+                
+                # Accumulate timestep reward into episode reward
+                current_episode_reward[name] += timestep_reward
 
                 # Q-learning update (skip in final episode for pure evaluation)
                 if not is_final_episode:
-                    agent.update_q_table(state_tuple, agent.action, reward, next_state_tuple)
+                    agent.update_q_table(state_tuple, agent.action, timestep_reward, next_state_tuple)
 
-                # Log per-agent values
-                step_record[f"reward_{name}"] = reward
+                # Log per-agent timestep reward
+                step_record[f"reward_{name}"] = timestep_reward
 
             evolution.append(step_record)
 
@@ -538,6 +550,11 @@ def run_training(config):
         episode_df = pd.DataFrame(evolution)
         episode_df.to_csv(f"results/evolution/episode_{episode}.csv", index=False)
         results.append(episode_df)
+        
+        # 8. Store episode reward for each agent
+        # Append the final episode reward (sum of all timestep rewards for this episode)
+        for name in agents.keys():
+            episode_rewards[name].append(current_episode_reward[name])
         
         logger.info("Episode %d/%d completed | epsilon=%.3f", episode + 1, num_episodes, epsilon)
 
@@ -577,5 +594,25 @@ def run_training(config):
     
     logger.info("Episode metadata saved to %s", metadata_excel_path)
     logger.info("Window frequency analysis: %d unique windows used across %d episodes", unique_windows, total_episodes)
+
+    # Save episode rewards summary
+    # Create DataFrame with episode rewards (one row per episode, one column per agent)
+    episode_rewards_df = pd.DataFrame(episode_rewards)
+    episode_rewards_df.insert(0, 'episode', range(num_episodes))
+    
+    # Save to CSV and Excel
+    rewards_csv_path = "results/logs/episode_rewards.csv"
+    rewards_excel_path = "results/logs/episode_rewards.xlsx"
+    
+    episode_rewards_df.to_csv(rewards_csv_path, index=False)
+    
+    # Calculate statistics for Excel
+    rewards_stats = episode_rewards_df.drop('episode', axis=1).describe()
+    
+    with pd.ExcelWriter(rewards_excel_path, engine='openpyxl') as writer:
+        episode_rewards_df.to_excel(writer, sheet_name='Episode Rewards', index=False)
+        rewards_stats.to_excel(writer, sheet_name='Statistics')
+    
+    logger.info("Episode rewards saved to %s and %s", rewards_csv_path, rewards_excel_path)
 
     return agents, results

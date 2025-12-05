@@ -1,0 +1,3 @@
+2025-12-03 20:33:57 | INFO | Loading external evaluation dataset: assets/datasets/Case1.csv
+2025-12-03 20:33:57 | INFO | External dataset loaded: 24 rows, 5 columns
+2025-12-03 20:33:57 | INFO | Applying power_scale_factor=1000.0 to columns: demand, solar_power_0, wind_power_0

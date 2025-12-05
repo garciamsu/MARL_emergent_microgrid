@@ -71,7 +71,8 @@ class MultiAgentEnv:
         """Reset continuous and discretized attributes for a new episode.
         
         Args:
-            episode_data (pd.DataFrame, optional): 24-hour contiguous window from dataset.
+            episode_data (pd.DataFrame, optional): Contiguous window from dataset.
+                Window size is configured via simulation.episode_window_hours.
                 If None, uses full dataset (for backward compatibility).
             initial_soc (float, optional): Initial SOC for battery agent(s).
                 If None, battery agents maintain their configured initial SOC.
@@ -110,7 +111,6 @@ class MultiAgentEnv:
         self.energy_balance_idx = digitize_clip(self.energy_balance, self.power_bins)
         self.delta_power_idx = "surplus"
 
-        self.scale_demand = 1
         self.state = None
 
     def _load_data(self, filename: str, offsets: dict | None = None) -> pd.DataFrame:
@@ -141,14 +141,14 @@ class MultiAgentEnv:
     def get_dataset(self, field: str, index: int) -> int:
         """Return discretized value for ``field`` at ``index`` updating env if needed.
         
-        Uses episode_data if available (from random 24h window), otherwise falls back to full dataset.
+        Uses episode_data if available (from random contiguous window), otherwise falls back to full dataset.
         """
         # Use episode_data if available, otherwise fall back to full dataset
         data_source = self.episode_data if self.episode_data is not None else self.dataset
         row = data_source.iloc[index]
         
         if field == "demand":
-            self.demand_power = row[field] * self.scale_demand
+            self.demand_power = row[field]
             self.demand_power_idx = digitize_clip(self.demand_power, self.power_bins)
             self.price = row["price"]
         

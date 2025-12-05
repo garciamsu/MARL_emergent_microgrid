@@ -221,20 +221,26 @@ def run_training(config):
     # Dictionary format: {agent_name: [episode_0_reward, episode_1_reward, ...]}
     episode_rewards = {name: [] for name in agents.keys()}
 
+    # Get configurable episode window size (in hours)
+    episode_window_hours = config.get("simulation", {}).get("episode_window_hours", 48)
+    
     for episode in range(num_episodes):
         # ==============================================
-        # 1. Select 24-hour contiguous random window
+        # 1. Select contiguous random window (configurable size)
         # ==============================================
         full_dataset_length = len(env.full_dataset)
         
-        # Random 24-hour window for all episodes
-        if full_dataset_length >= 24:
-            start = np.random.randint(0, full_dataset_length - 24)
-            episode_data = env.full_dataset.iloc[start:start + 24].copy()
+        # Random contiguous window for all episodes
+        if full_dataset_length >= episode_window_hours:
+            start = np.random.randint(0, full_dataset_length - episode_window_hours)
+            episode_data = env.full_dataset.iloc[start:start + episode_window_hours].copy()
         else:
-            # Fallback: if dataset is shorter than 24 hours, use full dataset
+            # Fallback: if dataset is shorter than configured window, use full dataset
             episode_data = env.full_dataset.copy()
-            logger.warning("Dataset shorter than 24 hours. Using full dataset for episode %d.", episode)
+            logger.warning(
+                "Dataset shorter than configured window (%d hours). Using full dataset for episode %d.",
+                episode_window_hours, episode
+            )
         
         # ==============================================
         # 2. Generate random initial SOC for battery
@@ -259,9 +265,9 @@ def run_training(config):
         env.reset(episode_data, initial_soc)
         
         # Record episode metadata
-        if full_dataset_length >= 24:
+        if full_dataset_length >= episode_window_hours:
             recorded_start = start
-            recorded_end = start + 24
+            recorded_end = start + episode_window_hours
         else:
             # Fallback
             recorded_start = 0
@@ -367,7 +373,7 @@ def run_training(config):
             # 3. Environment update based on agent actions
             # Sequential update order: Renewables → Load → Battery → Grid
 
-            # Load base demand and price from episode data (24h window)
+            # Load base demand and price from episode data (configurable window)
             data_source = env.episode_data if env.episode_data is not None else env.dataset
             base_demand_from_dataset = data_source.iloc[index]["demand"]
             env.get_dataset("demand", index)

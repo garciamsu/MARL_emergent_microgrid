@@ -14,19 +14,16 @@ simulation:
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 1324           # random seed for reproducibility
   dataset: training_v1.csv
+  
+  # Episode window size in hours (contiguous random window from dataset)
+  # Each episode uses a random contiguous window of this size
+  # Must be <= dataset length. Default: 48 hours (2 days)
+  episode_window_hours: 72
 
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
   # Excludes: price, Datetime columns
   power_scale_factor: 1000.0
-
-  # Demand scaling per episode. DEPRECATED: Now using direct demand from dataset.
-  # Kept for backward compatibility but ignored in random 24h window mode.
-  demand_scale:
-    mode: fixed         # fixed | random (use 'fixed' to disable artificial scaling)
-    fixed: 1.0          # no scaling applied
-    min: 1.0
-    max: 1.0
 
   epsilon:
     schedule: linear    # linear | exponential | constant | custom

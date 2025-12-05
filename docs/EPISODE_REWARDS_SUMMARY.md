@@ -45,56 +45,32 @@ for episode in range(num_episodes):
 - `results/logs/episode_rewards.csv`: CSV with columns [episode, agent1, agent2, ...]
 - `results/logs/episode_rewards.xlsx`: Excel with Episode Rewards and Statistics sheets
 
-### 2. Visualization Tool (`analysis_tools/plot_episode_rewards.py`)
+### 2. Comprehensive Analysis Tool (`analysis_tools/E_accumulated_reward.py`)
 
-**Purpose**: Plot episode rewards correctly (NOT cumulative across episodes)
+**Purpose**: Complete reward analysis, validation, and visualization
 
 **Features**:
-- Reads `episode_rewards.csv`
-- Generates two plots:
-  - Raw episode rewards per episode
-  - Moving average for trend analysis
-- Prints statistics and learning progress
+- Automatic validation: episode rewards match manual sum from CSVs
+- Checks for incorrect accumulation across episodes
+- Generates ALL reward visualizations:
+  - Episode rewards (per episode)
+  - Moving average (smoothed trends)
+  - Cumulative rewards (overall learning trend)
+- Computes statistics and learning progress
+- Outputs Excel and multiple SVG files
 
 **Usage**:
 ```bash
-python analysis_tools/plot_episode_rewards.py
+python analysis_tools/E_accumulated_reward.py
 ```
 
 **Outputs**:
-- `results/plots/episode_rewards.svg`
-- `results/plots/episode_rewards_moving_avg.svg`
+- `results/plots/episode_rewards.svg` (per episode)
+- `results/plots/episode_rewards_moving_avg.svg` (smoothed)
+- `results/plots/cumulative_rewards.svg` (cumulative trend)
+- `results/plots/agent_rewards_cumulative.xlsx` (data tables)
 
-### 3. Reference Implementation (`analysis_tools/episode_reward_reference.py`)
-
-**Purpose**: Educational reference showing correct vs incorrect patterns
-
-**Contents**:
-- Correct pattern with detailed explanation
-- Common mistakes to avoid
-- Executable demo with visual output
-
-**Usage**:
-```bash
-python analysis_tools/episode_reward_reference.py
-```
-
-### 4. Verification Tool (`analysis_tools/verify_episode_rewards.py`)
-
-**Purpose**: Validate correctness of implementation
-
-**Checks**:
-- Episode rewards match manual sum from individual episode CSVs
-- No accumulation across episodes
-- Correct data structure
-- Rewards fluctuate (not monotonically increasing)
-
-**Usage**:
-```bash
-python analysis_tools/verify_episode_rewards.py
-```
-
-### 5. Documentation (`docs/EPISODE_REWARDS_GUIDE.md`)
+### 3. Documentation (`docs/EPISODE_REWARDS_GUIDE.md`)
 
 Comprehensive guide covering:
 - Implementation details
@@ -112,14 +88,8 @@ Comprehensive guide covering:
 # 1. Run training
 python main.py
 
-# 2. Verify correctness
-python analysis_tools/verify_episode_rewards.py
-
-# 3. Visualize results
-python analysis_tools/plot_episode_rewards.py
-
-# 4. (Optional) Run reference demo
-python analysis_tools/episode_reward_reference.py
+# 2. Complete analysis (validation + all visualizations)
+python analysis_tools/E_accumulated_reward.py
 ```
 
 ### Python API
@@ -202,9 +172,7 @@ plt.plot(episodes, cumulative_rewards)  # Would be cumsum of episode_rewards
 - `core/simulation.py`: Added episode reward tracking and export
 
 ### Created
-- `analysis_tools/plot_episode_rewards.py`: Visualization tool
-- `analysis_tools/episode_reward_reference.py`: Reference implementation
-- `analysis_tools/verify_episode_rewards.py`: Verification tool
+- `analysis_tools/E_accumulated_reward.py`: Complete analysis, validation & visualization tool
 - `docs/EPISODE_REWARDS_GUIDE.md`: Comprehensive documentation
 - `docs/EPISODE_REWARDS_SUMMARY.md`: This file
 

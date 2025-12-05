@@ -20,16 +20,20 @@ Proporcionar un flujo de análisis **manual** y **secuencial** que permite:
 
 ```
 analysis_tools/
-├── README.md                    # 📖 Esta guía
-├── __init__.py                  # Paquete Python
-├── utils.py                     # Utilidades: carga de CSVs, discretización
-├── metrics.py                   # Cálculo de métricas (MEAN, ISE, IAE, penetraciones, rewards)
-├── plotting.py                  # Generación de gráficos (series, barras, histogramas, boxplots)
-├── A_data_check.py              # 🔍 Validar datasets y columnas
-├── B_run_training.py            # 🚀 Ejecutar entrenamiento (wrapper de main.py)
-├── C_collect_episodes.py        # 📦 Consolidar episodios en un CSV agregado
-├── D_compute_metrics.py         # 📊 Calcular métricas con PASS/FAIL
-└── E_plot_metrics.py            # 📈 Generar visualizaciones clave
+├── README.md                      # 📖 Esta guía
+├── __init__.py                    # Paquete Python
+├── utils.py                       # Utilidades: carga de CSVs, discretización
+├── metrics.py                     # Cálculo de métricas (MEAN, ISE, IAE, penetraciones, rewards)
+├── plotting.py                    # Generación de gráficos (series, barras, histogramas, boxplots)
+│
+├── run_full_pipeline.py           # 🚀 Pipeline completo automatizado
+│
+├── A_data_check.py                # 🔍 Validar datasets y columnas
+├── B_run_training.py              # 🏋️ Ejecutar entrenamiento (wrapper de main.py)
+├── C_collect_episodes.py          # 📦 Consolidar episodios en un CSV agregado
+├── D_compute_metrics.py           # 📊 Calcular métricas con PASS/FAIL
+├── E_accumulated_reward.py        # 📈 Análisis completo de rewards + validación + visualización
+└── E_graph_episode.py             # 📉 Generar visualizaciones clave
 ```
 
 ---
@@ -73,6 +77,29 @@ python analysis_tools/B_run_training.py
 **Salida esperada:**
 - CSVs de episodios en `results/evolution/episode_<n>.csv`.
 - Logs de agentes en `results/logs/run_*.log`.
+- Archivo `results/logs/episode_rewards.csv` con rewards por episodio.
+
+---
+
+**Nota:** La validación de rewards ahora está integrada en `E_accumulated_reward.py` (Paso 5), que automáticamente verifica la corrección de los datos antes del análisis.
+- ✅ Comparación de rewards almacenados vs. suma manual de timesteps
+- ✅ Detección de acumulación incorrecta entre episodios
+- ✅ Verificación de que valores fluctúan (no son monótonos)
+
+**Salida esperada:**
+- ✅ VERIFICATION PASSED: Todos los episodios verificados coinciden
+- 📊 Estadísticas de rewards por agente
+- 🔍 Verificación de acumulación incorrecta
+
+**Nota:** Este script es **crítico** para validar que la implementación de rewards sigue el patrón correcto:
+```python
+episode_reward = 0.0  # Reset al inicio de cada episodio
+for step in episode:
+    episode_reward += timestep_reward  # Acumular dentro del episodio
+episode_rewards.append(episode_reward)  # Guardar al final
+```
+
+**Referencia:** Los rewards por episodio están implementados correctamente en `metrics.py` y validados automáticamente por `E_accumulated_reward.py`.
 
 ---
 
@@ -133,7 +160,44 @@ analysis:
 
 ---
 
-### **Paso 5: Generar Visualizaciones** (`E_plot_metrics.py`)
+### **Paso 5: Gráficos de Reward Acumulado** (`E_accumulated_reward.py`)
+
+Genera análisis de recompensas acumuladas a través de los episodios para visualizar tendencias de aprendizaje.
+
+```bash
+python analysis_tools/E_accumulated_reward.py
+```
+
+**Funcionalidad:**
+- Lee `episode_rewards.csv` (generado por el entrenamiento)
+- Calcula suma acumulativa ENTRE episodios (para análisis de tendencias)
+- Genera estadísticas y visualizaciones
+
+**Archivos generados en `results/plots/`:**
+
+1. **`agent_rewards_cumulative.xlsx`**: Excel con 3 hojas:
+   - `Episode_Rewards`: Rewards por episodio (cada episodio independiente)
+   - `Cumulative_Sum`: Suma acumulativa entre episodios (para tendencia)
+   - `Statistics`: Estadísticas descriptivas
+
+2. **`cumulative_rewards.svg`**: Gráfico de suma acumulativa
+   - Muestra tendencia de aprendizaje a lo largo del entrenamiento
+   - Running sum de episode rewards (NO confundir con rewards por episodio)
+   - Útil para visualizar si los agentes están mejorando globalmente
+
+**Análisis impreso:**
+- 📊 Estadísticas por agente (mean, std, min, max por episodio)
+- 📈 Progreso de aprendizaje (primeros 10% vs últimos 10%)
+- 💹 Mejora porcentual y absoluta
+
+**Nota importante:** 
+- La suma acumulativa es solo para **visualización de tendencias**
+- Los episode rewards en sí NO son acumulativos (se resetean cada episodio)
+- Este gráfico complementa las visualizaciones de rewards que muestran las tendencias de aprendizaje
+
+---
+
+### **Paso 6: Generar Visualizaciones** (`E_plot_metrics.py`)
 
 Crea gráficos clave en formato SVG para análisis visual.
 
@@ -143,12 +207,15 @@ python analysis_tools/E_plot_metrics.py
 
 **Gráficos generados en `results/plots/`:**
 
-1. **`cumulative_rewards.svg`**: Evolución de recompensas acumuladas por agente con media móvil.
-2. **`penetrations.svg`**: Serie temporal de penetraciones renovable y de red.
-3. **`operational_metrics.svg`**: Barras de métricas operativas (MEAN, IAE, ISE, Variability) promediadas sobre últimos 10 episodios.
-4. **`energy_balance_histogram.svg`**: Histograma del balance energético (último episodio).
-5. **`balance_first_episode.svg`**: Serie temporal del balance en el primer episodio.
-6. **`balance_last_episode.svg`**: Serie temporal del balance en el último episodio.
+1. **`penetrations.svg`**: Serie temporal de penetraciones renovable y de red.
+2. **`operational_metrics.svg`**: Barras de métricas operativas (MEAN, IAE, ISE, Variability) promediadas sobre últimos 10 episodios.
+3. **`energy_balance_histogram.svg`**: Histograma del balance energético (último episodio).
+4. **`balance_first_episode.svg`**: Serie temporal del balance en el primer episodio.
+5. **`balance_last_episode.svg`**: Serie temporal del balance en el último episodio.
+
+---
+
+**Nota:** Todas las visualizaciones de rewards (episodio, promedio móvil, acumulativo) están integradas en `E_accumulated_reward.py` (Paso 5).
 
 ---
 
@@ -237,6 +304,69 @@ python analysis_tools/E_plot_metrics.py
 
 # 7. Revisar plots en results/plots/*.svg
 ```
+
+---
+
+## 🚀 Pipeline Automatizado
+
+Para ejecutar todos los pasos de forma secuencial y automática:
+
+```bash
+python analysis_tools/run_full_pipeline.py
+```
+
+**Secuencia de ejecución:**
+1. ✅ A_data_check.py - Validación de dataset
+2. ✅ B_run_training.py - Entrenamiento
+3. ✅ C_collect_episodes.py - Consolidación
+4. ✅ D_compute_metrics.py - Métricas
+5. ✅ E_accumulated_reward.py - Análisis de rewards & visualización
+6. ✅ E_graph_episode.py - Gráficos por episodio
+
+**Características:**
+- ⚠️ El pipeline se detiene si algún paso falla
+- 📊 Muestra resumen de pasos completados
+- 📁 Indica ubicación de todos los resultados generados
+
+---
+
+## 📚 Archivo de Referencia
+
+### **Scripts de Soporte Eliminados**
+
+- `episode_reward_reference.py`: Tutorial eliminado - la lógica correcta está en `metrics.py`
+- `verify_episode_rewards.py`: Integrado en `E_accumulated_reward.py` para validación automática
+- `plot_episode_rewards.py`: Integrado en `E_accumulated_reward.py` para visualización completa
+
+Este archivo es una **guía de referencia y documentación**, NO se ejecuta en el pipeline.
+
+**Propósito:**
+- Demuestra la forma **CORRECTA** de calcular episode rewards
+- Documenta patrones **INCORRECTOS** a evitar
+- Proporciona ejemplos de implementación
+
+**Principios clave documentados:**
+```python
+# ✅ CORRECTO
+episode_rewards = []
+for episode in range(num_episodes):
+    episode_reward = 0.0  # Reset al inicio
+    for step in range(max_steps):
+        timestep_reward = compute_reward(...)
+        episode_reward += timestep_reward  # Acumular dentro del episodio
+    episode_rewards.append(episode_reward)  # Guardar al final
+
+# ❌ INCORRECTO
+global_cumulative = 0.0  # NO hacer esto
+for episode in range(num_episodes):
+    for step in range(max_steps):
+        global_cumulative += reward  # Acumula entre episodios ❌
+```
+
+**Uso:**
+- Consultar cuando se implementan nuevas funciones de reward
+- Referencia para entender el patrón correcto
+- Documentación para nuevos desarrolladores
 
 ---
 

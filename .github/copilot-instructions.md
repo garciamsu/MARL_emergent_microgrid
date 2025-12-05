@@ -77,6 +77,9 @@ El bucle debe seguir estos pasos en cada episodio:
   * **✔ Comentarios y Docstrings:** Estrictamente en **INGLÉS**.
   * **✔ Mantener API:** NO alterar nombres de métodos, atributos, `update_power()`, `digitize_clip`, ni la construcción de Q-table.
   * **✔ Simulación Horaria:** Mantener la relación 1-step $\rightarrow$ 1-hour.
+  * Mantener la aplicación lo mas simple posible, evitando complejidades innecesarias.
+  * Todos los archivos generados como csv. xlsx, plots, etc., deben ser uticados en el directorio `results/` según corresponda.
+  * Toda la documentación relevante debe ser actualizada para reflejar estos cambios, incluyendo ejemplos de uso y guías de interpretación en el directorio `docs/`.
 
 -----
 
@@ -128,3 +131,5 @@ El bucle debe seguir estos pasos en cada episodio:
   * **No** reemplazar la lógica de Q-learning (`select_action()`, `update()`, etc.).
   * **No** romper la construcción del espacio de estados (`state_space`).
   * **No** alterar la estructura de logs o CSVs por episodio.
+  * **No** dejar script de pruebas o debug en el código final, sólo utiliza para validar cuando lo necesites y luego elimina.
+  

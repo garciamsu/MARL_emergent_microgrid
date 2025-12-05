@@ -1,0 +1,5 @@
+2025-12-05 15:24:45 | INFO | Episode 1/2 completed | epsilon=1.000
+2025-12-05 15:24:45 | INFO | Episode 2/2 completed | epsilon=0.000
+2025-12-05 15:24:45 | INFO | Episode metadata saved to results/logs/episode_metadata.xlsx
+2025-12-05 15:24:45 | INFO | Window frequency analysis: 2 unique windows used across 2 episodes
+2025-12-05 15:24:45 | INFO | Episode rewards saved to results/logs/episode_rewards.csv and results/logs/episode_rewards.xlsx

@@ -37,6 +37,32 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 
+# --- PLOT CONFIGURATION ---
+# Control which plots to generate and which agents to display in each plot
+PLOT_CONFIG = {
+    'episode_rewards': {
+        'enabled': True,
+        'agents': ['solar#0']  # None = all agents  'battery#0', 'grid#0', 'load#0', 'solar#0', 'wind#0'
+    },
+    'episode_rewards_moving_avg': {
+        'enabled': True,
+        'agents': ['solar#0']  # None = all agents
+    },
+    'cumulative_rewards': {
+        'enabled': True,
+        'agents': ['solar#0']  # None = all agents
+    }
+}
+
+# Examples of customization:
+# - To show only battery and grid in cumulative plot:
+#   PLOT_CONFIG['cumulative_rewards']['agents'] = ['battery#0', 'grid#0']
+# - To show all available agents, set to None:
+#   PLOT_CONFIG['episode_rewards']['agents'] = None
+# - To disable a plot entirely:
+#   PLOT_CONFIG['episode_rewards']['enabled'] = False
+
+
 def load_episode_rewards(rewards_file: str = "results/logs/episode_rewards.csv"):
     """
     Load episode rewards from CSV file with validation.
@@ -356,13 +382,30 @@ def plot_cumulative_rewards(df_cumulative: pd.DataFrame, output_dir: str):
         df_cumulative: DataFrame with cumulative rewards
         output_dir: Directory to save plot
     """
+    config = PLOT_CONFIG['cumulative_rewards']
+    if not config['enabled']:
+        print("ℹ️  Skipping cumulative_rewards plot (disabled in PLOT_CONFIG)")
+        return
+    
     os.makedirs(output_dir, exist_ok=True)
     
     # Configure matplotlib
     matplotlib.use('Agg')
     plt.style.use('seaborn-v0_8-paper')
     
-    agent_columns = [col for col in df_cumulative.columns if col != 'episode']
+    # Get all available agents
+    all_agents = [col for col in df_cumulative.columns if col != 'episode']
+    
+    # Filter agents based on configuration
+    if config['agents'] is None:
+        agent_columns = all_agents
+    else:
+        agent_columns = [a for a in config['agents'] if a in all_agents]
+        if not agent_columns:
+            print(f"⚠️  No valid agents found for cumulative_rewards. Available: {all_agents}")
+            return
+    
+    print(f"📊 Plotting cumulative_rewards with agents: {agent_columns}")
     
     # Get colors
     colormap = plt.get_cmap('tab10')
@@ -414,40 +457,72 @@ def plot_episode_rewards(df: pd.DataFrame, output_dir: str):
     matplotlib.use('Agg')
     plt.style.use('seaborn-v0_8-paper')
     
-    agent_columns = [col for col in df.columns if col != 'episode']
-    
-    # Get colors
-    colormap = plt.get_cmap('tab10')
-    colors = [colormap(i) for i in range(len(agent_columns))]
+    # Get all available agents
+    all_agents = [col for col in df.columns if col != 'episode']
     
     # ========================================
     # Plot 1: Episode Rewards (NOT cumulative)
     # ========================================
-    fig, ax = plt.subplots(figsize=(14, 8))
-    
-    for idx, agent in enumerate(agent_columns):
-        ax.plot(df['episode'], df[agent], 
-                marker='o', markersize=3, linewidth=1.5,
-                label=agent, color=colors[idx], alpha=0.8)
-    
-    ax.set_title('Episode Rewards (Per Episode)', fontsize=16, fontweight='bold')
-    ax.set_xlabel('Episode', fontsize=13)
-    ax.set_ylabel('Episode Reward', fontsize=13)
-    ax.legend(title='Agent', bbox_to_anchor=(1.02, 1), loc='upper left', frameon=True)
-    ax.grid(True, linestyle='--', alpha=0.5)
-    fig.tight_layout(rect=[0, 0, 0.88, 1])
-    
-    # Save plot
-    plot_path = os.path.join(output_dir, 'episode_rewards.svg')
-    plt.savefig(plot_path, format='svg', dpi=300, bbox_inches='tight')
-    print(f"✅ Plot saved: {plot_path}")
-    plt.close()
+    config_ep = PLOT_CONFIG['episode_rewards']
+    if config_ep['enabled']:
+        # Filter agents for this plot
+        if config_ep['agents'] is None:
+            agent_columns = all_agents
+        else:
+            agent_columns = [a for a in config_ep['agents'] if a in all_agents]
+            if not agent_columns:
+                print(f"⚠️  No valid agents for episode_rewards. Available: {all_agents}")
+                agent_columns = all_agents
+        
+        print(f"📊 Plotting episode_rewards with agents: {agent_columns}")
+        
+        # Get colors
+        colormap = plt.get_cmap('tab10')
+        colors = [colormap(i) for i in range(len(agent_columns))]
+        
+        fig, ax = plt.subplots(figsize=(14, 8))
+        
+        for idx, agent in enumerate(agent_columns):
+            ax.plot(df['episode'], df[agent], 
+                    marker='o', markersize=3, linewidth=1.5,
+                    label=agent, color=colors[idx], alpha=0.8)
+        
+        ax.set_title('Episode Rewards (Per Episode)', fontsize=16, fontweight='bold')
+        ax.set_xlabel('Episode', fontsize=13)
+        ax.set_ylabel('Episode Reward', fontsize=13)
+        ax.legend(title='Agent', bbox_to_anchor=(1.02, 1), loc='upper left', frameon=True)
+        ax.grid(True, linestyle='--', alpha=0.5)
+        fig.tight_layout(rect=[0, 0, 0.88, 1])
+        
+        # Save plot
+        plot_path = os.path.join(output_dir, 'episode_rewards.svg')
+        plt.savefig(plot_path, format='svg', dpi=300, bbox_inches='tight')
+        print(f"✅ Plot saved: {plot_path}")
+        plt.close()
+    else:
+        print("ℹ️  Skipping episode_rewards plot (disabled in PLOT_CONFIG)")
     
     # ========================================
     # Plot 2: Moving Average (smoothed)
     # ========================================
+    config_ma = PLOT_CONFIG['episode_rewards_moving_avg']
     window_size = min(10, len(df) // 4)  # Adaptive window size
-    if window_size >= 2:
+    if window_size >= 2 and config_ma['enabled']:
+        # Filter agents for moving average plot
+        if config_ma['agents'] is None:
+            agent_columns = all_agents
+        else:
+            agent_columns = [a for a in config_ma['agents'] if a in all_agents]
+            if not agent_columns:
+                print(f"⚠️  No valid agents for moving_avg. Available: {all_agents}")
+                agent_columns = all_agents
+        
+        print(f"📊 Plotting episode_rewards_moving_avg with agents: {agent_columns}")
+        
+        # Get colors
+        colormap = plt.get_cmap('tab10')
+        colors = [colormap(i) for i in range(len(agent_columns))]
+        
         fig, ax = plt.subplots(figsize=(14, 8))
         
         for idx, agent in enumerate(agent_columns):
@@ -468,6 +543,11 @@ def plot_episode_rewards(df: pd.DataFrame, output_dir: str):
         plt.savefig(plot_path, format='svg', dpi=300, bbox_inches='tight')
         print(f"✅ Plot saved: {plot_path}")
         plt.close()
+    elif not config_ma['enabled']:
+        print("ℹ️  Skipping episode_rewards_moving_avg plot (disabled in PLOT_CONFIG)")
+    elif window_size < 2:
+        print("ℹ️  Skipping moving average plot (insufficient data points)")
+
 
 
 def analyze_learning_progress(df: pd.DataFrame):
@@ -554,9 +634,15 @@ def main():
     print("="*80)
     print(f"\nOutputs:")
     print(f"  - Excel: {excel_output}")
-    print(f"  - Cumulative plot: {os.path.join(output_dir, 'cumulative_rewards.svg')}")
-    print(f"  - Episode rewards: {os.path.join(output_dir, 'episode_rewards.svg')}")
-    print(f"  - Moving average: {os.path.join(output_dir, 'episode_rewards_moving_avg.svg')}")
+    
+    # Dynamically list enabled plots
+    if PLOT_CONFIG['cumulative_rewards']['enabled']:
+        print(f"  - Cumulative plot: {os.path.join(output_dir, 'cumulative_rewards.svg')}")
+    if PLOT_CONFIG['episode_rewards']['enabled']:
+        print(f"  - Episode rewards: {os.path.join(output_dir, 'episode_rewards.svg')}")
+    if PLOT_CONFIG['episode_rewards_moving_avg']['enabled']:
+        print(f"  - Moving average: {os.path.join(output_dir, 'episode_rewards_moving_avg.svg')}")
+    
     print("\nValidation Summary:")
     print(f"  - Data verification: {'✅ PASSED' if verification_passed else '❌ FAILED'}")
     print(f"  - Accumulation check: {'✅ OK' if no_accumulation else '⚠️  WARNING'}")

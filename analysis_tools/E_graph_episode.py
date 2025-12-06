@@ -45,7 +45,7 @@ def get_latest_episode_number(base_dir):
     return max(episode_numbers)
 
 EPISODE_TO_PLOT = get_latest_episode_number(BASE_DIRECTORY) or 0
-OUTPUT_FILENAME = os.path.join(SCRIPT_DIR, "episode_dynamics.svg")
+OUTPUT_FILENAME = os.path.join(SCRIPT_DIR, "..", "results", "plots", "episode_dynamics.svg")
 
 # --- PARÁMETROS DE ESTILO ---
 STATE_FILL_TRANSPARENCY = 0.2

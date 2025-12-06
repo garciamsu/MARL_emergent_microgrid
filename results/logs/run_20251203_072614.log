@@ -1,7 +1,0 @@
-2025-12-03 07:26:14 | INFO | Episode 1/5 completed | epsilon=1.000
-2025-12-03 07:26:14 | INFO | Episode 2/5 completed | epsilon=0.750
-2025-12-03 07:26:14 | INFO | Episode 3/5 completed | epsilon=0.500
-2025-12-03 07:26:14 | INFO | Episode 4/5 completed | epsilon=0.250
-2025-12-03 07:26:14 | INFO | FINAL EPISODE: Using predefined window [5120:5168] (48 hours)
-2025-12-03 07:26:14 | INFO | FINAL EPISODE: Using fixed initial SOC = 0.500
-2025-12-03 07:26:14 | INFO | FINAL EPISODE: Setting epsilon = 0.0 (pure exploitation)

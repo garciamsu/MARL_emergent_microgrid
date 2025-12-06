@@ -1,6 +1,0 @@
-2025-11-30 22:04:42 | INFO | Episode 1/5 completed | epsilon=1.000
-2025-11-30 22:04:42 | INFO | Episode 2/5 completed | epsilon=0.750
-2025-11-30 22:04:42 | INFO | Episode 3/5 completed | epsilon=0.500
-2025-11-30 22:04:42 | INFO | Episode 4/5 completed | epsilon=0.250
-2025-11-30 22:04:42 | INFO | Episode 5/5 completed | epsilon=0.000
-2025-11-30 22:04:42 | INFO | Episode metadata saved to results/logs/episode_metadata.xlsx

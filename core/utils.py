@@ -27,31 +27,33 @@ def set_global_seed(seed: int) -> None:
 
 
 def build_logger(name: str = "marl", level: int = logging.INFO, log_dir: str = "results/logs") -> logging.Logger:
-    """Create a configured logger writing to stdout and timestamped file.
+    """Create a configured logger writing to stdout only.
+
+    The previous behaviour wrote timestamped files like ``run_YYYYMMDD_HHMMSS.log``
+    under ``results/logs``. Those per-run files are no longer needed and have
+    been removed to avoid cluttering the repository. Aggregated analytics
+    (``episode_metadata.xlsx``, ``episode_rewards.csv``, etc.) are still
+    handled elsewhere and remain unchanged.
 
     Args:
         name (str): Logger name.
         level (int): Logging level.
-        log_dir (str): Directory to store log files.
+        log_dir (str): Kept for backward compatibility, currently unused.
 
     Returns:
         logging.Logger: Configured logger instance.
     """
-    os.makedirs(log_dir, exist_ok=True)
     logger = logging.getLogger(name)
     if logger.handlers:  # Reuse existing
         return logger
+
     logger.setLevel(level)
-    formatter = logging.Formatter(fmt="%(asctime)s | %(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    formatter = logging.Formatter(
+        fmt="%(asctime)s | %(levelname)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
-    # File handler
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    fh = logging.FileHandler(os.path.join(log_dir, f"run_{ts}.log"))
-    fh.setFormatter(formatter)
-    fh.setLevel(level)
-    logger.addHandler(fh)
-
-    # Stream handler
+    # Stream handler only (stdout/stderr via logging)
     sh = logging.StreamHandler()
     sh.setFormatter(formatter)
     sh.setLevel(level)

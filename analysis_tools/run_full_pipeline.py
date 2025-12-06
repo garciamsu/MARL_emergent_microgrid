@@ -12,7 +12,6 @@ Executes the complete analysis pipeline in sequence:
 
 Each script is executed in order, and the pipeline stops if any script fails.
 """
-"""
 
 import os
 import sys

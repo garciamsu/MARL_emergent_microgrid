@@ -67,6 +67,8 @@ El código es completamente orientado a objetos; cada componente físico es un a
 
 Cada nueva funcionalidad o cambio de comportamiento relevante que desarrollen los agentes de IA debe reflejarse y resumirse apropiadamente en este archivo `copilot-instructions.md`, para mantener estas reglas siempre alineadas con el estado real del proyecto.
 
+Las respuestas generadas por GitHub Copilot u otros agentes de IA para este repositorio deben estar redactadas en **español**, salvo que se trate de comentarios/docstrings en el código, que siguen siendo en inglés.
+
 ## Herramientas y Flujos de Trabajo
 
 - Self‑check rápido: `python scripts/self_check.py` (corrida corta de validación).

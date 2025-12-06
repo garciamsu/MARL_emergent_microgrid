@@ -1,135 +1,84 @@
-¡Absolutamente\! Aquí tienes las instrucciones clave para **GitHub Copilot**, estrictamente formateadas con encabezados estilizados y listas para copiar y pegar.
+## Resumen del Proyecto
 
-## 📌 Contexto Global del Proyecto 🌍
+Este repositorio implementa un marco de **aprendizaje por refuerzo multi‑agente (MARL)** para la operación de una microred con:
+- Agentes: `solar`, `wind`, `battery`, `grid`, `load` (ver `agents/`).
+- Núcleo de entorno y bucle de entrenamiento: `core/environment.py`, `core/simulation.py`, `main.py`.
+- Datos: datasets horarios en CSV en `assets/datasets/`, seleccionados vía `configs/default.yaml`.
 
-Este repositorio implementa un sistema **Multi-Agent Reinforcement Learning (MARL)** para la operación de una microgrid.
+El código es completamente orientado a objetos; cada componente físico es un agente con su propia política y configuración de recompensas.
 
-  * **Agentes:** Solar, Wind, Battery, Grid, Load.
-  * **Método:** Q-learning tabular.
-  * **Arquitectura:** Orientada a Objetos (OOP).
-  * **Componentes Clave:** `core/environment.py` (simulación), `core/simulation.py` (entrenamiento).
-  * **Datos:** Dataset anual con resolución horaria.
+## Arquitectura y Módulos Clave
 
------
+- `main.py`: punto de entrada principal. Carga `configs/default.yaml`, construye entorno y agentes, ejecuta entrenamiento y escribe salidas en `results/`.
+- `core/environment.py`: entorno multi‑agente (construcción del estado, avance temporal, acceso a dataset, evolución de SOC, balance de potencia).
+- `core/simulation.py`: bucle de entrenamiento (episodios, programación de epsilon, actualización de Q‑tables, logging, exportación a CSV).
+- `agents/*.py`: clases concretas de agentes (solar, eólica, batería, red, carga) registradas mediante decoradores; implementan `update_power` y ganchos de política.
+- `core/rewards.py`: cálculo centralizado de recompensas impulsado por la configuración YAML (`agents.<type>.reward`). Los agentes no implementan su propia función de recompensa.
+- `utils/discretization.py`: utilidades de discretización de estado‑acción; las Q‑tables son tabulares sobre estos espacios discretos.
+- `analysis_tools/`: análisis post‑hoc (chequeos de datos, corridas de entrenamiento, métricas, gráficos) que asumen los formatos actuales de CSV/log.
 
-## 🚨 Cambios Mandatorios para Copilot 🛠️
+## Datos, Paso de Tiempo y Episodios
 
-Los siguientes cambios deben integrarse manteniendo la arquitectura existente.
+- El paso de tiempo `dt_h` está fijado a 1.0 h (ver `configs/loader.py`); mantener siempre la semántica 1 paso ⇾ 1 hora.
+- Los datasets son CSV indexados por hora en `assets/datasets/`; la selección se controla con `simulation.dataset` en `configs/default.yaml`.
+- Los episodios de entrenamiento recorren índices de tiempo contiguos; evita barajar filas o reordenar el tiempo cuando añadas nueva lógica.
 
-### 2.1 Ventanas Contiguas Aleatorias de 24 Horas
+## Convenciones de Configuración
 
-  * **Lógica:** Cada episodio usará una ventana contigua aleatoria de 24 horas del dataset.
-  * **Coherencia:** Se debe preservar la coherencia temporal (solar, eólica, demanda, etc.).
-  * **Restricciones:** **NO** usar *shuffling* ni muestrear hora por hora.
-  * **Implementación Obligatoria:**
-    ```python
-    start = np.random.randint(0, len(env.dataset) - 24)
-    episode_data = env.dataset.iloc[start:start + 24]
-    ```
-  * **Archivos Afectados:** `core/simulation.py`, `core/environment.py`.
+- Fuente única de verdad: `configs/default.yaml`.
+- Bloques importantes:
+  - `simulation.*`: episodios, dataset, semilla, programación de epsilon, posible escalado de demanda.
+  - `agents.<type>.policy.{alpha,gamma}`: hiperparámetros de Q‑learning tabular.
+  - `agents.<type>.reward`: pesos y parámetros de recompensa consumidos en `core/rewards.py`.
+  - `agents.battery.limits.*`: límites de SOC y comportamiento del SOC inicial por episodio.
+  - `discretization.*`: número de bins y rangos usados por `utils/discretization.py`.
+- Al añadir nuevas opciones, extiende este YAML y léelo en `configs/loader.py` o `core/utils` en lugar de usar constantes hard‑codeadas.
 
-### 2.2 SOC Inicial Aleatorio (Battery)
+## Bucle de Entrenamiento y Resultados
 
-  * **Lógica:** El Estado de Carga (SOC) inicial de la batería debe ser aleatorio en cada episodio.
-  * **Implementación Obligatoria:**
-    ```python
-    initial_soc = np.random.uniform(0.1, 0.9)
-    ```
-  * **Integración:** Este valor debe pasarse a `env.reset()` y al agente batería.
+- Ejecución estándar de entrenamiento: `python main.py`.
+- Flujo típico dentro de `core/simulation.py`:
+  1. Fijar la semilla global con `simulation.seed`.
+  2. Por episodio: SOC inicial de la batería desde el YAML.
+  3. Reiniciar entorno y agentes, luego avanzar el episodio (1 paso por hora).
+  4. Seleccionar acciones con política epsilon‑greedy (`policies/epsilon_greedy.py`) y actualizar Q‑tables.
+  5. Registrar la evolución en `results/evolution/episode_<n>.csv` y el estado general en `results/logs/`.
+- No cambies los nombres de archivos ni la estructura de directorios en `results/` sin actualizar también los scripts en `analysis_tools/`.
 
-### 2.3 Remover Escalado Artificial de Demanda
+## Recompensas y Agentes
 
-  * **Objetivo:** Utilizar la demanda directamente del dataset, sin alteraciones.
-  * **Acciones:** Desactivar o eliminar toda lógica de escalado artificial de demanda (`demand_scale`) en `simulation.py` y `environment.py`.
-  * **Configuración:** Conservar la estructura del `config`, pero ignorar/eliminar modos como "random" o "fixed".
+- Las recompensas están centralizadas: modifica siempre la lógica en `core/rewards.py` y en las secciones YAML correspondientes, nunca dentro de las clases de agentes.
+- Cada agente expone al menos `update_power` y reutiliza utilidades compartidas para discretización y actualización de Q‑tables.
+- Para introducir un nuevo agente:
+  - Crea `agents/<name>_agent.py`.
+  - Regístralo en `core/registry.py` con el decorador existente.
+  - Añade su configuración bajo `agents.<name>` en `configs/default.yaml`.
 
-### 2.4 Modificación de `Environment.reset()`
+## Estilo de Código e Invariantes
 
-  * **Nueva Firma:**
-    ```python
-    def reset(self, episode_data, initial_soc):
-    ```
-  * **Funciones:**
-      * Resetear acumuladores y índices de discretización.
-      * Asignar `initial_soc` a la batería.
-      * Cargar la ventana `episode_data` como el dataset del episodio.
-  * **Compatibilidad:** NO debe romper `get_dataset()` ni el acceso a variables (e.g., `solar_power_0`).
+- Mantén el código orientado a objetos; no conviertas los módulos núcleo en scripts puramente procedimentales.
+- Comentarios y docstrings deben estar en inglés.
+- Preserva las APIs públicas existentes entre módulos (por ejemplo, `reset/step` del entorno, `update_power` de los agentes, utilidades de discretización y funciones de registro).
+- Mantén el comportamiento determinista cuando `simulation.seed` esté definido (usa las utilidades de `core/utils.py`).
+- Mantén la aplicación lo más simple posible, evitando complejidades innecesarias.
+- Todos los archivos generados (CSV, XLSX, gráficos, etc.) deben ubicarse en el directorio `results/` correspondiente.
+- Toda la documentación relevante debe actualizarse para reflejar cambios de comportamiento, incluyendo ejemplos y guías de interpretación en `docs/`.
+- **No** dejes scripts de pruebas o debug en el código final; úsalos solo para validar y elimínalos después.
 
------
+Cada nueva funcionalidad o cambio de comportamiento relevante que desarrollen los agentes de IA debe reflejarse y resumirse apropiadamente en este archivo `copilot-instructions.md`, para mantener estas reglas siempre alineadas con el estado real del proyecto.
 
-## 2.5 Asegurar Bucle de Entrenamiento Coherente (En `core/simulation.run_training`)
+## Herramientas y Flujos de Trabajo
 
-El bucle debe seguir estos pasos en cada episodio:
+- Self‑check rápido: `python scripts/self_check.py` (corrida corta de validación).
+- Pipeline completo y análisis: `analysis_tools/run_full_pipeline.py` y scripts individuales en `analysis_tools/`.
+- Tests de humo con pytest (cuando existan): `pytest -q` o `python -m pytest -k smoke -q` desde la raíz del repositorio.
 
-1.  **Escoger** ventana de 24h (`episode_data`).
-2.  **Generar** SOC inicial *random* (`initial_soc`).
-3.  **Llamar** a `env.reset(episode_data, initial_soc)`.
-4.  **Ejecutar** ciclo de 24 pasos.
-5.  **Actualizar** Q-tables.
-6.  **Guardar** CSV por episodio.
+## Cómo Extender de Forma Segura
 
------
+- Al añadir funcionalidades, prioriza:
+  - Nuevos campos de configuración en `configs/default.yaml`.
+  - Helpers pequeños y enfocados en `core/utils.py`, `utils/discretization.py` o `analysis_tools/utils.py`.
+  - Reutilizar el sistema de logging y las utilidades de limpieza existentes en lugar de scripts ad‑hoc.
+- Evita romper la compatibilidad hacia atrás de los formatos de CSV/log; los scripts de `analysis_tools/` dependen de su esquema actual.
 
-## 🧠 Reglas Obligatorias de Arquitectura 🏛️
-
-  * **✔ OOP obligatorio:** Ningún archivo debe volverse procedural.
-  * **✔ No reescribir clases:** Modificar solo funciones específicas.
-  * **✔ Comentarios y Docstrings:** Estrictamente en **INGLÉS**.
-  * **✔ Mantener API:** NO alterar nombres de métodos, atributos, `update_power()`, `digitize_clip`, ni la construcción de Q-table.
-  * **✔ Simulación Horaria:** Mantener la relación 1-step $\rightarrow$ 1-hour.
-  * Mantener la aplicación lo mas simple posible, evitando complejidades innecesarias.
-  * Todos los archivos generados como csv. xlsx, plots, etc., deben ser uticados en el directorio `results/` según corresponda.
-  * Toda la documentación relevante debe ser actualizada para reflejar estos cambios, incluyendo ejemplos de uso y guías de interpretación en el directorio `docs/`.
-
------
-
-## 🗂 Archivos A Tocar y Detalles de Implementación 📝
-
-### ✔ `core/simulation.py`
-
-  * **Inyección de Lógica:** Añadir al inicio del bucle de episodio:
-    ```python
-    start = np.random.randint(0, len(env.dataset) - 24)
-    episode_data = env.dataset.iloc[start:start + 24]
-
-    initial_soc = np.random.uniform(
-        config["agents"]["battery"]["limits"]["initial_soc_min"],
-        config["agents"]["battery"]["limits"]["initial_soc_max"]
-    )
-
-    env.reset(episode_data, initial_soc)
-    ```
-
-### ✔ `core/environment.py`
-
-  * **Implementar `reset`:**
-    ```python
-    def reset(self, episode_data, initial_soc):
-        self.episode_data = episode_data  # Guardar la ventana
-        self.battery.soc = initial_soc    # Inyectar SOC
-        self.current_step = 0             # Resetear paso
-        # ... Lógica de reseteo de acumuladores ...
-    ```
-  * **Reemplazar Acceso a Dataset:**
-      * Donde se acceda a datos del dataset global por índice de paso, usar:
-        ```python
-        value = self.episode_data.iloc[self.current_step][varname]
-        ```
-
-### ✔ `configs/default.yaml` y `dataloader/loader.py`
-
-  * **Configuración:** Deshabilitar lógicas de `demand_scale` y verificar que los límites `initial_soc_min/max` estén presentes.
-  * **Dataloader:** Asegurar la lectura del dataset anual completo para que `simulation.py` pueda seleccionar la ventana.
-
------
-
-## ❌ Prohibiciones Estrictas 🚫
-
-  * **No** crear nuevas rutas de dataset.
-  * **No** generar agentes nuevos ni modificar el `agents/` folder.
-  * **No** modificar `core/rewards.py`.
-  * **No** reemplazar la lógica de Q-learning (`select_action()`, `update()`, etc.).
-  * **No** romper la construcción del espacio de estados (`state_space`).
-  * **No** alterar la estructura de logs o CSVs por episodio.
-  * **No** dejar script de pruebas o debug en el código final, sólo utiliza para validar cuando lo necesites y luego elimina.
-  
+Si alguna asunción arquitectónica no es evidente (flujo de recompensas, manejo de datasets o registro de agentes), revisa en conjunto `core/environment.py`, `core/rewards.py` y el paquete `agents/` antes de hacer refactors grandes.

@@ -263,9 +263,7 @@ class DefaultLoadReward(RewardFn):
         surplus = (renewable_idx > demand_idx)
         expensive = (real_price > getattr(agent, "comfort_threshold", 1.0))
         internal = (soc_idx > 1 or surplus)
-        
-        print("DEBUG LoadReward:", "renewable_idx: ", renewable_idx, "demand_idx: ", demand_idx, "price_idx: ", price_idx, "real_price: ", real_price, "comfort_threshold: ", getattr(agent, "comfort_threshold"), "soc_idx: ", soc_idx)
-        
+
         # ================================
         #   REWARD SIMPLE SIN ANIDACIÓN
         # ================================

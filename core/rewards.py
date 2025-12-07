@@ -134,47 +134,53 @@ class DefaultBatteryReward(RewardFn):
         renewable_idx = env.renewable_power_idx
         delta_p = renewable_idx - demand_idx
 
-        # Asegurar que soc_max esté definido
-        agent.soc_max = 4 # O el valor real
+        # soc_max ya está definido en el agente desde la configuración
+        # No necesitamos hardcodearlo aquí
+
+        # --- 2. Normalización Dinámica ---
+        max_p = max(env.num_power_bins - 1, 1)
+
+        imbalance_norm = delta_p / max_p
+        soc_norm = max(min(soc / float(agent.soc_max), 1.0), 0.0)
 
         # --- 3. Lógica de Recompensa (Corregida) ---
 
         # CASO 1: Descarga Correcta (PREMIO)
         # (Acción=Descargar, Hay Déficit, Batería tiene carga)
-        if agent.action == 2 and delta_p < 0 and soc > 0:
+        if agent.action == 2 and imbalance_norm < 0 and soc_norm > 0:
             # Premio por suplir la demanda
-            reward = self.psi * abs(delta_p) * soc
+            reward = self.psi * abs(imbalance_norm) * soc_norm
 
         # CASO 2: Descarga Incorrecta (CASTIGO)
         # (Acción=Descargar, PERO hay Excedente O Batería vacía)
-        elif agent.action == 2 and (delta_p >= 0 or soc == 0):
+        elif agent.action == 2 and (imbalance_norm >= 0 or soc_norm == 0):
             # Castigo fijo por acción ilógica o innecesaria
             reward = -self.sigma
 
         # CASO 3: Carga Correcta (PREMIO)
         # (Acción=Cargar, Hay Excedente)
-        elif agent.action == 1 and delta_p > 0:
+        elif agent.action == 1 and imbalance_norm > 0:
             # Premio por almacenar excedente (escala con espacio vacío)
-            reward = self.nu * delta_p * (agent.soc_max - soc)
+            reward = self.nu * imbalance_norm * (agent.soc_max - soc_norm)
 
         # CASO 4: Carga Incorrecta (CASTIGO)
         # (Acción=Cargar, PERO hay Déficit)
-        elif agent.action == 1 and delta_p <= 0:
+        elif agent.action == 1 and imbalance_norm <= 0:
             # Castigo por empeorar el déficit
-            reward = -self.beta * abs(delta_p)
+            reward = -self.beta * abs(imbalance_norm)
 
         # CASO 5: Inacción Incorrecta (CASTIGO)
         # (Acción=Inactivo, PERO hay Desequilibrio)
-        elif agent.action == 0 and soc > 0:
+        elif agent.action == 0 and soc_norm > 0:
             # Castigo por no actuar (cargar o descargar)
-            reward = -self.xi * abs(delta_p)
+            reward = -self.xi * abs(imbalance_norm)
 
         # CASO 6 ("else"): Inacción Correcta (PREMIO)
         # (Acción=Inactivo, Hay Equilibrio perfecto)
         else:
             # Tu corrección: Premio por inacción correcta
             reward = self.mu
-        
+
         return reward
 
 @register_reward("DefaultGridReward")

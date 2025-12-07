@@ -24,6 +24,7 @@ class MultiAgentEnv:
         csv_filename = config["simulation"]["dataset"]
         self.num_power_bins = config["discretization"]["power_bins"]
         self.num_price_bins = config["discretization"].get("price_bins", 5)
+        self.num_soc_bins = config["discretization"].get("soc_bins", 5)
         
         # Power scaling factor from configuration (kW/kWh to W/Wh)
         self.power_scale_factor = config["simulation"].get("power_scale_factor", 1000.0)

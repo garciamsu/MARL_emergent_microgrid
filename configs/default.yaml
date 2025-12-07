@@ -18,7 +18,7 @@ simulation:
   # Episode window size in hours (contiguous random window from dataset)
   # Each episode uses a random contiguous window of this size
   # Must be <= dataset length. Default: 48 hours (2 days)
-  episode_window_hours: 24
+  episode_window_hours: 48
 
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
@@ -44,6 +44,7 @@ validation:
 discretization:
   power_bins: 10
   price_bins: 5  # Number of bins for price discretization
+  soc_bins: 5    # Number of bins for SOC discretization
 
 # ==============================================================
 # Stability definition
@@ -105,7 +106,7 @@ agents:
       efficiency: 0.98
 
   wind:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15
@@ -122,14 +123,14 @@ agents:
       efficiency: 0.95
 
   battery:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15
       gamma: 0.95
     reward:
       type: DefaultBatteryReward
-      params: {psi: 4.970, sigma: 4.414, nu: 3.155, beta: 2.890, xi: 3.141, mu: 1.086}
+      params: {psi: 1, sigma: 0.89, nu: 0.63, beta: 0.58, xi: 0.63, mu: 0.22}
     state_space:
       - {var: soc,         source: self,    bins: [0,0.2,0.4,0.6,0.8,1.0]}
       - {var: demand,      source: env,     bins: auto}
@@ -164,7 +165,7 @@ agents:
       export_allowed: false
 
   load:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15

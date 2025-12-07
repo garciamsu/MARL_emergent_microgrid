@@ -24,7 +24,6 @@ class BatteryAgent(BaseAgent):
         env,
         name: str = "battery",
         capacity_ah: float = 3,
-        num_battery_soc_bins: int = 5,
         state_space=None,
         **kwargs,
     ):
@@ -68,6 +67,8 @@ class BatteryAgent(BaseAgent):
         # Ensure SOC within configured bounds
         self.soc = max(self.soc_min, min(self.soc_max, self.soc))
 
+        # Use soc_bins from environment configuration
+        num_battery_soc_bins = getattr(env, "num_soc_bins", 5)
         self.battery_soc_bins = np.linspace(self.soc_min, self.soc_max, num_battery_soc_bins)
         # Initialize discrete index consistent with initial SOC
         self.idx = digitize_clip(self.soc, self.battery_soc_bins)

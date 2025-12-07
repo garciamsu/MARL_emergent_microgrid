@@ -42,15 +42,15 @@ from pathlib import Path
 PLOT_CONFIG = {
     'episode_rewards': {
         'enabled': True,
-        'agents': ['battery#0']  # None = all agents  'battery#0', 'grid#0', 'load#0', 'solar#0', 'wind#0'
+        'agents': ['grid#0']  # None = all agents  'battery#0', 'grid#0', 'load#0', 'solar#0', 'wind#0'
     },
     'episode_rewards_moving_avg': {
         'enabled': True,
-        'agents': ['battery#0']  # None = all agents
+        'agents': ['grid#0']  # None = all agents
     },
     'cumulative_rewards': {
         'enabled': True,
-        'agents': ['battery#0']  # None = all agents
+        'agents': ['grid#0']  # None = all agents
     }
 }
 

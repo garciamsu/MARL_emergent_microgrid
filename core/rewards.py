@@ -139,7 +139,7 @@ class DefaultBatteryReward(RewardFn):
 
         # --- 2. Normalización Dinámica ---
         max_p = max(env.num_power_bins - 1, 1)
-        max_soc_idx = max(len(agent.battery_soc_bins) - 1, 1)
+        max_soc_idx = max(env.num_soc_bins - 1, 1)
 
         imbalance_norm = delta_p / max_p
         # Normalizar el índice de SOC a [0, 1]
@@ -189,59 +189,77 @@ class DefaultBatteryReward(RewardFn):
 
 @register_reward("DefaultGridReward")
 class DefaultGridReward(RewardFn):
-    """Simple, stable Grid reward using:
-       - discretized indices (renewable_idx, demand_idx, soc_idx)
-       - binary SOC interpretation (soc_idx == 0 => battery empty)
-       - hyperparameters psi, sigma, nu, xi controlling all magnitudes.
+    """Grid como 'último recurso':
+       - Premia importar cuando hay déficit y la batería está baja.
+       - Castiga fuerte quedarse idle con déficit y batería baja.
+       - Penaliza importar sin necesidad (sin déficit / con excedente).
+       - Premia no usar el Grid cuando no hay déficit.
     """
 
     def __init__(self, psi=1.0, sigma=1.0, nu=1.0, xi=1.0, C_M=1.0, **kwargs):
-        self.psi = psi     # reward: import when deficit + battery empty
-        self.sigma = sigma # penalty: import without need
-        self.nu = nu       # penalty: idle with deficit + battery empty
-        self.xi = xi       # reward: idle when no deficit
-        self.C_M = C_M     # (kept for compatibility but NOT used to scale reward)
+        # psi   → factor de PREMIO al importar cuando realmente hace falta (déficit + batería baja)
+        # sigma → factor de CASTIGO por importar sin necesidad (sin déficit / excedente)
+        # nu    → factor de CASTIGO por quedarse idle con déficit crítico
+        # xi    → factor de PREMIO por no usar el Grid cuando no hay déficit
+        # C_M   → mantenido por compatibilidad (no se usa directamente en la escala del reward)
+        self.psi = psi
+        self.sigma = sigma
+        self.nu = nu
+        self.xi = xi
+        self.C_M = C_M
 
     def compute(self, agent, env, state_tuple):
-        # --- 1. Variables de estado en forma de índices discretizados ---
+        # --- 1. Variables de estado ---
         soc_idx = state_tuple[0]
-        demand_idx = env.demand_power_idx
-        renewable_idx = env.renewable_power_idx
-        
-        # SOC binario
-        battery_empty = (soc_idx == 0)
 
-        # Deficit en espacio de índices
-        # deficit_idx > 0 significa: demanda > renovables
-        deficit_idx = (demand_idx - renewable_idx)
-        has_deficit = (deficit_idx > 0)
+        # delta_p < 0 → déficit, delta_p > 0 → excedente
+        delta_p = env.renewable_power_idx - env.demand_power_idx
 
-        # ----------------------------------------------------------
-        # NUEVA LÓGICA SIMPLE (versión A), usando hiperparámetros:
-        # psi   → premio por importar cuando es necesario
-        # sigma → castigo por importar sin necesidad
-        # nu    → castigo por idle cuando hay déficit + bateria vacía
-        # xi    → premio por idle cuando NO hay déficit
-        # ----------------------------------------------------------
+        max_p = max(env.num_power_bins - 1, 1)
+        max_soc_idx = max(env.num_soc_bins - 1, 1)
 
-        # CASO 1: Grid actúa (importa)
-        if agent.action == 1:
-            if has_deficit and battery_empty:
-                # Importación necesaria → premio controlado por psi
-                reward = self.psi
-            else:
-                # Importa sin necesidad → castigo controlado por sigma
-                reward = -self.sigma
+        # Normalización (en condiciones normales ya quedan en rangos controlados)
+        imbalance_norm = delta_p / max_p         # ≈ [-1, 1]
+        soc_norm = soc_idx / max_soc_idx         # [0, 1]
 
-        # CASO 2: Grid idle
+        # --- 2. Recompensa por partes (SIN anidación) ---
+
+        # Caso A: Grid IMPORTA y hay DÉFICIT (imbalance_norm < 0)
+        if agent.action == 1 and imbalance_norm < 0.0:
+            # déficit normalizado = -imbalance_norm  (p.ej. -1 → 1, -0.2 → 0.2)
+            # batería baja → (1 - soc_norm)
+            reward = self.psi * (
+                0.5 * (-imbalance_norm) +      # magnitud del déficit
+                0.5 * (1.0 - soc_norm)         # batería vacía/baja
+            )
+
+        # Caso B: Grid IMPORTA pero NO hay DÉFICIT (imbalance_norm >= 0)
+        elif agent.action == 1 and imbalance_norm >= 0.0:
+            # excedente normalizado = max(imbalance_norm, 0)
+            # batería cargada → soc_norm
+            reward = -self.sigma * (
+                0.5 * max(imbalance_norm, 0.0) +   # excedente o al menos no déficit
+                0.5 * soc_norm                     # SOC alto → más despilfarro
+            )
+
+        # Caso C: Grid IDLE y hay DÉFICIT (imbalance_norm < 0)
+        elif agent.action == 0 and imbalance_norm < 0.0:
+            # déficit grande + batería vacía → inacción muy grave
+            reward = -self.nu * (
+                0.5 * (-imbalance_norm) +      # tamaño del déficit
+                0.5 * (1.0 - soc_norm)         # batería baja/vacía
+            )
+
+        # Caso D: Grid IDLE y NO hay DÉFICIT
         else:
-            if has_deficit and battery_empty:
-                # Inacción crítica → castigo controlado por nu
-                reward = -self.nu
-            else:
-                # Idle correcto → premio controlado por xi
-                reward = self.xi
+            # estabilidad: no déficit (o leve) + batería con SOC aceptable
+            reward = self.xi * (
+                0.5 * (1.0 - max(-imbalance_norm, 0.0)) +  # “no déficit”: 1 cuando no falta nada
+                0.5 * soc_norm                             # batería con energía disponible
+            )
 
+        # --- 3. Clipping final para mantener escala consistente ---
+        reward = max(min(reward, 1.0), -1.0)
         return reward
 
 @register_reward("DefaultLoadReward")

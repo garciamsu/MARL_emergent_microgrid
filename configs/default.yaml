@@ -144,8 +144,8 @@ agents:
       # Random initial SOC sampled from U[initial_soc_min, initial_soc_max]
       initial_soc_min: 0.0
       initial_soc_max: 1.0
-      p_charge_max: 15000
-      p_discharge_max: 15000
+      p_charge_max: 200000
+      p_discharge_max: 200000
 
   grid:
     count: 1
@@ -155,13 +155,13 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultGridReward
-      params: {psi: 1, sigma: 0.3, nu: 1.5, xi: 0.15}
+      params: {psi: 1, sigma: 0.8, nu: 1.5, xi: 0.5}
     state_space:
       - {var: soc_idx,  source: external, bins: auto}
       - {var: demand,   source: env,      bins: auto}
       - {var: renewable,    source: global,   bins: auto}
     limits:
-      p_max: 25000
+      p_max: 250000
       export_allowed: false
 
   load:

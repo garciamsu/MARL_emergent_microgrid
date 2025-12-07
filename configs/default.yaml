@@ -26,11 +26,15 @@ simulation:
   power_scale_factor: 1000.0
 
   epsilon:
-    schedule: linear    # linear | exponential | constant | custom
+    # Exponential decay: drops from 1.0 to 0.001 aggressively
+    # Reaches ε < 0.1 by episode 500 (33%), ε ≈ 0.03 at mid-training (ep 750)
+    # Final episodes have minimal exploration (ε ≈ 0.001) → pure exploitation
+    # This ensures strong exploration early, smooth transition, and stable convergence
+    schedule: exponential    # linear | exponential | constant | custom
     start: 1.0
-    end: 0.0
-    decay: 0.997
-    values: []          # only for custom
+    end: 0.001              # Very low minimum for pure exploitation at end
+    decay: null             # Auto-calculated to reach 'end' across training
+    values: []              # only for custom
 
 validation:
   enabled: true
@@ -51,7 +55,7 @@ discretization:
 # ==============================================================
 
 stability:
-  window: 200
+  window: 100
   metric: IAE
   reference: median50
   tolerance: 1.10
@@ -92,11 +96,11 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.15
+      alpha: 0.06 # antes 0.15 → ahora más suave y estable
       gamma: 0.95
     reward:
       type: DefaultSolarReward
-      params: {theta=1, beta=0.5, nu=1, xi=0.5}
+      params: {theta: 100, beta: 50, nu: 100, xi: 50}
     state_space:
       - {var: solar_power, source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -109,11 +113,11 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.15
+      alpha: 0.06 # antes 0.15 → ahora más suave y estable
       gamma: 0.95
     reward:
       type: DefaultWindReward
-      params: {theta=1, beta=0.5, nu=1, xi=0.5}
+      params: {theta: 100, beta: 50, nu: 100, xi: 50}
     state_space:
       - {var: wind_power,  source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -126,7 +130,7 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.15
+      alpha: 0.06 # antes 0.15 → ahora más suave y estable
       gamma: 0.95
     reward:
       type: DefaultBatteryReward
@@ -136,7 +140,7 @@ agents:
       - {var: demand,      source: env,     bins: auto}
       - {var: renewable,   source: global,  bins: auto}
     limits:
-      capacity_ah: 8800
+      capacity_ah: 88000
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
@@ -151,7 +155,7 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.15
+      alpha: 0.06 # antes 0.15 → ahora más suave y estable
       gamma: 0.95
     reward:
       type: DefaultGridReward
@@ -168,7 +172,7 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.15
+      alpha: 0.06 # antes 0.15 → ahora más suave y estable
       gamma: 0.95
     reward:
       type: DefaultLoadReward

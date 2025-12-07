@@ -35,6 +35,13 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from pathlib import Path
+import sys
+
+# Add project root to path for imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from configs.loader import load_config
 
 
 # --- PLOT CONFIGURATION ---
@@ -42,15 +49,15 @@ from pathlib import Path
 PLOT_CONFIG = {
     'episode_rewards': {
         'enabled': True,
-        'agents': ['grid#0']  # None = all agents  'battery#0', 'grid#0', 'load#0', 'solar#0', 'wind#0'
+        'agents': None  # None = all agents  'battery#0', 'grid#0', 'load#0', 'solar#0', 'wind#0'
     },
     'episode_rewards_moving_avg': {
         'enabled': True,
-        'agents': ['grid#0']  # None = all agents
+        'agents': None  # None = all agents
     },
     'cumulative_rewards': {
         'enabled': True,
-        'agents': ['grid#0']  # None = all agents
+        'agents': None  # None = all agents
     }
 }
 
@@ -439,7 +446,7 @@ def plot_cumulative_rewards(df_cumulative: pd.DataFrame, output_dir: str):
     plt.close()
 
 
-def plot_episode_rewards(df: pd.DataFrame, output_dir: str):
+def plot_episode_rewards(df: pd.DataFrame, output_dir: str, window_size: int = None):
     """
     Generate episode reward visualizations (per episode, NOT cumulative).
     
@@ -450,6 +457,7 @@ def plot_episode_rewards(df: pd.DataFrame, output_dir: str):
     Args:
         df: DataFrame with episode rewards
         output_dir: Directory to save plots
+        window_size: Window size for moving average (default: from config or adaptive)
     """
     os.makedirs(output_dir, exist_ok=True)
     
@@ -506,7 +514,9 @@ def plot_episode_rewards(df: pd.DataFrame, output_dir: str):
     # Plot 2: Moving Average (smoothed)
     # ========================================
     config_ma = PLOT_CONFIG['episode_rewards_moving_avg']
-    window_size = min(10, len(df) // 4)  # Adaptive window size
+    # Use provided window_size or fall back to adaptive calculation
+    if window_size is None:
+        window_size = min(100, len(df) // 4)  # Adaptive fallback
     if window_size >= 2 and config_ma['enabled']:
         # Filter agents for moving average plot
         if config_ma['agents'] is None:
@@ -588,6 +598,12 @@ def main():
     print("📊 E_accumulated_reward.py - Cumulative Reward Analysis & Validation")
     print("="*80)
     
+    # Load configuration
+    config = load_config()
+    window_size = config.get('stability', {}).get('window', 100)
+    print(f"\n📋 Configuration loaded:")
+    print(f"   - Moving average window size: {window_size}")
+    
     # 1. Load episode rewards
     rewards_file = "results/logs/episode_rewards.csv"
     df = load_episode_rewards(rewards_file)
@@ -624,7 +640,7 @@ def main():
     plot_cumulative_rewards(df_cumulative, output_dir)
     
     # 8. Generate episode reward plots (per episode)
-    plot_episode_rewards(df, output_dir)
+    plot_episode_rewards(df, output_dir, window_size=window_size)
     
     # 9. Analyze learning progress
     analyze_learning_progress(df)

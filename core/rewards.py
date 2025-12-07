@@ -34,7 +34,7 @@ class DefaultSolarReward(RewardFn):
 
         # --- 1. Variables de Estado ---
         delta_p = env.renewable_power_idx - env.demand_power_idx # <0 Deficit, >0 Excedente
-
+        
         # --- 2. Normalización Dinámica ---
         max_p = max(env.num_power_bins - 1, 1)
 
@@ -164,7 +164,6 @@ class DefaultBatteryReward(RewardFn):
         elif agent.action == 1 and imbalance_norm > 0:
             # Premio por almacenar excedente (escala con espacio vacío)
             reward = self.nu * imbalance_norm * (agent.soc_max - soc_norm)
-            print(f"agent.soc_max: {agent.soc_max}")
 
         # CASO 4: Carga Incorrecta (CASTIGO)
         # (Acción=Cargar, PERO hay Déficit)

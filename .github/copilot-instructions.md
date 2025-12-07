@@ -32,7 +32,9 @@ El código es completamente orientado a objetos; cada componente físico es un a
   - `agents.<type>.reward`: pesos y parámetros de recompensa consumidos en `core/rewards.py`.
   - `agents.battery.limits.*`: límites de SOC y comportamiento del SOC inicial por episodio.
   - `discretization.*`: número de bins y rangos usados por `utils/discretization.py`.
+  - `stability.window`: tamaño de ventana para promedios móviles en análisis (usado por `analysis_tools/E_accumulated_reward.py`).
 - Al añadir nuevas opciones, extiende este YAML y léelo en `configs/loader.py` o `core/utils` en lugar de usar constantes hard‑codeadas.
+- **Principio**: Evita valores hardcodeados; lee siempre desde `default.yaml` cuando el parámetro afecta múltiples módulos o análisis.
 
 ## Bucle de Entrenamiento y Resultados
 

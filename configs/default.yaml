@@ -12,13 +12,13 @@ offline_run: null  # set run_id if mode=offline
 simulation:
   episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
-  seed: 1324           # random seed for reproducibility
+  seed: 43           # random seed for reproducibility
   dataset: training_v1.csv
   
   # Episode window size in hours (contiguous random window from dataset)
   # Each episode uses a random contiguous window of this size
   # Must be <= dataset length. Default: 48 hours (2 days)
-  episode_window_hours: 72
+  episode_window_hours: 24
 
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
@@ -95,7 +95,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultSolarReward
-      params: {theta=1, beta=1, nu=1, xi=1}
+      params: {theta=2, beta=1, nu=2, xi=1}
     state_space:
       - {var: solar_power, source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -105,14 +105,14 @@ agents:
       efficiency: 0.98
 
   wind:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15
       gamma: 0.95
     reward:
       type: DefaultWindReward
-      params: params: {theta=1, beta=1, nu=1, xi=1}
+      params: {theta=1, beta=1, nu=1, xi=1}
     state_space:
       - {var: wind_power,  source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -122,7 +122,7 @@ agents:
       efficiency: 0.95
 
   battery:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15
@@ -164,7 +164,7 @@ agents:
       export_allowed: false
 
   load:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15

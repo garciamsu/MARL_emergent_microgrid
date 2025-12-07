@@ -177,7 +177,6 @@ class DefaultBatteryReward(RewardFn):
         
         return reward
 
-
 @register_reward("DefaultGridReward")
 class DefaultGridReward(RewardFn):
     """Simple, stable Grid reward using:

@@ -128,20 +128,22 @@ class DefaultBatteryReward(RewardFn):
     def compute(self, agent, env, state_tuple):
 
         # --- 1. Obtener Variables de Estado y Entorno ---
-        soc, demand_idx, _ = state_tuple # total_idx no se usa
+        # state_tuple[0] es el ÍNDICE discreto del SOC [0, num_soc_bins-1]
+        soc_idx = state_tuple[0]
+        demand_idx = state_tuple[1]
+        # state_tuple[2] (renewable_idx) no se usa directamente
 
         # Corrección: Definir el desequilibrio ANTES de la acción de la batería
         renewable_idx = env.renewable_power_idx
         delta_p = renewable_idx - demand_idx
 
-        # soc_max ya está definido en el agente desde la configuración
-        # No necesitamos hardcodearlo aquí
-
         # --- 2. Normalización Dinámica ---
         max_p = max(env.num_power_bins - 1, 1)
+        max_soc_idx = max(len(agent.battery_soc_bins) - 1, 1)
 
         imbalance_norm = delta_p / max_p
-        soc_norm = max(min(soc / float(agent.soc_max), 1.0), 0.0)
+        # Normalizar el índice de SOC a [0, 1]
+        soc_norm = soc_idx / max_soc_idx
 
         # --- 3. Lógica de Recompensa (Corregida) ---
 
@@ -155,13 +157,14 @@ class DefaultBatteryReward(RewardFn):
         # (Acción=Descargar, PERO hay Excedente O Batería vacía)
         elif agent.action == 2 and (imbalance_norm >= 0 or soc_norm == 0):
             # Castigo fijo por acción ilógica o innecesaria
-            reward = -self.sigma
+            reward = -self.sigma * imbalance_norm
 
         # CASO 3: Carga Correcta (PREMIO)
         # (Acción=Cargar, Hay Excedente)
         elif agent.action == 1 and imbalance_norm > 0:
             # Premio por almacenar excedente (escala con espacio vacío)
             reward = self.nu * imbalance_norm * (agent.soc_max - soc_norm)
+            print(f"agent.soc_max: {agent.soc_max}")
 
         # CASO 4: Carga Incorrecta (CASTIGO)
         # (Acción=Cargar, PERO hay Déficit)
@@ -181,7 +184,8 @@ class DefaultBatteryReward(RewardFn):
             # Tu corrección: Premio por inacción correcta
             reward = self.mu
 
-        return reward
+        # --- 4. Clipping final ---
+        return max(min(reward, 1.0), -1.0)
 
 @register_reward("DefaultGridReward")
 class DefaultGridReward(RewardFn):

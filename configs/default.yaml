@@ -95,7 +95,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultSolarReward
-      params: {theta=4.926, beta=4.211, eta=0.711, nu=4.612, xi=4.362}
+      params: {theta=1, beta=1, nu=1, xi=1}
     state_space:
       - {var: solar_power, source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -112,7 +112,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultWindReward
-      params: {theta=4.926, beta=4.211, eta=0.711, nu=4.612, xi=4.362}
+      params: params: {theta=1, beta=1, nu=1, xi=1}
     state_space:
       - {var: wind_power,  source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}

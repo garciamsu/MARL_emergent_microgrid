@@ -13,113 +13,105 @@ class RewardFn:
 
 @register_reward("DefaultSolarReward")
 class DefaultSolarReward(RewardFn):
-    """Replica la lógica de SolarAgent.calculate_reward."""
+    """Recompensa simple y estable para agentes solares.
+    Lógica plana:
+    - Sin sol: Recompensa neutral.
+    - Déficit + Producir: Recompensa positiva (ayuda).
+    - Déficit + Nada: Penalización (oportunidad perdida).
+    - Excedente + Producir: Penalización (daña la red).
+    - Excedente + Nada: Recompensa positiva (ayuda/curtailment).
+    """
 
-    def __init__(self, theta=1.0, beta=1.0, eta=1.0, nu=1.0, xi=1.0, **kwargs):
-        self.theta = theta
-        self.beta = beta
-        self.eta = eta
-        self.nu = nu
-        self.xi = xi
+    def __init__(self, theta: float = 1.0, beta: float = 1.0,
+                 nu: float = 1.0, xi: float = 1.0,
+                 **kwargs) -> None:
+        self.theta = theta # Premio por producir en déficit
+        self.beta = beta   # Castigo por producir en excedente
+        self.nu = nu       # Premio por no producir en excedente
+        self.xi = xi       # Castigo por no producir en déficit
 
-    def compute(self, agent, env, state_tuple):
+    def compute(self, agent, env, state_tuple) -> float:
 
-        # --- 1. Obtener Variables de Estado y Entorno ---
-        renewable_idx = env.renewable_power_idx
-        demand_idx = env.demand_power_idx
-        
-        # La contribución potencial de ESTE agente
-        solar_potential_idx = state_tuple[0] 
-        
-        # --- 2. Calcular Desequilibrio y Magnitud ---
-        delta_p = renewable_idx - demand_idx
-        delta_abs = max(abs(delta_p), 1)
+        # --- 1. Variables de Estado ---
+        delta_p = env.renewable_power_idx - env.demand_power_idx # <0 Deficit, >0 Excedente
 
-        # --- 3. Lógica de Recompensa (Estructura Plana) ---
+        # --- 2. Normalización Dinámica ---
+        max_p = max(env.num_power_bins - 1, 1)
 
-        # CASO 1: Suministro Correcto (PREMIO)
-        # (Acción=Suministrar, Tenía potencial)
-        if agent.action == 1 and solar_potential_idx > 0:
-            reward =  self.theta * solar_potential_idx
-        
-        # CASO 2: Suministro Ilógico (CASTIGO)
-        # (Acción=Suministrar, PERO no tenía potencial)
-        # (Solo entra aquí si action==1 Y solar_potential_idx==0)
-        elif agent.action == 1:
-            reward =  -self.beta 
+        imbalance_norm = abs(delta_p) / max_p
+        solar_norm = state_tuple[0] / max_p
 
-        # CASO 3: Inacción Correcta (Forzada) (PREMIO)
-        # (Acción=No Suministrar, No tenía potencial)
-        elif agent.action == 0 and solar_potential_idx == 0:
-            reward =  self.eta
-        
-        # CASO 4: Inacción Correcta (Inteligente) (PREMIO)
-        # (Acción=No Suministrar, Tenía potencial, Había excedente)
-        # (Solo entra aquí si action==0, solar_potential_idx>0 Y delta_p>0)
-        elif agent.action == 0 and delta_p > 0:
-            reward =  self.nu * delta_abs 
-        
-        # CASO 5: Inacción Incorrecta (Fallo) (CASTIGO)
-        # (Único caso restante: Acción=No Suministrar, Tenía potencial, Había déficit)
-        else: 
-            reward =  -self.xi * delta_abs
+        # --- 3. Lógica Plana (Flat Logic) ---
 
-        return reward
+        # CASO A: DÉFICIT (Falta energía) y ACCIÓN = PRODUCIR (1)
+        if delta_p < 0 and agent.action == 1:
+            reward = self.theta * solar_norm * imbalance_norm
+
+        # CASO B: DÉFICIT (Falta energía) y ACCIÓN = IDLE (0)
+        elif delta_p < 0 and agent.action == 0:
+            reward = -self.xi * solar_norm * imbalance_norm
+
+        # CASO C: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = PRODUCIR (1)
+        elif delta_p >= 0 and agent.action == 1:
+            reward = -self.beta * solar_norm * imbalance_norm
+
+        # CASO D: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = IDLE (0)
+        else:
+            reward = self.nu * solar_norm * imbalance_norm
+
+        # --- 4. Clipping final ---
+        return max(min(reward, 1.0), -1.0)
 
 @register_reward("DefaultWindReward")
 class DefaultWindReward(RewardFn):
-    """Replica la lógica de WindAgent.calculate_reward."""
+    """Recompensa simple y estable para agentes eolicos.
+    Lógica plana:
+    - Sin sol: Recompensa neutral.
+    - Déficit + Producir: Recompensa positiva (ayuda).
+    - Déficit + Nada: Penalización (oportunidad perdida).
+    - Excedente + Producir: Penalización (daña la red).
+    - Excedente + Nada: Recompensa positiva (ayuda/curtailment).
+    """
 
-    def __init__(self, theta=1.0, beta=1.0, eta=1.0, nu=1.0, xi=1.0, **kwargs):
-        self.theta = theta
-        self.beta = beta
-        self.eta = eta
-        self.nu = nu
-        self.xi = xi
+    def __init__(self, theta: float = 1.0, beta: float = 1.0,
+                 nu: float = 1.0, xi: float = 1.0,
+                 **kwargs) -> None:
+        self.theta = theta # Premio por producir en déficit
+        self.beta = beta   # Castigo por producir en excedente
+        self.nu = nu       # Premio por no producir en excedente
+        self.xi = xi       # Castigo por no producir en déficit
 
-    def compute(self, agent, env, state_tuple):
+    def compute(self, agent, env, state_tuple) -> float:
 
-        # --- 1. Obtener Variables de Estado y Entorno ---
-        renewable_idx = env.renewable_power_idx
-        demand_idx = env.demand_power_idx
-        
-        # La contribución potencial de ESTE agente
-        wind_potential_idx = state_tuple[0]  
-        
-        # --- 2. Calcular Desequilibrio y Magnitud ---
-        delta_p = renewable_idx - demand_idx
-        delta_abs = max(abs(delta_p), 1)
+        # --- 1. Variables de Estado ---
+        delta_p = env.renewable_power_idx - env.demand_power_idx # <0 Deficit, >0 Excedente
 
-        # --- 3. Lógica de Recompensa (Estructura Plana) ---
-        
-        # CASO 1: Suministro Correcto (PREMIO)
-        # (Acción=Suministrar, Tenía potencial)
-        if agent.action == 1 and wind_potential_idx > 0:
-            reward =  self.theta * wind_potential_idx
+        # --- 2. Normalización Dinámica ---
+        max_p = max(env.num_power_bins - 1, 1)
 
-        # CASO 2: Suministro Ilógico (CASTIGO)
-        # (Acción=Suministrar, PERO no tenía potencial)
-        # (Solo entra aquí si action==1 Y wind_potential_idx==0)
-        elif agent.action == 1:
-            reward =  -self.beta 
+        imbalance_norm = abs(delta_p) / max_p
+        wind_norm = state_tuple[0] / max_p
 
-        # CASO 3: Inacción Correcta (Forzada) (PREMIO)
-        # (Acción=No Suministrar, No tenía potencial)
-        elif agent.action == 0 and wind_potential_idx == 0:
-            reward =  self.eta
-        
-        # CASO 4: Inacción Correcta (Inteligente) (PREMIO)
-        # (Acción=No Suministrar, Tenía potencial, Había excedente)
-        # (Solo entra aquí si action==0, wind_potential_idx>0 Y delta_pº>0)
-        elif agent.action == 0 and delta_p > 0:
-            reward =  self.nu * delta_abs 
-        
-        # CASO 5: Inacción Incorrecta (Fallo) (CASTIGO)
-        # (Único caso restante: Acción=No Suministrar, Tenía potencial, Había déficit)
-        else: 
-            reward = -self.xi * delta_abs
+        # --- 3. Lógica Plana (Flat Logic) ---
 
-        return reward
+        # CASO A: DÉFICIT (Falta energía) y ACCIÓN = PRODUCIR (1)
+        if delta_p < 0 and agent.action == 1:
+            reward = self.theta * wind_norm * imbalance_norm
+
+        # CASO B: DÉFICIT (Falta energía) y ACCIÓN = IDLE (0)
+        elif delta_p < 0 and agent.action == 0:
+            reward = -self.xi * wind_norm * imbalance_norm
+
+        # CASO C: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = PRODUCIR (1)
+        elif delta_p >= 0 and agent.action == 1:
+            reward = -self.beta * wind_norm * imbalance_norm
+
+        # CASO D: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = IDLE (0)
+        else:
+            reward = self.nu * wind_norm * imbalance_norm
+
+        # --- 4. Clipping final ---
+        return max(min(reward, 1.0), -1.0)
 
 @register_reward("DefaultBatteryReward")
 class DefaultBatteryReward(RewardFn):

@@ -18,6 +18,9 @@ except NameError:
 # 🔧 Corrección: el CSV está un nivel arriba de analysis_tools/
 BASE_DIRECTORY = os.path.join(SCRIPT_DIR, "..", "results", "evolution")
 
+# Directorio base para episodios offline (evaluación/explotación)
+OFFLINE_BASE_DIRECTORY = os.path.join(BASE_DIRECTORY, "offline")
+
 # Dynamic episode selection: find the latest episode file
 def get_latest_episode_number(base_dir):
     """Find the episode number with the highest value in the directory."""
@@ -46,6 +49,11 @@ def get_latest_episode_number(base_dir):
 
 EPISODE_TO_PLOT = get_latest_episode_number(BASE_DIRECTORY) or 0
 OUTPUT_FILENAME = os.path.join(SCRIPT_DIR, "..", "results", "plots", "episode_dynamics.svg")
+
+# Nombre base para gráficos offline; se completará con el run_id
+OFFLINE_OUTPUT_BASENAME = os.path.join(
+    SCRIPT_DIR, "..", "results", "plots", "episode_dynamics_offline_{}.svg"
+)
 
 # --- PARÁMETROS DE ESTILO ---
 STATE_FILL_TRANSPARENCY = 0.2
@@ -99,8 +107,25 @@ PLOT_CONFIG = {
 }
 
 
+def _build_time_ticks(time_steps: np.ndarray, max_ticks: int = 50):
+    """Return a subset of time steps to use as x-ticks.
+
+    Ensures that ticks do not overlap by limiting the total number
+    of ticks and spacing them approximately uniformly. For dt_h=1.0,
+    this results in labels such as 0, 2, 4, ... for longer episodes.
+    """
+    n = len(time_steps)
+    if n == 0:
+        return time_steps
+    if n <= max_ticks:
+        return time_steps
+
+    step = max(1, n // max_ticks)
+    return time_steps[::step]
+
+
 def plot_episode_dynamics(base_dir, episode_num, config):
-    """Crea el gráfico del episodio y guarda un SVG junto al script."""
+    """Crea el gráfico del episodio de entrenamiento y guarda un SVG."""
     # Buscar el archivo
     file_path = os.path.join(base_dir, f'episode_{episode_num}.csv')
     if not os.path.exists(file_path):
@@ -217,8 +242,9 @@ def plot_episode_dynamics(base_dir, episode_num, config):
                       shadow=False)
         # --- FIN MODIFICACIÓN ---
 
-        if len(time_steps) <= 50:
-            ax.set_xticks(time_steps)
+        # Ajuste de ticks en el eje X para evitar solapamiento de horas
+        ticks = _build_time_ticks(time_steps, max_ticks=50)
+        ax.set_xticks(ticks)
         
         ax.tick_params(axis='x', labelsize=AXIS_FONT_SIZE)
         ax.tick_params(axis='y', labelsize=AXIS_FONT_SIZE)
@@ -280,8 +306,130 @@ if __name__ == "__main__":
     output_dir = os.path.dirname(OUTPUT_FILENAME)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    
+
     print(f"🔍 Episodio seleccionado automáticamente: {EPISODE_TO_PLOT}")
-    print(f"📂 Directorio base: {BASE_DIRECTORY}")
-        
+    print(f"📂 Directorio base (training): {BASE_DIRECTORY}")
+
+    # Plot latest training episode dynamics
     plot_episode_dynamics(BASE_DIRECTORY, EPISODE_TO_PLOT, PLOT_CONFIG)
+
+    # Additionally, if there are offline evolution files, plot those too.
+    offline_pattern = os.path.join(OFFLINE_BASE_DIRECTORY, "episode_offline_*.csv")
+    offline_files = glob.glob(offline_pattern)
+    if offline_files:
+        print(f"\n🔍 Encontrados {len(offline_files)} archivos offline para graficar")
+        offline_output_dir = os.path.dirname(OFFLINE_OUTPUT_BASENAME)
+        if not os.path.exists(offline_output_dir):
+            os.makedirs(offline_output_dir)
+
+        for csv_path in offline_files:
+            basename = os.path.basename(csv_path)
+            run_id = basename.replace("episode_offline_", "").replace(".csv", "")
+            print(f"  ➜ Graficando offline_run={run_id} desde {csv_path}")
+
+            df_off = read_csv_auto(csv_path)
+            if df_off is None or df_off.empty:
+                print(f"  ⚠️  Archivo vacío o ilegible: {csv_path}")
+                continue
+
+            time_steps = np.arange(len(df_off))
+            matplotlib.use('Agg')
+            plt.style.use('seaborn-v0_8-paper')
+
+            fig, axes = plt.subplots(nrows=6, ncols=1, sharex=True, figsize=(15, 10))
+
+            for i, (panel_key, panel_config) in enumerate(PLOT_CONFIG.items()):
+                ax = axes[i]
+                color = panel_config.get('color', '#000000')
+                ax.set_title(panel_config['title'], loc='center',
+                             fontweight=AXIS_FONT_WEIGHT, fontsize=14)
+                ax.grid(True, linestyle='--', alpha=0.6)
+
+                ax_r = None
+                handles, labels = [], []
+
+                # Panel izquierdo
+                if 'left_Y' in panel_config:
+                    left = panel_config['left_Y']
+                    col = left['column']
+                    if col in df_off.columns:
+                        if panel_key == 'panel_6':
+                            vals = df_off[col]
+                            bar_colors = [
+                                panel_config['color_positive'] if v >= 0 else panel_config['color_negative']
+                                for v in vals
+                            ]
+                            ax.bar(time_steps, vals,
+                                   color=bar_colors,
+                                   width=1.0,
+                                   alpha=STATE_FILL_TRANSPARENCY,
+                                   zorder=3)
+                            ax.axhline(y=0, color='#28A745', linestyle='-', linewidth=1.5, zorder=5)
+
+                            pos_patch = mpatches.Patch(color=panel_config['color_positive'],
+                                                       label=panel_config['label_positive'],
+                                                       alpha=STATE_FILL_TRANSPARENCY)
+                            neg_patch = mpatches.Patch(color=panel_config['color_negative'],
+                                                       label=panel_config['label_negative'],
+                                                       alpha=STATE_FILL_TRANSPARENCY)
+                            handles.extend([pos_patch, neg_patch])
+                        else:
+                            line, = ax.plot(time_steps, df_off[col], color=color,
+                                            linestyle=POWER_LINE_STYLE, linewidth=POWER_LINE_WIDTH,
+                                            label=left['label'])
+                            handles.append(line)
+
+                        ax.tick_params(axis='y', labelcolor='black', labelsize=AXIS_FONT_SIZE)
+                    else:
+                        print(f"⚠️  Columna no encontrada (offline): {col} (Panel {panel_key})")
+
+                # Panel derecho
+                if 'right_Y' in panel_config:
+                    right = panel_config['right_Y']
+                    col = right['column']
+                    if col in df_off.columns:
+                        ax_r = ax.twinx()
+                        line, = ax_r.step(time_steps, df_off[col], where='post', color=color,
+                                          label=right['label'])
+                        handles.append(line)
+
+                        ax_r.fill_between(time_steps, df_off[col], step='post',
+                                          color=color, alpha=STATE_FILL_TRANSPARENCY)
+                        ax_r.tick_params(axis='y', labelcolor='black', labelsize=AXIS_FONT_SIZE)
+
+                        y_min = min(0, df_off[col].min())
+                        y_max = max(1, df_off[col].max() + 1)
+                        ax_r.set_ylim(y_min, y_max)
+
+                        if np.issubdtype(df_off[col].dtype, np.integer):
+                            ax_r.set_yticks(np.arange(int(y_min), int(y_max)))
+                    else:
+                        print(f"⚠️  Columna no encontrada (offline): {col} (Panel {panel_key})")
+
+                labels = [h.get_label() for h in handles]
+                if handles:
+                    ax.legend(handles, labels,
+                              loc='upper left',
+                              bbox_to_anchor=(1.02, 1.0),
+                              fontsize=AXIS_FONT_SIZE - 1,
+                              frameon=True,
+                              shadow=False)
+
+                ticks = _build_time_ticks(time_steps, max_ticks=50)
+                ax.set_xticks(ticks)
+                ax.tick_params(axis='x', labelsize=AXIS_FONT_SIZE)
+                ax.tick_params(axis='y', labelsize=AXIS_FONT_SIZE)
+                ax.set_xlim(time_steps[0], time_steps[-1])
+
+            axes[-1].set_xlabel("Time steps [Hour]", fontweight='bold', fontsize=AXIS_FONT_SIZE)
+
+            plt.tight_layout(pad=1.0, rect=[0, 0, 0.85, 0.98])
+
+            out_path = OFFLINE_OUTPUT_BASENAME.format(run_id)
+            try:
+                plt.savefig(out_path, format='svg', dpi=300, bbox_inches='tight')
+                print(f"  ✅ Gráfica offline guardada en: {out_path}")
+            except Exception as e:
+                print(f"  ❌ Error al guardar gráfica offline para run_id={run_id}: {e}")
+            finally:
+                plt.close(fig)

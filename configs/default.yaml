@@ -2,8 +2,24 @@
 # General mode
 # ==============================================================
 
-mode: train        # train | offline
-offline_run: null  # set run_id if mode=offline
+mode: offline        # train | offline
+offline_run: 44  # set run_id if mode=offline
+
+# ==============================================================
+# Offline mode parameters (evaluation / exploitation only)
+# ==============================================================
+
+offline:
+  # Dataset for offline operation (must exist in assets/datasets/)
+  dataset: Case1.csv
+
+  # Number of episodes in offline mode. Typically 1 long episode
+  # that spans the entire offline dataset.
+  episodes: 1
+
+  # Epsilon used during offline operation (constant schedule).
+  # Should be very small to favor pure exploitation.
+  epsilon: 0.01
 
 # ==============================================================
 # Simulation parameters

@@ -93,7 +93,13 @@ import numpy as np
 import os
 from core.environment import MultiAgentEnv
 from agents import instantiate_agents
-from core.utils import set_global_seed, build_logger
+from core.utils import (
+    set_global_seed,
+    build_logger,
+    get_offline_run_id,
+    save_q_tables,
+    load_q_tables,
+)
 from utils.discretization import digitize_clip
 
 
@@ -210,6 +216,21 @@ def run_training(config):
     scheduler = make_epsilon_scheduler(epsilon_cfg, num_episodes)
     epsilon = float(epsilon_cfg.get("start", 1.0))
 
+    # Detect if this run is an offline evaluation (exploitation-only)
+    # when an offline_run identifier is present in the config.
+    offline_run = get_offline_run_id(config)
+    is_offline = offline_run is not None and str(config.get("mode", "train")).lower() == "offline"
+
+    # If we are in offline mode and checkpoints exist, load Q-tables for agents
+    if is_offline and offline_run is not None:
+        loaded_any, ckpt_dir = load_q_tables(agents, config.get("io", {}).get("results_dir", "results"), offline_run)
+        if not loaded_any:
+            logger.warning(
+                "Offline run '%s' has no checkpoints in %s; using freshly initialized Q-tables.",
+                offline_run,
+                ckpt_dir,
+            )
+
     results = []
     # Simulation time step in hours (used for SOC integration)
     dt_h = config.get("simulation", {}).get("dt_h", 1.0)
@@ -226,21 +247,28 @@ def run_training(config):
     
     for episode in range(num_episodes):
         # ==============================================
-        # 1. Select contiguous random window (configurable size)
+        # 1. Select contiguous window
+        #    - Training: random window of size episode_window_hours
+        #    - Offline: use full dataset as a single long episode
         # ==============================================
         full_dataset_length = len(env.full_dataset)
-        
-        # Random contiguous window for all episodes
-        if full_dataset_length >= episode_window_hours:
-            start = np.random.randint(0, full_dataset_length - episode_window_hours)
-            episode_data = env.full_dataset.iloc[start:start + episode_window_hours].copy()
-        else:
-            # Fallback: if dataset is shorter than configured window, use full dataset
+
+        if is_offline:
+            # Offline evaluation: single long episode over entire offline dataset
             episode_data = env.full_dataset.copy()
-            logger.warning(
-                "Dataset shorter than configured window (%d hours). Using full dataset for episode %d.",
-                episode_window_hours, episode
-            )
+            start = 0
+        else:
+            # Training: random contiguous window for each episode
+            if full_dataset_length >= episode_window_hours:
+                start = np.random.randint(0, full_dataset_length - episode_window_hours)
+                episode_data = env.full_dataset.iloc[start:start + episode_window_hours].copy()
+            else:
+                # Fallback: if dataset is shorter than configured window, use full dataset
+                episode_data = env.full_dataset.copy()
+                logger.warning(
+                    "Dataset shorter than configured window (%d hours). Using full dataset for episode %d.",
+                    episode_window_hours, episode
+                )
         
         # ==============================================
         # 2. Generate random initial SOC for battery
@@ -265,13 +293,17 @@ def run_training(config):
         env.reset(episode_data, initial_soc)
         
         # Record episode metadata
-        if full_dataset_length >= episode_window_hours:
-            recorded_start = start
-            recorded_end = start + episode_window_hours
-        else:
-            # Fallback
+        if is_offline:
             recorded_start = 0
             recorded_end = full_dataset_length
+        else:
+            if full_dataset_length >= episode_window_hours:
+                recorded_start = start
+                recorded_end = start + episode_window_hours
+            else:
+                # Fallback
+                recorded_start = 0
+                recorded_end = full_dataset_length
         
         episode_metadata.append({
             "episode": episode,
@@ -468,7 +500,7 @@ def run_training(config):
                 for name, agent in agents.items()
             }
 
-            # 5. Reward calculation and Q-table update
+            # 5. Reward calculation and (optional) Q-table update
             for name, agent in agents.items():
                 state_tuple = state[name]
                 next_state_tuple = next_state[name]
@@ -485,8 +517,9 @@ def run_training(config):
                 # Accumulate timestep reward into episode reward
                 current_episode_reward[name] += timestep_reward
 
-                # Q-learning update
-                agent.update_q_table(state_tuple, agent.action, timestep_reward, next_state_tuple)
+                # Q-learning update (only in training mode)
+                if not is_offline:
+                    agent.update_q_table(state_tuple, agent.action, timestep_reward, next_state_tuple)
 
                 # Log per-agent timestep reward
                 step_record[f"reward_{name}"] = timestep_reward
@@ -497,15 +530,29 @@ def run_training(config):
 
         # 7. Save episode data
         episode_df = pd.DataFrame(evolution)
-        episode_df.to_csv(f"results/evolution/episode_{episode}.csv", index=False)
+
+        if is_offline and offline_run is not None:
+            # Offline evaluation: write a dedicated CSV under results/evolution/offline
+            os.makedirs("results/evolution/offline", exist_ok=True)
+            offline_path = f"results/evolution/offline/episode_offline_{offline_run}.csv"
+            episode_df.to_csv(offline_path, index=False)
+        else:
+            # Training: keep existing naming convention used by analysis_tools
+            episode_df.to_csv(f"results/evolution/episode_{episode}.csv", index=False)
         results.append(episode_df)
         
         # 8. Store episode reward for each agent
         # Append the final episode reward (sum of all timestep rewards for this episode)
         for name in agents.keys():
             episode_rewards[name].append(current_episode_reward[name])
-        
-        logger.info("Episode %d/%d completed | epsilon=%.3f", episode + 1, num_episodes, epsilon)
+
+        logger.info(
+            "%s episode %d/%d completed | epsilon=%.3f",
+            "OFFLINE" if is_offline else "TRAIN",
+            episode + 1,
+            num_episodes,
+            epsilon,
+        )
 
     # Save episode metadata to Excel with frequency analysis
     metadata_df = pd.DataFrame(episode_metadata)
@@ -563,5 +610,12 @@ def run_training(config):
         rewards_stats.to_excel(writer, sheet_name='Statistics')
     
     logger.info("Episode rewards saved to %s and %s", rewards_csv_path, rewards_excel_path)
+
+    # Persist Q-tables after training runs only (not offline evaluation)
+    if not is_offline:
+        # Derive a simple run_id if none is provided: use simulation.seed
+        run_id = str(config.get("simulation", {}).get("seed", "default"))
+        ckpt_dir = save_q_tables(agents, config.get("io", {}).get("results_dir", "results"), run_id)
+        logger.info("Q-tables saved to checkpoints directory: %s", ckpt_dir)
 
     return agents, results

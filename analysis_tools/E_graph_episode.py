@@ -110,17 +110,15 @@ PLOT_CONFIG = {
 def _build_time_ticks(time_steps: np.ndarray, max_ticks: int = 50):
     """Return a subset of time steps to use as x-ticks.
 
-    Ensures that ticks do not overlap by limiting the total number
-    of ticks and spacing them approximately uniformly. For dt_h=1.0,
-    this results in labels such as 0, 2, 4, ... for longer episodes.
+    Generates ticks every 2 hours (0, 2, 4, 6, ...) assuming dt_h=1.0.
+    This ensures consistent spacing and prevents label overlap.
     """
     n = len(time_steps)
     if n == 0:
         return time_steps
-    if n <= max_ticks:
-        return time_steps
-
-    step = max(1, n // max_ticks)
+    
+    # Generate ticks every 2 hours (step = 2)
+    step = 2
     return time_steps[::step]
 
 

@@ -2,8 +2,8 @@
 # General mode
 # ==============================================================
 
-mode: offline        # train | offline
-offline_run: 44  # set run_id if mode=offline
+mode: train        # train | offline
+offline_run: 45  # set run_id if mode=offline
 
 # ==============================================================
 # Offline mode parameters (evaluation / exploitation only)

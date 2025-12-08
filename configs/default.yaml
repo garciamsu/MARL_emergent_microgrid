@@ -26,7 +26,7 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 1500
+  episodes: 1
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 46           # random seed for reproducibility
   dataset: training_v1.csv
@@ -208,10 +208,8 @@ agents:
       # This reflects the instantaneous economic impact of the decision
       params: {sigma: 1.0, psi: 1.5, nu: 1.0, beta: 0.2}
     state_space:
-      - {var: soc_idx,          source: external,  bins: auto}
-      - {var: demand,           source: env,       bins: auto}
-      - {var: renewable,        source: global,    bins: auto}
-      - {var: price,            source: env,       bins: auto}
+      - {var: grid_power_idx, source: external,  bins: [0, 1]}
+      - {var: price_idx,      source: external,  bins: [0, 1]}
     limits:
       # p_load: Controllable load power (W) - AFTER power_scale_factor applied
       # This is the amount of demand that can be shed when action=0.

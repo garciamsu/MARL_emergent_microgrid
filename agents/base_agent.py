@@ -130,9 +130,14 @@ class BaseAgent:
             var = desc.get("var")
             source = desc.get("source")
 
-            # Caso especial SOC
-            if var in {"soc", "soc_idx"} and hasattr(self, "battery_soc_bins"):
-                cardinality = len(self.battery_soc_bins)
+            # Caso especial SOC: usar bins de la batería si existen, de lo contrario
+            # los bins globales de SOC del entorno para mantener la cardinalidad
+            # consistente entre agentes que leen soc_idx desde env.
+            if var in {"soc", "soc_idx"}:
+                if hasattr(self, "battery_soc_bins"):
+                    cardinality = len(self.battery_soc_bins)
+                else:
+                    cardinality = getattr(env, "num_soc_bins", 1) or 1
             # Caso especial price
             elif var == "price":
                 cardinality = len(getattr(env, "price_bins", [])) or 1
@@ -151,3 +156,8 @@ class BaseAgent:
             return
 
         self.q_table = {state: {a: 0.0 for a in self.actions} for state in product(*dims)}
+        agent_type = self.name.split("#")[0] if "#" in self.name else self.name
+        print(
+            f"Agente {agent_type}: tamaño actual (número de estados visitados): "
+            f"{len(self.q_table)}"
+        )

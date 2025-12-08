@@ -43,7 +43,6 @@ class DefaultSolarReward(RewardFn):
         solar_norm = 0.05 if solar_norm == 0 else solar_norm
 
         # --- 3. Lógica Plana (Flat Logic) ---
-        print(f"DEBUG: delta_p={delta_p}, max_p={max_p}, env.renewable_potential_idx={env.renewable_potential_idx}, env.demand_power_idx={env.demand_power_idx}, agent.action={agent.action}, solar_norm={solar_norm:.3f}, imbalance_norm={imbalance_norm:.3f}")
 
         # CASO A: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = PRODUCIR (1)
         if agent.action == 1 and delta_p >= 0 and solar_norm > 0:
@@ -295,79 +294,12 @@ class DefaultLoadReward(RewardFn):
 
     def compute(self, agent, env, state_tuple):
         # --- 1. Extract State Variables ---
-        soc_idx, demand_idx, renewable_idx, price_idx = state_tuple
-        action = agent.action  # 1 = ON, 0 = OFF
+        ## soc_idx, demand_idx, renewable_idx, price_idx = state_tuple
+        print("*******************************************************************")
+        print(state_tuple[0])
+        state_tuple[1]
 
-        # Access continuous values from environment
-        real_price = env.price
-        base_demand = getattr(env, 'base_demand', 0.0)
-        
-        # --- 2. Compute Normalization Factors ---
-        # demand_max: maximum demand observed in current dataset (after scaling)
-        demand_max = getattr(env, "demand_max", None)
+        reward = 0.0
 
-        # Fallback to avoid division by zero or missing attributes
-        if not demand_max or demand_max <= 0:
-            demand_max = 1.0
-
-        # Normalize base demand to [0, 1]
-        demand_norm = base_demand / demand_max
-
-        # Normalize discretized price index to [0, 1]
-        # Uses the same number of bins configured in the environment
-        num_price_bins = getattr(env, "num_price_bins", 1)
-        if num_price_bins > 1:
-            price_norm = price_idx / (num_price_bins - 1)
-        else:
-            price_norm = 0.0
-        
-        # Economic signal: instantaneous system cost (normalized)
-        # Represents: "How much is the system costing right now?"
-        economic_signal = demand_norm * price_norm
-        
-        # --- 3. Define Decision Variables ---
-        # Get SOC threshold from agent configuration (default to 0 if not set)
-        soc_threshold = getattr(agent, 'soc_threshold_idx', 0)
-        comfort_threshold = getattr(agent, "comfort_threshold", 21.0)
-        
-        # Internal energy available: battery has charge OR renewable surplus
-        internal_energy = (soc_idx > soc_threshold) or (renewable_idx > demand_idx)
-        
-        # Price is expensive: exceeds comfort threshold
-        expensive = (real_price > comfort_threshold)
-        
-        # --- 4. Flat Reward Logic (NO NESTING) ---
-        
-        # CASE 1: OFF when price expensive and no internal energy
-        # CORRECT behavior: Demand response to high price signal
-        if action == 0 and expensive and not internal_energy:
-            reward = self.sigma * economic_signal
-        
-        # CASE 2: ON when price expensive
-        # INCORRECT behavior: Ignoring price signal, consuming at high cost
-        elif action == 1 and expensive:
-            reward = -self.psi * economic_signal
-        
-        # CASE 3: ON when internal energy available (regardless of price)
-        # CORRECT behavior: Using renewable/battery energy
-        elif action == 1 and internal_energy:
-            reward = self.sigma * economic_signal
-        
-        # CASE 4: OFF when internal energy available and price acceptable
-        # INCORRECT behavior: Missing opportunity to use cheap/free energy
-        elif action == 0 and internal_energy and not expensive:
-            reward = -self.nu * economic_signal
-        
-        # CASE 5: ON when price acceptable but no internal energy
-        # ACCEPTABLE behavior: Importing from grid at reasonable price
-        # Small positive reward (user willing to pay)
-        elif action == 1 and not expensive and not internal_energy:
-            reward = self.beta * economic_signal
-        
-        # CASE 6 (else): OFF when price acceptable and no internal energy
-        # NEUTRAL behavior: Conservative, avoiding import
-        else:
-            reward = 0.0
-        
         # --- 5. Clipping for Q-Learning Stability ---
         return max(min(reward, 1.0), -1.0)

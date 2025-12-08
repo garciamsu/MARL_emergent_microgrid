@@ -216,6 +216,10 @@ def run_training(config):
     scheduler = make_epsilon_scheduler(epsilon_cfg, num_episodes)
     epsilon = float(epsilon_cfg.get("start", 1.0))
 
+    # Comfort price threshold for load agents (EUR/MWh) from YAML
+    load_limits_cfg = config.get("agents", {}).get("load", {}).get("limits", {}) or {}
+    load_comfort_threshold = float(load_limits_cfg.get("comfort_threshold", 0.0))
+
     # Detect if this run is an offline evaluation (exploitation-only)
     # when an offline_run identifier is present in the config.
     offline_run = get_offline_run_id(config)
@@ -359,6 +363,7 @@ def run_training(config):
         # Add initial environment states
         initial_state_record.update({
             "env_price": 0.0,
+            "env_price_idx": 0,
             "env_renewable_potential": 0.0,
             "env_renewable_potential_idx": 0,
             "env_total_renewable": 0.0,
@@ -367,6 +372,8 @@ def run_training(config):
             "env_total_power_idx": 0,
             "env_demand_power": 0.0,
             "env_demand_power_idx": 0,
+            "env_grid_power": 0.0,
+            "env_grid_power_idx": 0,
             "env_energy_balance": 0.0,
             "env_energy_balance_idx": 0,
             "env_delta_power_idx": "surplus",
@@ -410,19 +417,21 @@ def run_training(config):
             base_demand_from_dataset = data_source.iloc[index]["demand"]
             env.get_dataset("demand", index)
             env.get_dataset("price", index)
-            
+
             # Store base demand for load agent to use
             env.base_demand = base_demand_from_dataset
-            
+
             # Reset power accumulators
             env.total_power = 0.0
             env.renewable_power = 0.0
             env.renewable_potential = 0.0
-            
-            # Update discretized indices    
+            env.grid_power = 0.0
+
+            # Update discretized indices
             env.renewable_potential_idx = digitize_clip(env.renewable_potential, env.power_bins)
             env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
             env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
+            env.grid_power_idx = 1  if env.grid_power > 0 else 0
 
             # PHASE 1: Update renewable agents (solar, wind)
             for agent in agents.values():
@@ -438,6 +447,8 @@ def run_training(config):
                     agent.update_power(env)
                     # Load power is negative (consumption)
                     env.demand_power += abs(agent.power)
+                    # Price state reflects affordability vs comfort threshold
+                    env.price_idx = 1 if env.price > load_comfort_threshold else 0
 
             # PHASE 3: Update battery agent (reacts to balance)
             for agent in agents.values():
@@ -455,6 +466,7 @@ def run_training(config):
                     agent.update_power(env)
                     # Grid only imports (positive power)
                     if agent.power > 0:
+                        env.grid_power = agent.power
                         env.total_power += agent.power
 
             # Step log: Per-agent variables (safe defaults if attribute is missing)
@@ -471,16 +483,18 @@ def run_training(config):
             env.energy_balance = env.total_power - env.demand_power
             env.delta_power_idx = "surplus" if env.energy_balance >= 0 else "deficit"
 
-            # Update discretized indices    
+            # Update discretized indices
             env.renewable_potential_idx = digitize_clip(env.renewable_potential, env.power_bins)
             env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
             env.demand_power_idx = digitize_clip(env.demand_power, env.power_bins)
             env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
             env.energy_balance_idx = digitize_clip(env.energy_balance, env.power_bins)
+            env.grid_power_idx = 1  if env.grid_power > 0 else 0
 
             # Step log: Append environment globals at the end (preserve insertion order)
             step_record.update({
                 "env_price": env.price,
+                "env_price_idx": env.price_idx,
                 "env_renewable_potential": env.renewable_potential,
                 "env_renewable_potential_idx": env.renewable_potential_idx,
                 "env_total_renewable": env.renewable_power,
@@ -489,6 +503,8 @@ def run_training(config):
                 "env_total_power_idx": env.total_power_idx,
                 "env_demand_power": env.demand_power,
                 "env_demand_power_idx": env.demand_power_idx,
+                "env_grid_power": env.grid_power,
+                "env_grid_power_idx": env.grid_power_idx,
                 "env_energy_balance": env.energy_balance,
                 "env_energy_balance_idx": env.energy_balance_idx,
                 "env_delta_power_idx": env.delta_power_idx,

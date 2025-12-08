@@ -25,15 +25,15 @@ class DefaultSolarReward(RewardFn):
     def __init__(self, theta: float = 1.0, beta: float = 1.0,
                  nu: float = 1.0, xi: float = 1.0,
                  **kwargs) -> None:
-        self.theta = theta # Premio por producir en déficit
-        self.beta = beta   # Castigo por producir en excedente
-        self.nu = nu       # Premio por no producir en excedente
-        self.xi = xi       # Castigo por no producir en déficit
+        self.theta = theta # Premio por producir en excedente
+        self.beta = beta   # Castigo por producir en déficit
+        self.nu = nu       # Castigo por no producir en excedente
+        self.xi = xi       # Premio por no producir en déficit
 
     def compute(self, agent, env, state_tuple) -> float:
 
         # --- 1. Variables de Estado ---
-        delta_p = env.renewable_power_idx - env.demand_power_idx # <0 Deficit, >0 Excedente
+        delta_p = env.renewable_potential_idx - env.demand_power_idx # <0 Deficit, >0 Excedente
         
         # --- 2. Normalización Dinámica ---
         max_p = max(env.num_power_bins - 1, 1)
@@ -42,22 +42,23 @@ class DefaultSolarReward(RewardFn):
         solar_norm = state_tuple[0] / max_p
 
         # --- 3. Lógica Plana (Flat Logic) ---
+        print(f"DEBUG: delta_p={delta_p}, max_p={max_p}, env.renewable_potential_idx={env.renewable_potential_idx}, env.demand_power_idx={env.demand_power_idx}, agent.action={agent.action}, solar_norm={solar_norm:.3f}, imbalance_norm={imbalance_norm:.3f}")
 
-        # CASO A: DÉFICIT (Falta energía) y ACCIÓN = PRODUCIR (1)
-        if delta_p < 0 and agent.action == 1:
-            reward = self.theta * solar_norm * imbalance_norm
+        # CASO A: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = PRODUCIR (1)
+        if delta_p >= 0 and agent.action == 1:
+            reward = self.theta * imbalance_norm
 
         # CASO B: DÉFICIT (Falta energía) y ACCIÓN = IDLE (0)
         elif delta_p < 0 and agent.action == 0:
-            reward = -self.xi * solar_norm * imbalance_norm
+            reward = self.xi * imbalance_norm
 
-        # CASO C: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = PRODUCIR (1)
-        elif delta_p >= 0 and agent.action == 1:
-            reward = -self.beta * solar_norm * imbalance_norm
+        # CASO C: DÉFICIT (Falta energía) y ACCIÓN = PRODUCIR (1)
+        elif delta_p < 0 and agent.action == 1:
+            reward = -self.beta * imbalance_norm
 
         # CASO D: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = IDLE (0)
         else:
-            reward = self.nu * solar_norm * imbalance_norm
+            reward = -self.nu * imbalance_norm
 
         # --- 4. Clipping final ---
         return max(min(reward, 1.0), -1.0)
@@ -76,16 +77,16 @@ class DefaultWindReward(RewardFn):
     def __init__(self, theta: float = 1.0, beta: float = 1.0,
                  nu: float = 1.0, xi: float = 1.0,
                  **kwargs) -> None:
-        self.theta = theta # Premio por producir en déficit
-        self.beta = beta   # Castigo por producir en excedente
-        self.nu = nu       # Premio por no producir en excedente
-        self.xi = xi       # Castigo por no producir en déficit
+        self.theta = theta # Premio por producir en excedente
+        self.beta = beta   # Castigo por producir en déficit
+        self.nu = nu       # Castigo por no producir en excedente
+        self.xi = xi       # Premio por no producir en déficit
 
     def compute(self, agent, env, state_tuple) -> float:
 
         # --- 1. Variables de Estado ---
-        delta_p = env.renewable_power_idx - env.demand_power_idx # <0 Deficit, >0 Excedente
-
+        delta_p = env.renewable_potential_idx - env.demand_power_idx # <0 Deficit, >0 Excedente
+        
         # --- 2. Normalización Dinámica ---
         max_p = max(env.num_power_bins - 1, 1)
 
@@ -94,21 +95,21 @@ class DefaultWindReward(RewardFn):
 
         # --- 3. Lógica Plana (Flat Logic) ---
 
-        # CASO A: DÉFICIT (Falta energía) y ACCIÓN = PRODUCIR (1)
-        if delta_p < 0 and agent.action == 1:
-            reward = self.theta * wind_norm * imbalance_norm
+        # CASO A: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = PRODUCIR (1)
+        if delta_p >= 0 and agent.action == 1:
+            reward = self.theta * imbalance_norm
 
         # CASO B: DÉFICIT (Falta energía) y ACCIÓN = IDLE (0)
         elif delta_p < 0 and agent.action == 0:
-            reward = -self.xi * wind_norm * imbalance_norm
+            reward = self.xi * imbalance_norm
 
-        # CASO C: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = PRODUCIR (1)
-        elif delta_p >= 0 and agent.action == 1:
-            reward = -self.beta * wind_norm * imbalance_norm
+        # CASO C: DÉFICIT (Falta energía) y ACCIÓN = PRODUCIR (1)
+        elif delta_p < 0 and agent.action == 1:
+            reward = -self.beta * imbalance_norm
 
         # CASO D: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = IDLE (0)
         else:
-            reward = self.nu * wind_norm * imbalance_norm
+            reward = -self.nu * imbalance_norm
 
         # --- 4. Clipping final ---
         return max(min(reward, 1.0), -1.0)
@@ -263,41 +264,108 @@ class DefaultGridReward(RewardFn):
 
 @register_reward("DefaultLoadReward")
 class DefaultLoadReward(RewardFn):
-    """Replica la lógica de LoadAgent.calculate_reward."""
+    """Dynamic reward for controllable load agent (demand-side management).
+    
+    Implements economic-based reward modulation aligned with emergent systems paradigm.
+    Rewards reflect real economic impact: savings when turning OFF at high prices,
+    costs when consuming unnecessarily.
+    
+    Decision logic:
+    - Load turns OFF only if: price > comfort_threshold AND (no internal energy)
+    - Load stays ON if: price acceptable OR internal energy available
+    - Internal energy = (soc_idx > soc_threshold) OR renewable surplus
+    
+    Reward modulation:
+    - economic_signal = (base_demand / demand_max) × (price / price_max)
+    - Reflects instantaneous system cost in normalized scale [0, 1]
+    - All rewards scaled by this signal to reflect economic impact
+    """
 
-    def __init__(self, sigma=1.0, psi=1.0, nu=1.0, beta=-1.0, **kwargs):
+    def __init__(self, sigma=1.0, psi=1.5, nu=1.0, beta=0.2, **kwargs):
+        # sigma: Scale factor for correct behavior (OFF when expensive, ON with internal energy)
         self.sigma = sigma
+        # psi: Scale factor for incorrect behavior (ON when expensive) - higher penalty
         self.psi = psi
+        # nu: Scale factor for missed opportunity (OFF when could use internal energy)
         self.nu = nu
+        # beta: Scale factor for acceptable grid import (ON with low price, no internal)
         self.beta = beta
 
     def compute(self, agent, env, state_tuple):
+        # --- 1. Extract State Variables ---
         soc_idx, demand_idx, renewable_idx, price_idx = state_tuple
         action = agent.action  # 1 = ON, 0 = OFF
 
-        # Access REAL continuous price from environment, not discretized index
+        # Access continuous values from environment
         real_price = env.price
+        base_demand = getattr(env, 'base_demand', 0.0)
         
-        surplus = (renewable_idx > demand_idx)
-        expensive = (real_price > getattr(agent, "comfort_threshold", 1.0))
-        internal = (soc_idx > 1 or surplus)
+        # --- 2. Compute Normalization Factors ---
+        # demand_max: maximum demand observed in current dataset (after scaling)
+        demand_max = getattr(env, "demand_max", None)
 
-        # ================================
-        #   REWARD SIMPLE SIN ANIDACIÓN
-        # ================================
-        if action == 1 and internal:
-            reward = self.sigma             # encender con energía interna → correcto
+        # Fallback to avoid division by zero or missing attributes
+        if not demand_max or demand_max <= 0:
+            demand_max = 1.0
 
-        elif action == 1 and expensive:
-            reward = -self.psi              # encender caro sin interno → incorrecto
+        # Normalize base demand to [0, 1]
+        demand_norm = base_demand / demand_max
 
-        elif action == 0 and internal:
-            reward = -self.nu               # apagar con SOC/excedente → oportunidad perdida
-
-        elif action == 0 and expensive:
-            reward = self.sigma             # apagar caro → comportamiento racional
-
+        # Normalize discretized price index to [0, 1]
+        # Uses the same number of bins configured in the environment
+        num_price_bins = getattr(env, "num_price_bins", 1)
+        if num_price_bins > 1:
+            price_norm = price_idx / (num_price_bins - 1)
         else:
-            reward = self.beta              # zona neutra
-
-        return reward
+            price_norm = 0.0
+        
+        # Economic signal: instantaneous system cost (normalized)
+        # Represents: "How much is the system costing right now?"
+        economic_signal = demand_norm * price_norm
+        
+        # --- 3. Define Decision Variables ---
+        # Get SOC threshold from agent configuration (default to 0 if not set)
+        soc_threshold = getattr(agent, 'soc_threshold_idx', 0)
+        comfort_threshold = getattr(agent, "comfort_threshold", 21.0)
+        
+        # Internal energy available: battery has charge OR renewable surplus
+        internal_energy = (soc_idx > soc_threshold) or (renewable_idx > demand_idx)
+        
+        # Price is expensive: exceeds comfort threshold
+        expensive = (real_price > comfort_threshold)
+        
+        # --- 4. Flat Reward Logic (NO NESTING) ---
+        
+        # CASE 1: OFF when price expensive and no internal energy
+        # CORRECT behavior: Demand response to high price signal
+        if action == 0 and expensive and not internal_energy:
+            reward = self.sigma * economic_signal
+        
+        # CASE 2: ON when price expensive
+        # INCORRECT behavior: Ignoring price signal, consuming at high cost
+        elif action == 1 and expensive:
+            reward = -self.psi * economic_signal
+        
+        # CASE 3: ON when internal energy available (regardless of price)
+        # CORRECT behavior: Using renewable/battery energy
+        elif action == 1 and internal_energy:
+            reward = self.sigma * economic_signal
+        
+        # CASE 4: OFF when internal energy available and price acceptable
+        # INCORRECT behavior: Missing opportunity to use cheap/free energy
+        elif action == 0 and internal_energy and not expensive:
+            reward = -self.nu * economic_signal
+        
+        # CASE 5: ON when price acceptable but no internal energy
+        # ACCEPTABLE behavior: Importing from grid at reasonable price
+        # Small positive reward (user willing to pay)
+        elif action == 1 and not expensive and not internal_energy:
+            reward = self.beta * economic_signal
+        
+        # CASE 6 (else): OFF when price acceptable and no internal energy
+        # NEUTRAL behavior: Conservative, avoiding import
+        else:
+            reward = 0.0
+        
+        # --- 5. Clipping for Q-Learning Stability ---
+        return max(min(reward, 1.0), -1.0)

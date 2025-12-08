@@ -10,9 +10,9 @@ class LoadAgent(BaseAgent):
         super().__init__(env,  name, actions=[0, 1], state_space=state_space, **kwargs)
         self.env = env
         self.limits = kwargs.get("limits", {})
-        self.comfort_threshold = self.limits.get("comfort_threshold", 1)
-        self.p_load = self.limits.get("p_load", 200.0)  # Controllable load in W
-        self.market_price = 1
+        self.comfort_threshold = self.limits.get("comfort_threshold", 21.0)
+        self.p_load = self.limits.get("p_load", 2000.0)  # Controllable load in W
+        self.soc_threshold_idx = self.limits.get("soc_threshold_idx", 0)  # Minimum SOC for internal energy
 
     # Q-table se inicializa en BaseAgent.initialize_q_table según state_space
 

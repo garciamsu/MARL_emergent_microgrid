@@ -36,6 +36,19 @@ class MultiAgentEnv:
         self.dataset = self._load_data(csv_filename)
         self.max_steps = len(self.dataset)
 
+        # Precompute demand and price statistics for dynamic normalization in rewards
+        if "demand" in self.dataset.columns:
+            self.demand_max = float(self.dataset["demand"].max())
+        else:
+            self.demand_max = 0.0
+
+        if "price" in self.dataset.columns:
+            self.price_min = float(self.dataset["price"].min())
+            self.price_max = float(self.dataset["price"].max())
+        else:
+            self.price_min = 0.0
+            self.price_max = 0.0
+
         # Excluir columnas no deseadas
         excluded_columns = ["price", "demand", "Datetime"]
 
@@ -99,6 +112,7 @@ class MultiAgentEnv:
         self.renewable_potential = 0
         self.renewable_power = 0
         self.demand_power = 0
+        self.base_demand = 0  # Base demand from dataset (before load agent modulation)
         self.total_power = 0
         self.price = 0
         self.energy_balance = 0
@@ -150,6 +164,7 @@ class MultiAgentEnv:
         
         if field == "demand":
             self.demand_power = row[field]
+            self.base_demand = row[field]  # Store original demand before load agent modulation
             self.demand_power_idx = digitize_clip(self.demand_power, self.power_bins)
             self.price = row["price"]
         

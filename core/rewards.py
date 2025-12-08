@@ -40,12 +40,13 @@ class DefaultSolarReward(RewardFn):
 
         imbalance_norm = abs(delta_p) / max_p
         solar_norm = state_tuple[0] / max_p
+        solar_norm = 0.05 if solar_norm == 0 else solar_norm
 
         # --- 3. Lógica Plana (Flat Logic) ---
         print(f"DEBUG: delta_p={delta_p}, max_p={max_p}, env.renewable_potential_idx={env.renewable_potential_idx}, env.demand_power_idx={env.demand_power_idx}, agent.action={agent.action}, solar_norm={solar_norm:.3f}, imbalance_norm={imbalance_norm:.3f}")
 
         # CASO A: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = PRODUCIR (1)
-        if delta_p >= 0 and agent.action == 1:
+        if agent.action == 1 and delta_p >= 0 and solar_norm > 0:
             reward = self.theta * imbalance_norm
 
         # CASO B: DÉFICIT (Falta energía) y ACCIÓN = IDLE (0)
@@ -92,24 +93,25 @@ class DefaultWindReward(RewardFn):
 
         imbalance_norm = abs(delta_p) / max_p
         wind_norm = state_tuple[0] / max_p
+        wind_norm = 0.05 if wind_norm == 0 else wind_norm
 
         # --- 3. Lógica Plana (Flat Logic) ---
 
         # CASO A: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = PRODUCIR (1)
         if delta_p >= 0 and agent.action == 1:
-            reward = self.theta * imbalance_norm
+            reward = self.theta * imbalance_norm * wind_norm
 
         # CASO B: DÉFICIT (Falta energía) y ACCIÓN = IDLE (0)
         elif delta_p < 0 and agent.action == 0:
-            reward = self.xi * imbalance_norm
+            reward = self.xi * imbalance_norm* wind_norm
 
         # CASO C: DÉFICIT (Falta energía) y ACCIÓN = PRODUCIR (1)
         elif delta_p < 0 and agent.action == 1:
-            reward = -self.beta * imbalance_norm
+            reward = -self.beta * imbalance_norm* wind_norm
 
         # CASO D: EXCEDENTE o BALANCE (Sobra energía) y ACCIÓN = IDLE (0)
         else:
-            reward = -self.nu * imbalance_norm
+            reward = -self.nu * imbalance_norm* wind_norm
 
         # --- 4. Clipping final ---
         return max(min(reward, 1.0), -1.0)

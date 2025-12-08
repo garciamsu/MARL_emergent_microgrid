@@ -28,7 +28,7 @@ offline:
 simulation:
   episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
-  seed: 44           # random seed for reproducibility
+  seed: 46           # random seed for reproducibility
   dataset: training_v1.csv
   
   # Episode window size in hours (contiguous random window from dataset)
@@ -116,7 +116,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultSolarReward
-      params: {theta: 10, beta: 2.5, nu: 10, xi: 2.5}
+      params: {theta: 15, beta: 2.5, nu: 10, xi: 2.5}
     state_space:
       - {var: solar_power, source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}
@@ -133,7 +133,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultWindReward
-      params: {theta: 10, beta: 2.5, nu: 10, xi: 2.5}
+      params: {theta: 10, beta: 10, nu: 10, xi: 10}
     state_space:
       - {var: wind_power,  source: local,   bins: auto}
       - {var: demand,      source: env,     bins: auto}

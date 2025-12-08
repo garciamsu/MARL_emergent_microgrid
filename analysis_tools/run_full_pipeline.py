@@ -32,7 +32,7 @@ def run_script(script_name: str, script_path: Path) -> bool:
     print("\n" + "="*80)
     print(f"▶️  Running: {script_name}")
     print("="*80)
-    
+
     try:
         result = subprocess.run(
             [sys.executable, str(script_path)],

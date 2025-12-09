@@ -21,11 +21,11 @@ from pathlib import Path
 
 def run_script(script_name: str, script_path: Path) -> bool:
     """Execute a script and return True if successful, False otherwise.
-    
+
     Args:
         script_name: Display name of the script
         script_path: Full path to the script file
-        
+
     Returns:
         bool: True if script executed successfully, False otherwise
     """
@@ -40,14 +40,14 @@ def run_script(script_name: str, script_path: Path) -> bool:
             check=True,
             capture_output=False
         )
-        
+
         if result.returncode == 0:
             print(f"\n✅ {script_name} completed successfully")
             return True
         else:
             print(f"\n⚠️  {script_name} finished with code {result.returncode}")
             return False
-            
+
     except subprocess.CalledProcessError as e:
         print(f"\n❌ ERROR executing {script_name}: {e}")
         return False

@@ -449,6 +449,7 @@ def run_training(config):
                     env.demand_power += abs(agent.power)
                     # Price state reflects affordability vs comfort threshold
                     env.price_idx = 1 if env.price > load_comfort_threshold else 0
+                    print(agent.q_table)
 
             # PHASE 3: Update battery agent (reacts to balance)
             for agent in agents.values():

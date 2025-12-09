@@ -206,7 +206,7 @@ agents:
       # Dynamic modulation: All rewards are scaled by economic_signal
       # economic_signal = (base_demand / demand_max) × (price / price_max)
       # This reflects the instantaneous economic impact of the decision
-      params: {sigma: 1.0, psi: 1.5, nu: 1.0, beta: 0.2}
+      params: {sigma: 0.2, psi: 1.0, nu: 1.0, beta: 0.2}
     state_space:
       - {var: grid_power_idx, source: external,  bins: [0, 1]}
       - {var: price_idx,      source: external,  bins: [0, 1]}
@@ -243,7 +243,7 @@ agents:
       # - All rewards scaled by: (base_demand/demand_max) × (price/price_max)
       # - Reflects instantaneous economic impact (cost or savings)
       # - Enables emergent coordination with battery and grid agents
-      comfort_threshold: 18
+      comfort_threshold: 10
       
       # soc_threshold_idx: Minimum SOC index to consider battery energy "available"
       # With 5 SOC bins: 0=[0-20%], 1=[20-40%], 2=[40-60%], 3=[60-80%], 4=[80-100%]

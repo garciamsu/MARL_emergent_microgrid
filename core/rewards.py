@@ -265,41 +265,47 @@ class DefaultGridReward(RewardFn):
 
 @register_reward("DefaultLoadReward")
 class DefaultLoadReward(RewardFn):
-    """Dynamic reward for controllable load agent (demand-side management).
-    
-    Implements economic-based reward modulation aligned with emergent systems paradigm.
-    Rewards reflect real economic impact: savings when turning OFF at high prices,
-    costs when consuming unnecessarily.
-    
-    Decision logic:
-    - Load turns OFF only if: price > comfort_threshold AND (no internal energy)
-    - Load stays ON if: price acceptable OR internal energy available
-    - Internal energy = (soc_idx > soc_threshold) OR renewable surplus
-    
-    Reward modulation:
-    - economic_signal = (base_demand / demand_max) × (price / price_max)
-    - Reflects instantaneous system cost in normalized scale [0, 1]
-    - All rewards scaled by this signal to reflect economic impact
+    """Recompensa discreta para la carga controlable.
+
+    Usa dos entradas del estado discretizado: potencia de red disponible
+    (`grid_power_idx`) y precio (`price_idx`). Acciones esperadas: 0=OFF, 1=ON.
+
+    - OFF sin potencia de red → penalización fija (`-sigma`).
+    - ON con potencia y precio barato → premio proporcional (`psi * grid_norm`).
+    - ON con potencia y precio caro → penalización proporcional (`-nu * grid_norm`).
+    - Cualquier otro caso → premio/base neutral (`beta`).
     """
 
-    def __init__(self, sigma=1.0, psi=1.5, nu=1.0, beta=0.2, **kwargs):
-        # sigma: Scale factor for correct behavior (OFF when expensive, ON with internal energy)
+    def __init__(self, sigma=0.2, psi=1.0, nu=1.0, beta=0.2, **kwargs):
+        # sigma: Penaliza permanecer OFF cuando no hay potencia de red
         self.sigma = sigma
-        # psi: Scale factor for incorrect behavior (ON when expensive) - higher penalty
+        # psi: Premia consumir cuando hay potencia y precio barato
         self.psi = psi
-        # nu: Scale factor for missed opportunity (OFF when could use internal energy)
+        # nu: Penaliza consumir cuando hay potencia pero el precio es caro
         self.nu = nu
-        # beta: Scale factor for acceptable grid import (ON with low price, no internal)
+        # beta: Recompensa base para casos neutros
         self.beta = beta
 
     def compute(self, agent, env, state_tuple):
-        # --- 1. Extract State Variables ---
-        ## soc_idx, demand_idx, renewable_idx, price_idx = state_tuple
-        print("*******************************************************************")
-        print(state_tuple[0])
-        state_tuple[1]
+        # --- 1. Extraer variables de estado ---
+        grid_power_idx = state_tuple[0] # Índice discreto de potencia de red disponible
+        price_idx = state_tuple[1]      # Índice discreto de precio (0=barato, 1=caro)
 
-        reward = 0.0
+        # --- 2. Normalización dinámica ---
+        max_p = max(env.num_power_bins - 1, 1)
+        grid_norm = env.grid_power_idx / max_p
+
+        # --- 3. Lógica de recompensa ---
+        if agent.action == 0 and grid_power_idx == 0:
+            reward = -self.sigma
+        elif agent.action == 1 and grid_power_idx > 0 and price_idx==0:
+            reward = self.psi * grid_norm
+        elif agent.action == 1 and grid_power_idx > 0 and price_idx==1:
+            reward = -self.nu * grid_norm
+        else:
+            reward = self.beta
+
+        print(f"DEBUG: LoadReward - Action: {agent.action}, GridIdx: {grid_power_idx}, PriceIdx: {price_idx}, GridNorm: {grid_norm:.2f}, Reward: {reward:.2f}")
 
         # --- 5. Clipping for Q-Learning Stability ---
         return max(min(reward, 1.0), -1.0)

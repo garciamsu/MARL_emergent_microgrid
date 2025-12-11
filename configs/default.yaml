@@ -70,7 +70,8 @@ validation:
 # ==============================================================
 
 discretization:
-  power_bins: 5
+  delta_bins: 3  # Number of bins for delta_ph discretization
+  power_bins: 2  # Number of bins for power discretization
   price_bins: 2  # Number of bins for price discretization
   soc_bins: 3    # Number of bins for SOC discretization
 

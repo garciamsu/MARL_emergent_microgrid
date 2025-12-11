@@ -327,6 +327,12 @@ def run_training(config):
                 for name, agent in agents.items()
             }
 
+            print(index)
+            print(range(episode_steps))
+            print(state)
+
+            exit(1)
+
             # Step log: environment global variables and per-agent fields
             step_record = {
                 "episode": episode,

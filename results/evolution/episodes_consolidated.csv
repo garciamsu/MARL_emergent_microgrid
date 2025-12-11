@@ -1,2 +1,0 @@
-episode,mean_demand_power,mean_energy_balance,mean_renewable_power,mean_total_power,total_reward_solar,total_reward_wind,total_reward_battery,total_reward_grid,total_reward_load,solar_activation_rate,wind_activation_rate,battery_charge_rate,battery_discharge_rate,grid_import_rate,load_reduction_rate
-0,97013.61533807917,-36536.06611279167,29490.189002377087,60477.549225287505,0.4444444444444444,1.166666666666666,-2.201388888888888,-3.1597222222222223,8.6,0.4583333333333333,0.3541666666666667,0.2916666666666667,0.2916666666666667,0.4375,0.1875

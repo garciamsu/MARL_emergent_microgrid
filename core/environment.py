@@ -23,9 +23,9 @@ class MultiAgentEnv:
         """
         csv_filename = config["simulation"]["dataset"]
         self.num_power_bins = config["discretization"]["power_bins"]
-        self.num_price_bins = config["discretization"].get("price_bins", 5)
+        self.num_price_bins = config["discretization"].get("price_bins", 2)
         self.num_soc_bins = config["discretization"].get("soc_bins", 5)
-        
+
         # Power scaling factor from configuration (kW/kWh to W/Wh)
         self.power_scale_factor = config["simulation"].get("power_scale_factor", 1000.0)
 
@@ -49,33 +49,26 @@ class MultiAgentEnv:
             self.price_min = 0.0
             self.price_max = 0.0
 
-        # Excluir columnas no deseadas
-        excluded_columns = ["price", "demand", "Datetime"]
+        # Get maximum power value from config (design limit / physical constraint)
+        self.max_value = float(config.get("simulation", {}).get("max_power", 300000.0))
+        print(f"Maximum power value from config: {self.max_value}")
 
-        # Calcular la suma fila por fila, descartando las columnas excluidas
-        row_sums = (
-            self.dataset.drop(columns=excluded_columns, errors='ignore')
-            .apply(pd.to_numeric, errors="coerce")
-            .sum(axis=1)
-        )
-
-        # Obtener el valor máximo de las sumas de filas
-        self.max_value = row_sums.max()
-        print(f"Máximo valor calculado en dataset: {self.max_value}")
+        # Get maximum price value from config (design limit / physical constraint)
+        max_price_config = float(config.get("simulation", {}).get("max_price", 200.0))
+        print(f"Maximum price value from config: {max_price_config}")
 
         self.power_bins = np.linspace(0, self.max_value, self.num_power_bins)
-        
-        # Create price bins if price column exists
-        if "price" in self.dataset.columns:
-            price_min = self.dataset["price"].min()
-            price_max = self.dataset["price"].max()
-            self.price_bins = np.linspace(price_min, price_max, self.num_price_bins)
-        else:
-            self.price_bins = np.linspace(0, 1, self.num_price_bins)  # Default bins
-        
+
+        # Create price bins using comfort_threshold from load agent config
+        # If comfort_threshold is defined, create asymmetric bins: [0, threshold, max_price]
+        # This creates two categories: "cheap" (below threshold) and "expensive" (above threshold)
+        comfort_threshold = config.get("agents", {}).get("load", {}).get("limits", {}).get("comfort_threshold")
+        self.price_bins = np.array([0, float(comfort_threshold), max_price_config])
+        print(f"Price bins (asymmetric): [0, {comfort_threshold}, {max_price_config}] EUR/MWh")
+
         # Store full dataset for random window selection
         self.full_dataset = self.dataset.copy()
-        
+
         # Initialize with full dataset (will be replaced per episode)
         self.episode_data = None
         self.current_step = 0
@@ -159,19 +152,19 @@ class MultiAgentEnv:
 
     def get_dataset(self, field: str, index: int) -> int:
         """Return discretized value for ``field`` at ``index`` updating env if needed.
-        
+
         Uses episode_data if available (from random contiguous window), otherwise falls back to full dataset.
         """
         # Use episode_data if available, otherwise fall back to full dataset
         data_source = self.episode_data if self.episode_data is not None else self.dataset
         row = data_source.iloc[index]
-        
+
         if field == "demand":
             self.demand_power = row[field]
             self.base_demand = row[field]  # Store original demand before load agent modulation
             self.demand_power_idx = digitize_clip(self.demand_power, self.power_bins)
             self.price = row["price"]
-        
+
         # Use appropriate bins based on field type
         if field == "price":
             return digitize_clip(row[field], self.price_bins)

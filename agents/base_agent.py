@@ -38,7 +38,11 @@ class BaseAgent:
         self.action = 0
         self.idx = 0
         self.power = 0
+        self.power_norm = 0
+        self.power_idx = 0
         self.potential = 0
+        self.potential_norm = 0
+        self.potential_idx = 0
         # Recompensa inyectada desde configuración (si existe)
         self.reward_fn = kwargs.get("reward_fn", None)
         # Guarda la definición del espacio de estado si se provee, evita variable no definida
@@ -54,9 +58,11 @@ class BaseAgent:
         # Extract values from dataset row
         row = self.env.dataset.iloc[index]
         self.potential = row[field]  # Update potential
+        self.potential_norm = self.potential / self.env.max_value
+        self.potential_idx = digitize_clip(self.potential, self.env.power_bins)
 
         # Compute discretized states
-        return digitize_clip(row[field], self.env.power_bins)
+        return self.potential_idx
 
     def get_discretized_state(self, env, index):
         """Construct the discretized state tuple for this agent.

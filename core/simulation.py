@@ -442,7 +442,9 @@ def run_training(config):
                 "env_grid_power_idx": env.grid_power_idx,
                 "env_energy_balance": env.energy_balance,
                 "env_energy_balance_idx": env.energy_balance_idx,
-                "env_delta_power_idx": env.delta_power_idx,
+                "env_delta_ph": env.delta_ph,
+                "env_delta_ph_norm": env.delta_ph_norm,
+                "env_delta_ph_idx": env.delta_ph_idx,
             })
 
             # 4. Next state

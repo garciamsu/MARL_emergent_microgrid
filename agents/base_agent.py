@@ -131,9 +131,11 @@ class BaseAgent:
                 grid_power_idx = 1 if grid_power_norm  > 0.00 else 0
                 value = grid_power_idx
             elif var == "cm":
-                grid_power_norm = env.price / env.max_price
-                grid_power_idx = env.delta_ph_idx = digitize_clip(env.price, env.price_bins)
-                value = grid_power_idx
+                # Use comfort_threshold from price_bins (loaded from YAML)
+                # price_bins = [0, comfort_threshold, max_price] creates binary discretization
+                env.price_norm  = env.price / env.max_price
+                env.price_idx = digitize_clip(env.price, env.price_bins)
+                value = env.price_idx
             else:  # Default to 'env'
                 value = -999 # Valor por defecto si no se reconoce la variable
 

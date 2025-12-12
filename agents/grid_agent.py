@@ -41,4 +41,4 @@ class GridAgent(BaseAgent):
             self.potential = max(0, current_deficit)
             self.power = 0.0
             
-        self.idx = digitize_clip(self.power, env.power_bins)
+        self.idx = 1 if self.power  > 0.00 else 0

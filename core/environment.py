@@ -112,6 +112,7 @@ class MultiAgentEnv:
         self.base_demand = 0  # Base demand from dataset (before load agent modulation)
         self.total_power = 0
         self.price = 0
+        self.price_norm = 0
         self.price_idx = 0
         self.energy_balance = 0
         self.soc_idx = 0
@@ -124,7 +125,6 @@ class MultiAgentEnv:
         self.total_power_idx = digitize_clip(self.total_power, self.power_bins)
         self.energy_balance_idx = digitize_clip(self.energy_balance, self.power_bins)
         self.grid_power_idx = 0
-        self.price_idx = 0
         self.delta_power_idx = "surplus"
         self.delta_ph = 0
         self.delta_ph_norm = 0
@@ -135,6 +135,7 @@ class MultiAgentEnv:
         self.wind_potential_norm = 0
         self.solar_potential_idx = 0
         self.wind_potential_idx = 0
+
 
         self.state = None
 

@@ -226,7 +226,7 @@ agents:
       # This value is safe (< min_demand) and provides meaningful load control
       # Alternative: 2187 W (90% of min_demand) for maximum controllable load
       p_load: 4000
-      
+
       # comfort_threshold: Maximum acceptable electricity price (EUR/MWh)
       # MANDATORY condition for load to turn OFF - price must exceed this threshold
       # Used in reward function to determine if price is "expensive"
@@ -247,7 +247,7 @@ agents:
       # - All rewards scaled by: (base_demand/demand_max) × (price/price_max)
       # - Reflects instantaneous economic impact (cost or savings)
       # - Enables emergent coordination with battery and grid agents
-      comfort_threshold: 10
+      comfort_threshold: 27
       
       # soc_threshold_idx: Minimum SOC index to consider battery energy "available"
       # With 5 SOC bins: 0=[0-20%], 1=[20-40%], 2=[40-60%], 3=[60-80%], 4=[80-100%]

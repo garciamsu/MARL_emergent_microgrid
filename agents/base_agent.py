@@ -183,10 +183,19 @@ class BaseAgent:
             var = desc.get("var")
             source = desc.get("source")
 
+            # Caso especial delta_ph: discretize_ternary produce {-1, 0, 1}
+            if var == "delta_ph":
+                dims.append([-1, 0, 1])
+                continue
+            # Caso especial variables binarias: solar_potential, wind_potential, pu_power, cm
+            # Estas variables usan comparaciones binarias que producen {0, 1}
+            elif var in {"solar_potential", "wind_potential", "pu_power", "cm"}:
+                dims.append([0, 1])
+                continue
             # Caso especial SOC: usar bins de la batería si existen, de lo contrario
             # los bins globales de SOC del entorno para mantener la cardinalidad
             # consistente entre agentes que leen soc_idx desde env.
-            if var in {"soc", "soc_idx"}:
+            elif var in {"soc", "soc_idx"}:
                 if hasattr(self, "battery_soc_bins"):
                     cardinality = len(self.battery_soc_bins)
                 else:

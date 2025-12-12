@@ -22,9 +22,11 @@ class MultiAgentEnv:
                 ``discretization.bins_power``.
         """
         csv_filename = config["simulation"]["dataset"]
-        self.num_power_bins = config["discretization"]["power_bins"]
+
+        self.num_delta_bins = config["discretization"].get("delta_bins", 3)
+        self.num_power_bins = config["discretization"].get("power_bins", 2)
         self.num_price_bins = config["discretization"].get("price_bins", 2)
-        self.num_soc_bins = config["discretization"].get("soc_bins", 5)
+        self.num_soc_bins = config["discretization"].get("soc_bins", 3)
 
         # Power scaling factor from configuration (kW/kWh to W/Wh)
         self.power_scale_factor = config["simulation"].get("power_scale_factor", 1000.0)
@@ -54,17 +56,19 @@ class MultiAgentEnv:
         print(f"Maximum power value from config: {self.max_value}")
 
         # Get maximum price value from config (design limit / physical constraint)
-        max_price_config = float(config.get("simulation", {}).get("max_price", 200.0))
-        print(f"Maximum price value from config: {max_price_config}")
+        self.max_price = float(config.get("simulation", {}).get("max_price", 200.0))
+        print(f"Maximum price value from config: {self.max_price}")
 
-        self.power_bins = np.linspace(0, self.max_value, self.num_power_bins)
+        self.price_bins = np.linspace(0, 1, self.num_price_bins)
+        self.power_bins = np.linspace(0, 1, self.num_power_bins)
+        self.delta_bins = np.linspace(-1, 1, self.num_delta_bins)
 
         # Create price bins using comfort_threshold from load agent config
         # If comfort_threshold is defined, create asymmetric bins: [0, threshold, max_price]
         # This creates two categories: "cheap" (below threshold) and "expensive" (above threshold)
         comfort_threshold = config.get("agents", {}).get("load", {}).get("limits", {}).get("comfort_threshold")
-        self.price_bins = np.array([0, float(comfort_threshold), max_price_config])
-        print(f"Price bins (asymmetric): [0, {comfort_threshold}, {max_price_config}] EUR/MWh")
+        self.price_bins = np.array([0, float(comfort_threshold), self.max_price])
+        print(f"Price bins (asymmetric): [0, {comfort_threshold}, {self.max_price}] EUR/MWh")
 
         # Store full dataset for random window selection
         self.full_dataset = self.dataset.copy()
@@ -122,6 +126,15 @@ class MultiAgentEnv:
         self.grid_power_idx = 0
         self.price_idx = 0
         self.delta_power_idx = "surplus"
+        self.delta_ph = 0
+        self.delta_ph_norm = 0
+        self.delta_ph_idx = 0
+        self.solar_potential = 0
+        self.wind_potential = 0
+        self.solar_potential_norm = 0
+        self.wind_potential_norm = 0
+        self.solar_potential_idx = 0
+        self.wind_potential_idx = 0
 
         self.state = None
 
@@ -138,7 +151,7 @@ class MultiAgentEnv:
         for col in df.columns:
             # Scale all power columns except price and datetime
             if col not in ["price", "Datetime", "datetime"]:
-                if "power" in col.lower() or col.lower() == "demand":
+                if "potential" in col.lower() or col.lower() == "demand":
                     df[col] = df[col] * self.power_scale_factor
 
         if offsets:

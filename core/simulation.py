@@ -237,7 +237,7 @@ def run_training(config):
                 # Fallback
                 recorded_start = 0
                 recorded_end = full_dataset_length
-        
+
         episode_metadata.append({
             "episode": episode,
             "window_start_index": recorded_start,
@@ -245,13 +245,13 @@ def run_training(config):
             "window_size": recorded_end - recorded_start,
             "initial_soc": initial_soc
         })
-        
+
         # ==============================================
         # 4. Set initial SOC for all battery agents
         # ==============================================
         soc_min_cfg = float(limits_cfg.get("soc_min", 0.0))
         soc_max_cfg = float(limits_cfg.get("soc_max", 1.0))
-        
+
         for a_name, a in agents.items():
             if "battery" in a_name.lower():
                 # Clip to configured battery limits
@@ -259,7 +259,7 @@ def run_training(config):
                 # Update discrete index according to battery bins
                 if hasattr(a, "battery_soc_bins"):
                     a.idx = digitize_clip(a.soc, a.battery_soc_bins)
-                
+
                 # Verification log
                 logger.debug(
                     "Episode %d - Battery SOC initialized: %.3f (idx=%d)",
@@ -281,9 +281,9 @@ def run_training(config):
         
         # Add initial agent states (especially battery SOC)
         for name, agent in agents.items():
+            initial_state_record[f"potential_{name}"] = None
             initial_state_record[f"action_{name}"] = None
             initial_state_record[f"power_{name}"] = 0.0
-            initial_state_record[f"potential_{name}"] = None
             initial_state_record[f"idx_{name}"] = getattr(agent, "idx", 0)
             if name.startswith("battery"):
                 initial_state_record[f"soc_{name}"] = agent.soc
@@ -321,17 +321,17 @@ def run_training(config):
         episode_steps = env.max_steps - 1
         for index in range(episode_steps):
 
+            # Reset power accumulators
+            env.total_power = 0.0
+            env.renewable_power = 0.0
+            env.renewable_potential = 0.0
+            env.grid_power = 0.0
+
             # 1. Discretized state per agent
             state = {
                 name: agent.get_discretized_state(env, index)
                 for name, agent in agents.items()
             }
-
-            print(index)
-            print(range(episode_steps))
-            print(state)
-
-            exit(1)
 
             # Step log: environment global variables and per-agent fields
             step_record = {
@@ -356,37 +356,27 @@ def run_training(config):
             # Store base demand for load agent to use
             env.base_demand = base_demand_from_dataset
 
-            # Reset power accumulators
-            env.total_power = 0.0
-            env.renewable_power = 0.0
-            env.renewable_potential = 0.0
-            env.grid_power = 0.0
-
             # Update discretized indices
-            env.renewable_potential_idx = digitize_clip(env.renewable_potential, env.power_bins)
-            env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
-            env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
-            env.grid_power_idx = 1  if env.grid_power > 0 else 0
+            #env.renewable_potential_idx = digitize_clip(env.renewable_potential, env.power_bins)
+            #env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
+            #env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
+            #env.grid_power_idx = 1  if env.grid_power > 0 else 0
 
             # PHASE 1: Update renewable agents (solar, wind)
             for agent in agents.values():
-                if "solar" in agent.name.lower() or "wind" in agent.name.lower():
+                if "solar" in agent.name.lower():
                     agent.update_power(env)
-                    env.renewable_potential += agent.potential
+                    #env.renewable_potential += agent.potential
                     env.renewable_power += agent.power
                     env.total_power += agent.power
 
-            # PHASE 2: Update load agent (can reduce demand)
-            for agent in agents.values():
-                if "load" in agent.name.lower():
+                if "wind" in agent.name.lower():
                     agent.update_power(env)
-                    # Load power is negative (consumption)
-                    env.demand_power += abs(agent.power)
-                    # Price state reflects affordability vs comfort threshold
-                    env.price_idx = 1 if env.price > load_comfort_threshold else 0
-                    print(agent.q_table)
+                    #env.renewable_potential += agent.potential
+                    env.renewable_power += agent.power
+                    env.total_power += agent.power
 
-            # PHASE 3: Update battery agent (reacts to balance)
+            # PHASE 2: Update battery agent (reacts to balance)
             for agent in agents.values():
                 if "battery" in agent.name.lower():
                     agent.update_power(env)
@@ -396,7 +386,7 @@ def run_training(config):
                     else:
                         env.demand_power += abs(agent.power)
 
-            # PHASE 4: Update grid agent (last resort)
+            # PHASE 3: Update grid agent (last resort)
             for agent in agents.values():
                 if "grid" in agent.name.lower():
                     agent.update_power(env)
@@ -404,6 +394,15 @@ def run_training(config):
                     if agent.power > 0:
                         env.grid_power = agent.power
                         env.total_power += agent.power
+
+            # PHASE 4: Update load agent (can reduce demand)
+            for agent in agents.values():
+                if "load" in agent.name.lower():
+                    agent.update_power(env)
+                    # Load power is negative (consumption)
+                    env.demand_power += abs(agent.power)
+                    # Price state reflects affordability vs comfort threshold
+                    env.price_idx = 1 if env.price > load_comfort_threshold else 0
 
             # Step log: Per-agent variables (safe defaults if attribute is missing)
             for name, agent in agents.items():

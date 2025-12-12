@@ -305,7 +305,5 @@ class DefaultLoadReward(RewardFn):
         else:
             reward = self.beta
 
-        print(f"DEBUG: LoadReward - Action: {agent.action}, GridIdx: {grid_power_idx}, PriceIdx: {price_idx}, GridNorm: {grid_norm:.2f}, Reward: {reward:.2f}")
-
         # --- 5. Clipping for Q-Learning Stability ---
         return max(min(reward, 1.0), -1.0)

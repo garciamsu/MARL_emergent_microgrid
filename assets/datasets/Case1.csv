@@ -1,4 +1,4 @@
-Datetime;demand;price;solar_power_0;wind_power_0
+Datetime;demand;price;solar_potential;wind_potential
 2019-01-01 00:00:00;25;2;0;0
 2019-01-01 01:00:00;25;2;0;20.8404465948
 2019-01-01 02:00:00;25;2;0;18.7831351362

@@ -74,6 +74,7 @@ class BaseAgent:
 
         state_values = []
 
+        """
         for state in self.state_space:
             if state["source"] == "local":
                 # Example: var_wind_0 (if agent name is wind#0 and var = "var")
@@ -91,6 +92,50 @@ class BaseAgent:
             else:
                 # Use environment value
                 value = env.get_dataset(state["var"], index)
+
+            state_values.append(value)
+        """
+        # Use episode_data (random window) if available, otherwise fall back to full dataset
+        data_source = env.episode_data if env.episode_data is not None else env.dataset
+        row = data_source.iloc[index]
+
+        env.solar_potential = row["solar_potential"]
+        env.solar_potential_norm = env.solar_potential / env.max_value
+        env.solar_potential_idx = 1 if env.solar_potential_norm  > 0.0 else 0
+        env.wind_potential = row["wind_potential"]
+        env.wind_potential_norm = env.wind_potential / env.max_value
+        env.wind_potential_idx = 1 if env.wind_potential_norm  > 0.0 else 0
+        env.price = row["price"]
+        env.demand_power = row["demand"]
+
+        env.renewable_potential = env.solar_potential + env.wind_potential
+        env.demand_power = env.demand_power
+
+        for state in self.state_space:
+            
+            var = state.get("var")
+
+            if var == "delta_ph":
+               env.delta_ph =  env.renewable_power - env.demand_power
+               env.delta_ph_norm = env.delta_ph / env.max_value
+               env.delta_ph_idx = digitize_clip(env.delta_ph_norm, env.delta_bins)
+               value = env.delta_ph_idx
+            elif var == "solar_potential":
+               value = env.solar_potential_idx
+            elif var == "wind_potential":
+               value = env.wind_potential_idx
+            elif var == "soc":
+                value = self.idx
+            elif var == "pu_power":
+                grid_power_norm = env.grid_power / env.max_value
+                grid_power_idx = 1 if grid_power_norm  > 0.00 else 0
+                value = grid_power_idx
+            elif var == "cm":
+                grid_power_norm = env.price / env.max_price
+                grid_power_idx = env.delta_ph_idx = digitize_clip(env.price, env.price_bins)
+                value = grid_power_idx
+            else:  # Default to 'env'
+                value = -999 # Valor por defecto si no se reconoce la variable
 
             state_values.append(value)
 

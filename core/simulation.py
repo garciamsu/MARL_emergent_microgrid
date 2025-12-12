@@ -413,6 +413,7 @@ def run_training(config):
                 if name.startswith("battery"):
                     step_record[f"soc_{name}"] = getattr(agent, "soc", None)
                     step_record[f"soc_idx_{name}"] = getattr(agent, "idx", None)
+                    env.soc = getattr(agent, "soc", 0.0)
 
             # Update environment global variables
             env.energy_balance = env.total_power - env.demand_power

@@ -116,6 +116,7 @@ class MultiAgentEnv:
         self.price_idx = 0
         self.energy_balance = 0
         self.soc_idx = 0
+        self.soc = 0
         self.grid_power = 0
 
         # Reset discretized indices

@@ -1,5 +1,5 @@
 import random
-from utils.discretization import digitize_clip
+from utils.discretization import digitize_clip, discretize_ternary
 from itertools import product
 
 class BaseAgent:
@@ -107,18 +107,18 @@ class BaseAgent:
         env.wind_potential_idx = 1 if env.wind_potential_norm  > 0.0 else 0
         env.price = row["price"]
         env.demand_power = row["demand"]
-
         env.renewable_potential = env.solar_potential + env.wind_potential
-        env.demand_power = env.demand_power
+
 
         for state in self.state_space:
             
             var = state.get("var")
 
             if var == "delta_ph":
-               env.delta_ph =  env.renewable_power - env.demand_power
+               env.delta_ph =  env.renewable_potential - env.demand_power
                env.delta_ph_norm = env.delta_ph / env.max_value
-               env.delta_ph_idx = digitize_clip(env.delta_ph_norm, env.delta_bins)
+               # Discretize delta_ph_norm to ternary state: -1 (deficit), 0 (balanced), 1 (surplus)
+               env.delta_ph_idx = discretize_ternary(env.delta_ph_norm, threshold=0.01)
                value = env.delta_ph_idx
             elif var == "solar_potential":
                value = env.solar_potential_idx

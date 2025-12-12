@@ -29,7 +29,7 @@ from core.utils import (
     save_q_tables,
     load_q_tables,
 )
-from utils.discretization import digitize_clip
+from utils.discretization import digitize_clip, discretize_ternary
 
 
 def make_epsilon_scheduler(cfg: dict, episodes: int):
@@ -425,6 +425,12 @@ def run_training(config):
             env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
             env.energy_balance_idx = digitize_clip(env.energy_balance, env.power_bins)
             env.grid_power_idx = 1  if env.grid_power > 0 else 0
+            env.delta_ph =  env.renewable_potential - env.demand_power
+            env.delta_ph_norm = env.delta_ph / env.max_value
+            # Discretize delta_ph_norm to ternary state: -1 (deficit), 0 (balanced), 1 (surplus)
+            # Threshold of 0.01 means values in [-0.01, 0.01] are considered balanced (0)
+            env.delta_ph_idx = discretize_ternary(env.delta_ph_norm, threshold=0.01)
+
 
             # Step log: Append environment globals at the end (preserve insertion order)
             step_record.update({

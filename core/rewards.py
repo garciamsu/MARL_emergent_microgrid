@@ -111,32 +111,21 @@ class DefaultGridReward(RewardFn):
 
     def compute(self, agent, env, state_tuple):
         delta_ph, soc = state_tuple
-        soc_norm = env.soc
         reward = 0.0
 
         
-        #if delta_ph < 0 and soc == 0 and agent.action == 1:
-        if soc == 0 and agent.action == 1:
+        if delta_ph < 0 and soc == 0 and agent.action == 1:
             reward = self.psi * 1
-
-        #elif delta_ph < 0 and soc == 0 and agent.action == 0:
-        elif soc == 0 and agent.action == 0:
-            reward = -self.beta * 1
-
-        #elif (delta_ph > 0 or soc > 0) and agent.action == 1:
-        elif soc > 0 and agent.action == 1:
-            reward = -self.beta * 1
-
-        #elif (delta_ph > 0 or soc > 0) and agent.action == 0:
+        elif delta_ph < 0 and soc == 0 and agent.action == 0:
+            reward = -self.beta * 2
+        elif (delta_ph > 0 or soc > 0) and agent.action == 1:
+            reward = -self.beta * 3
+        elif (delta_ph > 0 or soc > 0) and agent.action == 0:
+            reward = self.nu*4
         else:
-            reward = self.nu
-
-        # elif delta_ph == 0 and agent.action == 0:
-        #    reward = +self.nu
-
-        #else:
-        #    reward = -0.1
+            reward = 4
         
+        print(f"\n delta_ph {delta_ph} soc {soc} agent.action {agent.action} reward {reward}")
         return reward
 
 

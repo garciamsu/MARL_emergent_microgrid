@@ -13,59 +13,55 @@ class RewardFn:
 @register_reward("DefaultSolarReward")
 class DefaultSolarReward(RewardFn):
 
-    def __init__(self, theta=1.0, beta=1.0, nu=0.3, **kwargs):
+    def __init__(self, theta=1.0, beta=1.0, nu=1.0, **kwargs):
         self.theta = theta  # escala dinámica principal
         self.beta = beta    # castigos dinámicos
-        self.nu = nu        # balance suave
+        self.nu = nu        # balance suave 0.3
 
     def compute(self, agent, env, state_tuple):
-        delta_ph, pv = state_tuple
+        delta_ph_idx, pv_idx = state_tuple
+        reward = 0.0
 
-        if delta_ph == 1 and agent.action == 1 and pv == 1:
-            reward = +self.theta * abs(env.delta_ph_norm)
-
-        elif delta_ph == 1 and agent.action == 0:
-            reward = -self.beta * abs(env.delta_ph_norm)
-
-        elif delta_ph == -1 and agent.action == 0:
-            reward = +self.theta * abs(env.delta_ph_norm)
-
-        elif delta_ph == -1 and agent.action == 1:
-            reward = -self.beta * abs(env.delta_ph_norm)
-
+        if delta_ph_idx > 0 and agent.action == 1:
+            reward = 1 * (1 if pv_idx > 0 else -1)
+        elif delta_ph_idx > 0 and agent.action == 0:
+            reward = -1 
+        elif delta_ph_idx < 0 and agent.action == 0:
+            reward = 1
+        elif delta_ph_idx < 0 and agent.action > 0:
+            reward = -1
         else:
-            reward = +self.nu
+            reward = 1
 
-        return max(min(reward, 1.0), -1.0)
+        return reward
+
+
 
 
 @register_reward("DefaultWindReward")
 class DefaultWindReward(RewardFn):
 
-    def __init__(self, theta=1.0, beta=1.0, nu=0.3, **kwargs):
+    def __init__(self, theta=1.0, beta=1.0, nu=1.0, **kwargs):
         self.theta = theta
         self.beta = beta
         self.nu = nu
 
     def compute(self, agent, env, state_tuple):
-        delta_ph, pw = state_tuple
+        delta_ph_idx, pw_idx = state_tuple
+        reward = 0.0
 
-        if delta_ph == 1 and agent.action == 1 and pw == 1:
-            reward = +self.theta * abs(env.delta_ph_norm)
-
-        elif delta_ph == 1 and agent.action == 0:
-            reward = -self.beta * abs(env.delta_ph_norm)
-
-        elif delta_ph == -1 and agent.action == 0:
-            reward = +self.theta * abs(env.delta_ph_norm)
-
-        elif delta_ph == -1 and agent.action == 1:
-            reward = -self.beta * abs(env.delta_ph_norm)
-
+        if delta_ph_idx > 0 and agent.action == 1:
+            reward = 1 * 1 if pw_idx > 0 else -1
+        elif delta_ph_idx > 0 and agent.action == 0:
+            reward = -1
+        elif delta_ph_idx < 0 and agent.action == 0:
+            reward = 1
+        elif delta_ph_idx < 0 and agent.action > 0:
+            reward = -1
         else:
-            reward = +self.nu
+            reward = 1
 
-        return max(min(reward, 1.0), -1.0)
+        return reward
 
 
 @register_reward("DefaultBatteryReward")
@@ -101,7 +97,7 @@ class DefaultBatteryReward(RewardFn):
         else:
             reward = -self.nu
 
-        return max(min(reward, 1.0), -1.0)
+        return reward
 
 
 @register_reward("DefaultGridReward")
@@ -134,7 +130,7 @@ class DefaultGridReward(RewardFn):
         else:
             reward = -self.nu
 
-        return max(min(reward, 1.0), -1.0)
+        return reward
 
 
 @register_reward("DefaultLoadReward")
@@ -163,5 +159,5 @@ class DefaultLoadReward(RewardFn):
         else:
             reward = +self.nu * 0.5
 
-        return max(min(reward, 1.0), -1.0)
+        return reward
 

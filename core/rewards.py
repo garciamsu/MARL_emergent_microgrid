@@ -104,7 +104,7 @@ class DefaultBatteryReward(RewardFn):
 @register_reward("DefaultGridReward")
 class DefaultGridReward(RewardFn):
 
-    def __init__(self, psi=1.0, beta=1.0, nu=0.4, **kwargs):
+    def __init__(self, psi=1.0, beta=1.0, nu=1, **kwargs):
         self.psi = psi
         self.beta = beta
         self.nu = nu
@@ -115,23 +115,27 @@ class DefaultGridReward(RewardFn):
         reward = 0.0
 
         
-        if delta_ph < 0 and soc == 0 and agent.action == 1:
-            reward = +self.psi * 1
+        #if delta_ph < 0 and soc == 0 and agent.action == 1:
+        if soc == 0 and agent.action == 1:
+            reward = self.psi * 1
 
-        elif delta_ph < 0 and soc == 0 and agent.action == 0:
+        #elif delta_ph < 0 and soc == 0 and agent.action == 0:
+        elif soc == 0 and agent.action == 0:
             reward = -self.beta * 1
 
-        elif (delta_ph > 0 or soc > 0) and agent.action == 1:
+        #elif (delta_ph > 0 or soc > 0) and agent.action == 1:
+        elif soc > 0 and agent.action == 1:
             reward = -self.beta * 1
 
-        elif (delta_ph > 0 or soc > 0) and agent.action == 0:
-            reward = +self.nu
+        #elif (delta_ph > 0 or soc > 0) and agent.action == 0:
+        else:
+            reward = self.nu
 
         # elif delta_ph == 0 and agent.action == 0:
         #    reward = +self.nu
 
-        else:
-            reward = -0.1
+        #else:
+        #    reward = -0.1
         
         return reward
 

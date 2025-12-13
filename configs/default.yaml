@@ -161,7 +161,7 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
     limits:
-      capacity_ah: 88000
+      capacity_ah: 8800
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0

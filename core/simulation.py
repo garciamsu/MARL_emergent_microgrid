@@ -400,7 +400,7 @@ def run_training(config):
                 if "load" in agent.name.lower():
                     agent.update_power(env)
                     # Load power is negative (consumption)
-                    env.demand_power += abs(agent.power)
+                    env.demand_power -= agent.power
                     # Price state reflects affordability vs comfort threshold
                     env.price_idx = 1 if env.price > load_comfort_threshold else 0
 

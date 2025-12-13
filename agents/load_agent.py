@@ -34,20 +34,18 @@ class LoadAgent(BaseAgent):
         # Calculate actual demand based on action
         if self.action == 1:
             # Action 1: Full demand (load ON)
-            self.potential = base_demand
-            self.power = -base_demand
+            self.potential = 0
+            self.power = 0
         else:  # action == 0
             # Action 0: Shed controllable load (load OFF)
             # Safety check: prevent negative demand
             if base_demand < self.p_load:
                 # If base_demand < p_load, only shed what's available
                 # This prevents physical inconsistency
-                actual_shed = base_demand
                 controllable_demand = 0
             else:
                 # Normal operation: shed p_load from base_demand
-                actual_shed = self.p_load
-                controllable_demand = base_demand - self.p_load
+                controllable_demand = self.p_load
             
-            self.potential = base_demand
-            self.power = -controllable_demand
+            self.potential = controllable_demand
+            self.power = controllable_demand

@@ -39,7 +39,7 @@ simulation:
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
   # Excludes: price, Datetime columns
-  power_scale_factor: 1000.0
+  power_scale_factor: 1000
 
   # Maximum power value for simulation (design limit / physical constraint)
   # Used for discretization bins and normalization. Units: W (after scaling)
@@ -247,7 +247,7 @@ agents:
       # - All rewards scaled by: (base_demand/demand_max) × (price/price_max)
       # - Reflects instantaneous economic impact (cost or savings)
       # - Enables emergent coordination with battery and grid agents
-      comfort_threshold: 27
+      comfort_threshold: 50
       
       # soc_threshold_idx: Minimum SOC index to consider battery energy "available"
       # With 5 SOC bins: 0=[0-20%], 1=[20-40%], 2=[40-60%], 3=[60-80%], 4=[80-100%]

@@ -26,15 +26,15 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 1500
+  episodes: 500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
-  seed: 48          # random seed for reproducibility
+  seed: 46          # random seed for reproducibility
   dataset: training_v1.csv
   
   # Episode window size in hours (contiguous random window from dataset)
   # Each episode uses a random contiguous window of this size
   # Must be <= dataset length. Default: 48 hours (2 days)
-  episode_window_hours: 48
+  episode_window_hours: 72
 
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
@@ -55,8 +55,8 @@ simulation:
     # Final episodes have minimal exploration (ε ≈ 0.001) → pure exploitation
     # This ensures strong exploration early, smooth transition, and stable convergence
     schedule: exponential    # linear | exponential | constant | custom
-    start: 1.0
-    end: 0.01              # Very low minimum for pure exploitation at end
+    start: 1
+    end: 0.1              # Very low minimum for pure exploitation at end
     decay: null             # Auto-calculated to reach 'end' across training
     values: []              # only for custom
 

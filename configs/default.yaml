@@ -26,7 +26,7 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 500
+  episodes: 1
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 46          # random seed for reproducibility
   dataset: training_v1.csv
@@ -34,7 +34,7 @@ simulation:
   # Episode window size in hours (contiguous random window from dataset)
   # Each episode uses a random contiguous window of this size
   # Must be <= dataset length. Default: 48 hours (2 days)
-  episode_window_hours: 72
+  episode_window_hours: 96
 
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
@@ -54,9 +54,9 @@ simulation:
     # Reaches ε < 0.1 by episode 500 (33%), ε ≈ 0.03 at mid-training (ep 750)
     # Final episodes have minimal exploration (ε ≈ 0.001) → pure exploitation
     # This ensures strong exploration early, smooth transition, and stable convergence
-    schedule: exponential    # linear | exponential | constant | custom
-    start: 1
-    end: 0.1              # Very low minimum for pure exploitation at end
+    schedule: constant    # linear | exponential | constant | custom
+    start: 0.3
+    end: 0.3            # Very low minimum for pure exploitation at end
     decay: null             # Auto-calculated to reach 'end' across training
     values: []              # only for custom
 
@@ -121,8 +121,8 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.15 # antes 0.15 → ahora más suave y estable
-      gamma: 0.95
+      alpha: 0.3 # antes 0.15 → ahora más suave y estable
+      gamma: 0.85
     reward:
       type: DefaultSolarReward
       params: {theta: 1, beta: 1, nu: 1, xi: 1}
@@ -136,8 +136,8 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.15 # antes 0.15 → ahora más suave y estable
-      gamma: 0.95
+      alpha: 0.3 # antes 0.15 → ahora más suave y estable
+      gamma: 0.85
     reward:
       type: DefaultWindReward
       params: {theta: 1, beta: 1, nu: 1, xi: 1}
@@ -152,8 +152,8 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.15 # antes 0.15 → ahora más suave y estable
-      gamma: 0.95
+      alpha: 0.3 # antes 0.15 → ahora más suave y estable
+      gamma: 0.85
     reward:
       type: DefaultBatteryReward
       params: {psi: 1, sigma: 1, nu: 1, beta: 1, xi: 1, mu: 1}
@@ -176,8 +176,8 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.15 # antes 0.15 → ahora más suave y estable
-      gamma: 0.95
+      alpha: 0.3 # antes 0.15 → ahora más suave y estable
+      gamma: 0.85
     reward:
       type: DefaultGridReward
       params: {psi: 1, beta: 1, nu: 1, xi: 1}
@@ -192,8 +192,8 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.15  # Learning rate: 0.15 para convergencia suave y estable
-      gamma: 0.95 # Discount factor: 0.95 valora fuertemente recompensas futuras
+      alpha: 0.3 # antes 0.15 → ahora más suave y estable
+      gamma: 0.85
     reward:
       type: DefaultLoadReward
       # Reward parameters (hyperparameters for dynamic reward modulation):

@@ -26,9 +26,9 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 500
+  episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
-  seed: 46           # random seed for reproducibility
+  seed: 48          # random seed for reproducibility
   dataset: training_v1.csv
   
   # Episode window size in hours (contiguous random window from dataset)
@@ -54,7 +54,7 @@ simulation:
     # Reaches ε < 0.1 by episode 500 (33%), ε ≈ 0.03 at mid-training (ep 750)
     # Final episodes have minimal exploration (ε ≈ 0.001) → pure exploitation
     # This ensures strong exploration early, smooth transition, and stable convergence
-    schedule: linear    # linear | exponential | constant | custom
+    schedule: exponential    # linear | exponential | constant | custom
     start: 1.0
     end: 0.01              # Very low minimum for pure exploitation at end
     decay: null             # Auto-calculated to reach 'end' across training

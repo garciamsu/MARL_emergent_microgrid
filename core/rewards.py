@@ -110,22 +110,23 @@ class DefaultGridReward(RewardFn):
         self.nu = nu
 
     def compute(self, agent, env, state_tuple):
-        delta_ph, soc = state_tuple
+        delta_ph, soc_idx = state_tuple
+        soc = env.soc_state
         reward = 0.0
 
         
         if delta_ph < 0 and soc == 0 and agent.action == 1:
             reward = self.psi * 1
         elif delta_ph < 0 and soc == 0 and agent.action == 0:
-            reward = -self.beta * 2
+            reward = -self.beta * 1
         elif (delta_ph > 0 or soc > 0) and agent.action == 1:
-            reward = -self.beta * 3
+            reward = -self.beta * 1
         elif (delta_ph > 0 or soc > 0) and agent.action == 0:
-            reward = self.nu*4
+            reward = self.nu*1
         else:
-            reward = 4
+            reward = -0.25
         
-        print(f"\n delta_ph {delta_ph} soc {soc} agent.action {agent.action} reward {reward}")
+        #print(f"\n delta_ph {delta_ph} soc {soc} agent.action {agent.action} reward {reward}")
         return reward
 
 
@@ -142,16 +143,12 @@ class DefaultLoadReward(RewardFn):
 
         if agent.action == 1 and pu == 1 and cm == 0:
             reward = +self.psi
-
         elif agent.action == 1 and pu == 1 and cm == 1:
             reward = -self.beta
-
         elif agent.action == 0 and pu == 0:
             reward = -self.nu
-
         elif agent.action == 0 and pu == 1 and cm == 0:
             reward = -self.nu
-
         else:
             reward = +self.nu * 0.5
 

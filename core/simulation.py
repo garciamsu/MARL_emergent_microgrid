@@ -381,6 +381,7 @@ def run_training(config):
                 if "battery" in agent.name.lower():
                     agent.update_power(env)
                     # Battery can charge (negative) or discharge (positive)
+                    env.soc_state = agent.action
                     if agent.power >= 0:
                         env.total_power += agent.power
                     else:

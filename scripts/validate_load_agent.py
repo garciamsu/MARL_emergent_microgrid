@@ -33,7 +33,7 @@ def load_dataset(config):
     scale_factor = config['simulation'].get('power_scale_factor', 1000.0)
     
     dataset_path = os.path.join(os.path.dirname(__file__), '..', 'assets', 'datasets', dataset_name)
-    df = pd.read_csv(dataset_path, sep="[;,]", engine="python")
+    df = pd.read_csv(dataset_path, sep="[;,]", engine="python", decimal=".")
     
     # Scale power columns
     for col in df.columns:

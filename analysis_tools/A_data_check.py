@@ -34,7 +34,7 @@ def validate_dataset(dataset_path: str) -> bool:
         return False
     
     try:
-        df = pd.read_csv(dataset_path, sep="[;,]", engine="python")
+        df = pd.read_csv(dataset_path, sep="[;,]", engine="python", decimal=".")
     except Exception as e:
         print(f"❌ ERROR leyendo dataset: {e}")
         return False

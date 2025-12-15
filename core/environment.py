@@ -148,7 +148,7 @@ class MultiAgentEnv:
         Scaling is applied to columns containing 'power' or matching 'demand'.
         """
         file_path = os.path.join(os.getcwd(), "assets", "datasets", filename)
-        df = pd.read_csv(file_path, sep="[;,]", engine="python")
+        df = pd.read_csv(file_path, sep="[;,]", engine="python", decimal=".")
 
         # Scale power values from kW/kWh to Watts using configured factor
         for col in df.columns:

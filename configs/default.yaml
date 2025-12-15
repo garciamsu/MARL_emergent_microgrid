@@ -26,10 +26,10 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 250
+  episodes: 150
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
-  seed: 46          # random seed for reproducibility
-  dataset: microgrid_dataset_10d_hourly_demand250_scaled.csv
+  seed: 42          # random seed for reproducibility
+  dataset: microgrid_dataset_10d_hourly_demand250.csv
   
   # Episode window size in hours (contiguous random window from dataset)
   # Each episode uses a random contiguous window of this size
@@ -54,7 +54,7 @@ simulation:
     # Reaches ε < 0.1 by episode 500 (33%), ε ≈ 0.03 at mid-training (ep 750)
     # Final episodes have minimal exploration (ε ≈ 0.001) → pure exploitation
     # This ensures strong exploration early, smooth transition, and stable convergence
-    schedule: exponential    # linear | exponential | constant | custom
+    schedule: linear    # linear | exponential | constant | custom
     start: 1
     end: 0.01            # Very low minimum for pure exploitation at end
     decay: null             # Auto-calculated to reach 'end' across training
@@ -129,7 +129,7 @@ agents:
     state_space:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: solar_potential,  source: local,   bins: auto}
-    p_max: 300000
+    p_max: 1000000
     efficiency: 0.98
 
   wind:
@@ -145,7 +145,7 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: solar_potential,  source: local,   bins: auto}
     limits:
-      p_max: 300000
+      p_max: 1000000
       efficiency: 0.95
 
   battery:
@@ -161,7 +161,7 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
     limits:
-      capacity_ah: 1000000
+      capacity_ah: 260000
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
@@ -169,8 +169,8 @@ agents:
       # Random initial SOC sampled from U[initial_soc_min, initial_soc_max]
       initial_soc_min: 1.0
       initial_soc_max: 1.0
-      p_charge_max: 300000
-      p_discharge_max: 300000
+      p_charge_max: 500000
+      p_discharge_max: 500000
 
   grid:
     count: 1
@@ -185,7 +185,7 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
     limits:
-      p_max: 300000
+      p_max: 500000
       export_allowed: false
 
   load:

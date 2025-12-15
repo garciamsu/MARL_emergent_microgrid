@@ -118,7 +118,7 @@ def _build_time_ticks(time_steps: np.ndarray, max_ticks: int = 50):
         return time_steps
     
     # Generate ticks every 2 hours (step = 2)
-    step = 2
+    step = 10
     return time_steps[::step]
 
 

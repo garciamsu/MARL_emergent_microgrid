@@ -121,11 +121,11 @@ class DefaultGridReward(RewardFn):
         elif (delta_ph > 0 or soc > 0) and agent.action == 1:
             reward = -self.beta * 1
         elif (delta_ph > 0 or soc > 0) and agent.action == 0:
-            reward = self.nu*1
+            reward = self.nu *1
         else:
-            reward = -0.25
+            reward = 0.25
         
-        #print(f"\n delta_ph {delta_ph} soc {soc} agent.action {agent.action} reward {reward}")
+        print(f"\n delta_ph {delta_ph} soc {soc} agent.action {agent.action} reward {reward}")
         return reward
 
 

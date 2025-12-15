@@ -1,0 +1,2 @@
+episode,n_steps,balance_MEAN,balance_VAR,balance_IAE,balance_ISE,balance_idx_MEAN,balance_idx_VAR,balance_idx_IAE,balance_idx_ISE,Renewable_Penetration_energy,Grid_Penetration_energy,Renewable_Penetration_time,Grid_Penetration_time
+249,239,-70539382.58501185,5.664722316222025e+16,56742904708.05914,1.4671256387026864e+19,0.37656903765690375,0.2357512042473893,90.0,90.0,,5.039755269484114e-06,0.38493723849372385,0.0041841004184100415

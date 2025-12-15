@@ -81,16 +81,16 @@ class DefaultBatteryReward(RewardFn):
             reward = +self.psi * abs(env.delta_ph_norm) * soc_norm
 
         elif delta_ph < 0 and agent.action == 1:
-            reward = -self.beta * abs(env.delta_ph_norm)
+            reward = -self.beta * 1
 
         elif delta_ph < 0 and agent.action == 0:
-            reward = -self.nu * abs(env.delta_ph_norm)
+            reward = -self.nu * 1
 
         elif delta_ph > 0  and agent.action == 1:
-            reward = +self.psi * abs(env.delta_ph_norm) * (1 - soc_norm)
+            reward = +self.psi * 1 * (1 - soc_norm)
 
         elif delta_ph > 0 and agent.action == 2:
-            reward = -self.beta * abs(env.delta_ph_norm)
+            reward = -self.beta * 1
 
         elif delta_ph == 0 and agent.action == 0:
             reward = +self.nu
@@ -113,7 +113,6 @@ class DefaultGridReward(RewardFn):
         delta_ph, soc_idx = state_tuple
         soc = env.soc_state
         reward = 0.0
-
         
         if delta_ph < 0 and soc == 0 and agent.action == 1:
             reward = self.psi * 1

@@ -1,0 +1,256 @@
+# ==============================================================
+# General mode
+# ==============================================================
+
+mode: train        # train | offline
+offline_run: 45  # set run_id if mode=offline
+
+# ==============================================================
+# Offline mode parameters (evaluation / exploitation only)
+# ==============================================================
+
+offline:
+  # Dataset for offline operation (must exist in assets/datasets/)
+  dataset: microgrid_dataset_10d_hourly_demand250.csv
+
+  # Number of episodes in offline mode. Typically 1 long episode
+  # that spans the entire offline dataset.
+  episodes: 1
+
+  # Epsilon used during offline operation (constant schedule).
+  # Should be very small to favor pure exploitation.
+  epsilon: 0.01
+
+# ==============================================================
+# Simulation parameters
+# ==============================================================
+
+simulation:
+  episodes: 1500
+  dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
+  seed: 46          # random seed for reproducibility
+  dataset: training_v1.csv
+  
+  # Episode window size in hours (contiguous random window from dataset)
+  # Each episode uses a random contiguous window of this size
+  # Must be <= dataset length. Default: 48 hours (2 days)
+  episode_window_hours: 48
+
+  # Power unit conversion factor (kW/kWh to W/Wh)
+  # Applied to: solar_power_*, wind_power_*, demand columns
+  # Excludes: price, Datetime columns
+  power_scale_factor: 1000
+
+  # Maximum power value for simulation (design limit / physical constraint)
+  # Used for discretization bins and normalization. Units: W (after scaling)
+  max_power: 300000.0
+
+  # Maximum price value for simulation (design limit / physical constraint)
+  # Used for discretization bins and normalization. Units: EUR/MWh
+  max_price: 200.0
+
+  epsilon:
+    # Exponential decay: drops from 1.0 to 0.001 aggressively
+    # Reaches ε < 0.1 by episode 500 (33%), ε ≈ 0.03 at mid-training (ep 750)
+    # Final episodes have minimal exploration (ε ≈ 0.001) → pure exploitation
+    # This ensures strong exploration early, smooth transition, and stable convergence
+    schedule: exponential    # linear | exponential | constant | custom
+    start: 1
+    end: 0.01            # Very low minimum for pure exploitation at end
+    decay: null             # Auto-calculated to reach 'end' across training
+    values: []              # only for custom
+
+validation:
+  enabled: true
+  episodes: 20
+  epsilon: 0.0
+
+# ==============================================================
+# Discretization parameters
+# ==============================================================
+
+discretization:
+  delta_bins: 3  # Number of bins for delta_ph discretization
+  power_bins: 2  # Number of bins for power discretization
+  price_bins: 2  # Number of bins for price discretization
+  soc_bins: 3    # Number of bins for SOC discretization
+
+# ==============================================================
+# Stability definition
+# ==============================================================
+
+stability:
+  window: 100
+  metric: IAE
+  reference: median50
+  tolerance: 1.10
+
+# ==============================================================
+# I/O and results
+# ==============================================================
+
+io:
+  export: true
+  results_dir: results
+  plots_dir: plots
+  evolution_dir: evolution
+  checkpoints_dir: checkpoints
+  metrics_file: metrics_episode.xlsx
+  export_plots_format: svg
+
+# ==============================================================
+# Metrics to compute
+# ==============================================================
+
+metrics:
+  - IAE
+  - ISE
+  - Var_dif
+  - REP
+  - GEP
+  - Q_norm
+  - Mean_Rewards
+
+# ==============================================================
+# Agents and their configurations
+# ==============================================================
+
+agents:
+
+  solar:
+    count: 1
+    policy:
+      type: tabular_ql
+      alpha: 0.1 # antes 0.15 → ahora más suave y estable
+      gamma: 0.90
+    reward:
+      type: DefaultSolarReward
+      params: {theta: 1, beta: 1, nu: 1, xi: 1}
+    state_space:
+      - {var: delta_ph,         source: env,     bins: auto}
+      - {var: solar_potential,  source: local,   bins: auto}
+    p_max: 1000000
+    efficiency: 0.98
+
+  wind:
+    count: 1
+    policy:
+      type: tabular_ql
+      alpha: 0.1 # antes 0.15 → ahora más suave y estable
+      gamma: 0.90
+    reward:
+      type: DefaultWindReward
+      params: {theta: 1, beta: 1, nu: 1, xi: 1}
+    state_space:
+      - {var: delta_ph,         source: env,     bins: auto}
+      - {var: solar_potential,  source: local,   bins: auto}
+    limits:
+      p_max: 1000000
+      efficiency: 0.95
+
+  battery:
+    count: 1
+    policy:
+      type: tabular_ql
+      alpha: 0.1 # antes 0.15 → ahora más suave y estable
+      gamma: 0.90
+    reward:
+      type: DefaultBatteryReward
+      params: {psi: 1, sigma: 1, nu: 1, beta: 1, xi: 1, mu: 1}
+    state_space:
+      - {var: delta_ph,         source: env,     bins: auto}
+      - {var: soc,              source: local,   bins: auto}
+    limits:
+      capacity_ah: 260000
+      v_nom: 48
+      soc_min: 0.0
+      soc_max: 1.0
+      # Initial SOC is now ALWAYS random per episode (as per mandatory changes)
+      # Random initial SOC sampled from U[initial_soc_min, initial_soc_max]
+      initial_soc_min: 1.0
+      initial_soc_max: 1.0
+      p_charge_max: 500000
+      p_discharge_max: 500000
+
+  grid:
+    count: 1
+    policy:
+      type: tabular_ql
+      alpha: 0.1 # antes 0.15 → ahora más suave y estable
+      gamma: 0.90
+    reward:
+      type: DefaultGridReward
+      params: {psi: 1, beta: 1, nu: 1, xi: 1}
+    state_space:
+      - {var: delta_ph,         source: env,     bins: auto}
+      - {var: soc,              source: local,   bins: auto}
+    limits:
+      p_max: 500000
+      export_allowed: false
+
+  load:
+    count: 1
+    policy:
+      type: tabular_ql
+      alpha: 0.1 # antes 0.15 → ahora más suave y estable
+      gamma: 0.90
+    reward:
+      type: DefaultLoadReward
+      # Reward parameters (hyperparameters for dynamic reward modulation):
+      #   sigma: Scale factor for CORRECT behavior reward
+      #          - OFF when price > comfort_threshold (demand response)
+      #          - ON when internal energy available (renewable/battery)
+      #   psi: Scale factor for INCORRECT behavior penalty (higher to emphasize)
+      #        - ON when price > comfort_threshold (ignoring price signal)
+      #   nu: Scale factor for MISSED OPPORTUNITY penalty
+      #       - OFF when internal energy available and price acceptable
+      #   beta: Neutral/small reward for acceptable import from grid
+      #         - ON when price <= comfort_threshold but no internal energy
+      # 
+      # Dynamic modulation: All rewards are scaled by economic_signal
+      # economic_signal = (base_demand / demand_max) × (price / price_max)
+      # This reflects the instantaneous economic impact of the decision
+      params: {sigma: 1, psi: 1, nu: 1, beta: 1}
+    state_space:
+      - {var: pu_power,   source: env,     bins: auto}
+      - {var: cm,         source: local,   bins: auto}
+    limits:
+      # p_load: Controllable load power (W) - AFTER power_scale_factor applied
+      # This is the amount of demand that can be shed when action=0.
+      # When action=1 (ON):  effective_demand = dataset_demand
+      # When action=0 (OFF): effective_demand = dataset_demand - p_load
+      #
+      # IMPORTANT: Must be LESS than minimum demand in dataset to avoid negative demand.
+      # Dataset demand range (after scaling): 2431 W (min) to 13599 W (max), avg 8339 W
+      # Current value: 2000 W represents 24% of average demand
+      # This value is safe (< min_demand) and provides meaningful load control
+      # Alternative: 2187 W (90% of min_demand) for maximum controllable load
+      p_load: 4000
+
+      # comfort_threshold: Maximum acceptable electricity price (EUR/MWh)
+      # MANDATORY condition for load to turn OFF - price must exceed this threshold
+      # Used in reward function to determine if price is "expensive"
+      #
+      # Dataset price range: 0.01 to 45.68 EUR/MWh, avg 21.01 EUR/MWh
+      # Price distribution: p25=15, p50=21, p67=25, p75=27, p90=32 EUR/MWh
+      # Current value: 21 EUR/MWh → Median-based threshold (50% cheap, 50% expensive)
+      #
+      # DECISION LOGIC (Demand-Side Management):
+      # 1. IF price > comfort_threshold AND (grid importing OR no internal energy):
+      #    → Load turns OFF (demand response to high price)
+      # 2. IF price <= comfort_threshold:
+      #    → Load stays ON (user willing to pay acceptable price)
+      # 3. Internal energy = (soc_idx > 0) OR (renewable_idx > demand_idx)
+      #    → Battery ≥20% SOC OR renewable surplus available
+      #
+      # REWARD MODULATION:
+      # - All rewards scaled by: (base_demand/demand_max) × (price/price_max)
+      # - Reflects instantaneous economic impact (cost or savings)
+      # - Enables emergent coordination with battery and grid agents
+      comfort_threshold: 50
+      
+      # soc_threshold_idx: Minimum SOC index to consider battery energy "available"
+      # With 5 SOC bins: 0=[0-20%], 1=[20-40%], 2=[40-60%], 3=[60-80%], 4=[80-100%]
+      # Current: 0 → Battery considered available if SOC ≥ 20% (permissive)
+      # This encourages using battery energy before importing from grid
+      soc_threshold_idx: 0

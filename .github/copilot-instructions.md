@@ -77,6 +77,62 @@ Las respuestas generadas por GitHub Copilot u otros agentes de IA para este repo
 - Pipeline completo y análisis: `analysis_tools/run_full_pipeline.py` y scripts individuales en `analysis_tools/`.
 - Tests de humo con pytest (cuando existan): `pytest -q` o `python -m pytest -k smoke -q` desde la raíz del repositorio.
 
+## Análisis de Estabilidad MARL (Nuevo)
+
+El repositorio ahora incluye herramientas de análisis de estabilidad para sistemas MARL distribuidos:
+
+### Módulos de Análisis de Estabilidad
+
+- `analysis_tools/stability_analysis.py`: Clases analizadoras para estudios de estabilidad (Bellman y Consenso).
+- `analysis_tools/collect_qtables_per_episode.py`: Recolecta snapshots de Q-tables por episodio durante el entrenamiento.
+- `analysis_tools/run_stability_analysis.py`: Ejecuta ambos análisis de estabilidad sobre datos recolectados.
+- `analysis_tools/test_stability_analysis.py`: Suite de validación con datos sintéticos.
+
+### Dos Estudios de Estabilidad
+
+**1. Estabilidad por Contracción de Bellman:**
+- Métrica: `ΔV(k) = max_i || V_i(k+1) - V_i(k) ||_∞`
+- Mide convergencia de funciones de valor entre episodios consecutivos.
+- `ΔV → 0` indica aprendizaje estable y convergencia.
+
+**2. Estabilidad por Consenso Distribuido:**
+- Métrica: `D(k) = (1/N) * Σ_i || V_i(k) - V_avg(k) ||_2`
+- Mide consenso entre agentes respecto a la representación de valor promedio.
+- `D → 0` indica consenso distribuido y coordinación emergente.
+
+### Flujo de Uso
+
+```bash
+# 1. Recolectar Q-tables por episodio
+python analysis_tools/collect_qtables_per_episode.py
+
+# 2. Ejecutar análisis de estabilidad
+python analysis_tools/run_stability_analysis.py
+
+# 3. Validar implementación (opcional)
+python analysis_tools/test_stability_analysis.py
+```
+
+### Salidas
+
+- `results/stability/qtables_per_episode.npz`: Historial de Q-tables comprimido.
+- `results/stability/bellman_contraction_stability.csv` y `.png`: Métricas y gráfico de contracción.
+- `results/stability/consensus_stability.csv` y `.png`: Métricas y gráfico de consenso.
+
+### Documentación
+
+- **Guía completa**: `docs/STABILITY_ANALYSIS.md` (fundamentos teóricos, interpretación, uso avanzado).
+- **Referencia rápida**: `docs/STABILITY_ANALYSIS_QUICK_REF.md` (comandos, umbrales, troubleshooting).
+- **Integración en pipeline**: Ver `analysis_tools/README.md` sección "Análisis de Estabilidad".
+
+### Características Clave
+
+- **No modifica código existente**: Scripts autocontenidos que no alteran agentes, recompensas ni entrenamiento.
+- **Análisis post-hoc**: Opera sobre datos recolectados; no interfiere con el bucle de entrenamiento.
+- **Validación teórica**: Métricas alineadas con teoría de programación dinámica distribuida y sistemas emergentes.
+- **Manejo robusto de heterogeneidad**: Soporta Q-tables de tamaños variables entre agentes y episodios (padding automático).
+- **Interpretación clara**: Umbrales y guías de interpretación incluidos en documentación y plots.
+
 ## Cómo Extender de Forma Segura
 
 - Al añadir funcionalidades, prioriza:

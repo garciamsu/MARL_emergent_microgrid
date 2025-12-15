@@ -11,7 +11,7 @@ offline_run: 45  # set run_id if mode=offline
 
 offline:
   # Dataset for offline operation (must exist in assets/datasets/)
-  dataset: microgrid_dataset_10d_hourly_demand250.csv
+  dataset: training_v1.csv
 
   # Number of episodes in offline mode. Typically 1 long episode
   # that spans the entire offline dataset.
@@ -19,22 +19,22 @@ offline:
 
   # Epsilon used during offline operation (constant schedule).
   # Should be very small to favor pure exploitation.
-  epsilon: 0.01
+  epsilon: 1
 
 # ==============================================================
 # Simulation parameters
 # ==============================================================
 
 simulation:
-  episodes: 150
+  episodes: 1500
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
-  seed: 42          # random seed for reproducibility
-  dataset: microgrid_dataset_10d_hourly_demand250.csv
+  seed: 48          # random seed for reproducibility
+  dataset: training_v1.csv
   
   # Episode window size in hours (contiguous random window from dataset)
   # Each episode uses a random contiguous window of this size
   # Must be <= dataset length. Default: 48 hours (2 days)
-  episode_window_hours: 239
+  episode_window_hours: 48
 
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
@@ -54,9 +54,9 @@ simulation:
     # Reaches ε < 0.1 by episode 500 (33%), ε ≈ 0.03 at mid-training (ep 750)
     # Final episodes have minimal exploration (ε ≈ 0.001) → pure exploitation
     # This ensures strong exploration early, smooth transition, and stable convergence
-    schedule: linear    # linear | exponential | constant | custom
-    start: 1
-    end: 0.01            # Very low minimum for pure exploitation at end
+    schedule: exponential    # linear | exponential | constant | custom
+    start: 1.0
+    end: 0.01              # Very low minimum for pure exploitation at end
     decay: null             # Auto-calculated to reach 'end' across training
     values: []              # only for custom
 
@@ -121,23 +121,23 @@ agents:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.1 # antes 0.15 → ahora más suave y estable
-      gamma: 0.90
+      alpha: 0.15 # antes 0.15 → ahora más suave y estable
+      gamma: 0.95
     reward:
       type: DefaultSolarReward
       params: {theta: 1, beta: 1, nu: 1, xi: 1}
     state_space:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: solar_potential,  source: local,   bins: auto}
-    p_max: 1000000
+    p_max: 300000
     efficiency: 0.98
 
   wind:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
-      alpha: 0.1 # antes 0.15 → ahora más suave y estable
-      gamma: 0.90
+      alpha: 0.15 # antes 0.15 → ahora más suave y estable
+      gamma: 0.95
     reward:
       type: DefaultWindReward
       params: {theta: 1, beta: 1, nu: 1, xi: 1}
@@ -145,15 +145,15 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: solar_potential,  source: local,   bins: auto}
     limits:
-      p_max: 1000000
+      p_max: 300000
       efficiency: 0.95
 
   battery:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.1 # antes 0.15 → ahora más suave y estable
-      gamma: 0.90
+      alpha: 0.15 # antes 0.15 → ahora más suave y estable
+      gamma: 0.95
     reward:
       type: DefaultBatteryReward
       params: {psi: 1, sigma: 1, nu: 1, beta: 1, xi: 1, mu: 1}
@@ -161,23 +161,23 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
     limits:
-      capacity_ah: 260000
+      capacity_ah: 8800
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
       # Initial SOC is now ALWAYS random per episode (as per mandatory changes)
       # Random initial SOC sampled from U[initial_soc_min, initial_soc_max]
-      initial_soc_min: 1.0
+      initial_soc_min: 0.0
       initial_soc_max: 1.0
-      p_charge_max: 500000
-      p_discharge_max: 500000
+      p_charge_max: 300000
+      p_discharge_max: 300000
 
   grid:
     count: 1
     policy:
       type: tabular_ql
-      alpha: 0.1 # antes 0.15 → ahora más suave y estable
-      gamma: 0.90
+      alpha: 0.15 # antes 0.15 → ahora más suave y estable
+      gamma: 0.95
     reward:
       type: DefaultGridReward
       params: {psi: 1, beta: 1, nu: 1, xi: 1}
@@ -185,15 +185,15 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
     limits:
-      p_max: 500000
+      p_max: 300000
       export_allowed: false
 
   load:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
-      alpha: 0.1 # antes 0.15 → ahora más suave y estable
-      gamma: 0.90
+      alpha: 0.15  # Learning rate: 0.15 para convergencia suave y estable
+      gamma: 0.95 # Discount factor: 0.95 valora fuertemente recompensas futuras
     reward:
       type: DefaultLoadReward
       # Reward parameters (hyperparameters for dynamic reward modulation):
@@ -225,7 +225,7 @@ agents:
       # Current value: 2000 W represents 24% of average demand
       # This value is safe (< min_demand) and provides meaningful load control
       # Alternative: 2187 W (90% of min_demand) for maximum controllable load
-      p_load: 50000
+      p_load: 4000
 
       # comfort_threshold: Maximum acceptable electricity price (EUR/MWh)
       # MANDATORY condition for load to turn OFF - price must exceed this threshold
@@ -247,7 +247,7 @@ agents:
       # - All rewards scaled by: (base_demand/demand_max) × (price/price_max)
       # - Reflects instantaneous economic impact (cost or savings)
       # - Enables emergent coordination with battery and grid agents
-      comfort_threshold: 1.25
+      comfort_threshold: 50
       
       # soc_threshold_idx: Minimum SOC index to consider battery energy "available"
       # With 5 SOC bins: 0=[0-20%], 1=[20-40%], 2=[40-60%], 3=[60-80%], 4=[80-100%]

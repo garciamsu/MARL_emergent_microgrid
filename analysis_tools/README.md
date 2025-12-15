@@ -33,7 +33,11 @@ analysis_tools/
 ├── C_collect_episodes.py          # 📦 Consolidar episodios en un CSV agregado
 ├── D_compute_metrics.py           # 📊 Calcular métricas con PASS/FAIL
 ├── E_accumulated_reward.py        # 📈 Análisis completo de rewards + validación + visualización
-└── E_graph_episode.py             # 📉 Generar visualizaciones clave
+├── E_graph_episode.py             # 📉 Generar visualizaciones clave
+│
+├── stability_analysis.py          # 🔬 Analizadores de estabilidad MARL (Bellman + Consenso)
+├── collect_qtables_per_episode.py # 📸 Recolección de Q-tables por episodio
+└── run_stability_analysis.py      # 📊 Ejecutar análisis de estabilidad completo
 ```
 
 ---
@@ -401,12 +405,59 @@ El curtailment (energía renovable no aprovechada) se maneja mediante acciones d
 
 ---
 
+## � Análisis de Estabilidad (Nuevo)
+
+### **Análisis de Estabilidad para Sistemas MARL Distribuidos**
+
+Dos estudios independientes para validar convergencia y consenso:
+
+#### **1. Estabilidad por Contracción de Bellman**
+
+Mide convergencia de funciones de valor entre episodios consecutivos:
+
+```bash
+# Paso 1: Recolectar Q-tables por episodio
+python analysis_tools/collect_qtables_per_episode.py
+
+# Paso 2: Ejecutar análisis de estabilidad
+python analysis_tools/run_stability_analysis.py
+```
+
+**Métrica:** `ΔV(k) = max_i || V_i(k+1) - V_i(k) ||_∞`
+
+**Interpretación:**
+- ✅ `ΔV → 0`: Convergencia estable
+- ⚠️ `ΔV oscila`: Inestabilidad
+- ❌ `ΔV diverge`: No converge
+
+#### **2. Estabilidad por Consenso Distribuido**
+
+Mide consenso entre agentes:
+
+**Métrica:** `D(k) = (1/N) * Σ_i || V_i(k) - V_avg(k) ||_2`
+
+**Interpretación:**
+- ✅ `D → 0`: Consenso logrado
+- ⚠️ `D > 0 persistente`: Falta de coordinación
+- ❌ `D diverge`: Inestabilidad del sistema
+
+**Archivos de Salida:**
+- `results/stability/bellman_contraction_stability.csv`
+- `results/stability/bellman_contraction_stability.png`
+- `results/stability/consensus_stability.csv`
+- `results/stability/consensus_stability.png`
+
+**Documentación detallada:** Ver [docs/STABILITY_ANALYSIS.md](../docs/STABILITY_ANALYSIS.md) y [docs/STABILITY_ANALYSIS_QUICK_REF.md](../docs/STABILITY_ANALYSIS_QUICK_REF.md)
+
+---
+
 ## 📖 Referencias y Archivos Clave
 
 - **Simulación**: `core/simulation.py`, `core/environment.py`
 - **Agentes**: `agents/base_agent.py`, `agents/*_agent.py`
 - **Políticas**: `core/policies.py`, `core/rewards.py`
 - **Config**: `configs/default.yaml`, `configs/loader.py`
+- **Análisis de Estabilidad**: `analysis_tools/stability_analysis.py`, `docs/STABILITY_ANALYSIS.md`
 - **Instrucciones generales**: `.github/copilot-instructions.md`
 
 ---

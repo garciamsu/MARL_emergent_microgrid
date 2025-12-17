@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 from utils.discretization import digitize_clip
+from core.csv_handler import read_dataset_csv
 
 
 class MultiAgentEnv:
@@ -148,7 +149,7 @@ class MultiAgentEnv:
         Scaling is applied to columns containing 'power' or matching 'demand'.
         """
         file_path = os.path.join(os.getcwd(), "assets", "datasets", filename)
-        df = pd.read_csv(file_path, sep="[;,]", engine="python", decimal=".")
+        df = read_dataset_csv(file_path)
 
         # Scale power values from kW/kWh to Watts using configured factor
         for col in df.columns:

@@ -6,6 +6,12 @@ import numpy as np
 import glob
 import chardet
 import matplotlib.patches as mpatches # <-- Importado para la leyenda del Panel 6
+import sys
+from pathlib import Path
+
+# Add root to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from core.csv_handler import read_result_csv
 
 
 # --- CONFIGURACIÓN PRINCIPAL ---
@@ -263,39 +269,13 @@ def plot_episode_dynamics(base_dir, episode_num, config):
 
 def read_csv_auto(file_path):
     """
-    Lee un archivo CSV detectando automáticamente:
-      - El encoding (UTF-8, ISO-8859-1, Windows-1252, etc.)
-      - El separador (',' o ';')
-    Devuelve un DataFrame de pandas.
+    Lee un archivo CSV usando el formato estandarizado de la aplicación.
+    Usa read_result_csv() para mantener consistencia en decimales y separadores.
     """
-
     try:
-        with open(file_path, 'rb') as f:
-            raw_data = f.read(5000)
-            detected = chardet.detect(raw_data)
-            encoding = detected['encoding'] or 'utf-8'
-
-        with open(file_path, 'r', encoding=encoding, errors='replace') as f:
-            first_line = f.readline()
-
-        if ';' in first_line and ',' not in first_line:
-            sep = ';'
-        elif ',' in first_line and ';' not in first_line:
-            sep = ','
-        else:
-            try:
-                df = pd.read_csv(file_path, sep=';', encoding=encoding, on_bad_lines='skip')
-                if df.shape[1] > 1:
-                    print(f"✅ Archivo leído con separador ';' y codificación '{encoding}'")
-                    return df
-            except Exception:
-                pass
-            sep = ',' 
-
-        df = pd.read_csv(file_path, sep=sep, encoding=encoding, on_bad_lines='skip')
-        print(f"✅ Archivo leído correctamente con separador '{sep}' y codificación '{encoding}'")
+        df = read_result_csv(file_path)
+        print(f"✅ Archivo leído correctamente con formato estandarizado")
         return df
-
     except Exception as e:
         print(f"❌ Error al leer CSV: {e}")
         return None

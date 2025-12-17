@@ -25,6 +25,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from configs.loader import load_config
+from core.csv_handler import read_result_csv, write_result_csv
 
 
 def _find_latest_episode_file(pattern: str = "results/evolution/episode_*.csv") -> tuple[str, int]:
@@ -148,30 +149,30 @@ def _format_table(metrics_row: dict) -> pd.DataFrame:
 def main():
     """Punto de entrada principal."""
     print("=" * 80)
-    print("📊 D_compute_metrics.py - Métricas del último episodio")
+    print("[D] D_compute_metrics.py - Metricas del ultimo episodio")
     print("=" * 80)
 
     # Cargar configuración (por si se requiere en el futuro)
     try:
         _ = load_config()
     except Exception as exc:
-        print(f"\n⚠️ Advertencia al cargar configuración (no bloqueante): {exc}")
+        print(f"\n[WARN] Advertencia al cargar configuracion (no bloqueante): {exc}")
 
     # Localizar último episodio
     latest_path, ep_num = _find_latest_episode_file()
     if not latest_path or ep_num < 0:
-        print("\n❌ No se encontraron episodios en results/evolution/.")
+        print("\n[ERROR] No se encontraron episodios en results/evolution/.")
         print("   Ejecuta primero analysis_tools/B_run_training.py o main.py")
         sys.exit(1)
 
-    print(f"\n🗂️  Usando episodio más reciente: episode_{ep_num}.csv")
-    print(f"    Ruta: {latest_path}")
+    print(f"\n[INFO] Usando episodio mas reciente: episode_{ep_num}.csv")
+    print(f"       Ruta: {latest_path}")
 
     # Cargar episodio
     try:
-        episode_df = pd.read_csv(latest_path)
+        episode_df = read_result_csv(latest_path)
     except Exception as exc:
-        print(f"\n❌ Error leyendo {latest_path}: {exc}")
+        print(f"\n[ERROR] Error leyendo {latest_path}: {exc}")
         sys.exit(1)
 
     # Métricas de balance (continuo e índice)
@@ -212,10 +213,10 @@ def main():
     out_dir = Path("results/metrics")
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"metrics_episode_{ep_num}.csv"
-    pd.DataFrame([metrics_row]).to_csv(out_path, index=False)
+    write_result_csv(pd.DataFrame([metrics_row]), out_path)
 
     print("\n" + "=" * 80)
-    print("✅ Cálculo de métricas completado y guardado.")
+    print("[OK] Calculo de metricas completado y guardado.")
     print(f"   Archivo: {out_path}")
     print("=" * 80)
 

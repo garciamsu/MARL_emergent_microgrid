@@ -26,20 +26,20 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 1500
+  episodes: 200        # number of training episodes
   dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
   seed: 48          # random seed for reproducibility
-  dataset: training_v1.csv
+  dataset: microgrid_dataset_8d_hourly_comparative_quantite.csv
   
   # Episode window size in hours (contiguous random window from dataset)
   # Each episode uses a random contiguous window of this size
   # Must be <= dataset length. Default: 48 hours (2 days)
-  episode_window_hours: 48
+  episode_window_hours: 191
 
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
   # Excludes: price, Datetime columns
-  power_scale_factor: 1000
+  power_scale_factor: 1
 
   # Maximum power value for simulation (design limit / physical constraint)
   # Used for discretization bins and normalization. Units: W (after scaling)
@@ -54,9 +54,9 @@ simulation:
     # Reaches ε < 0.1 by episode 500 (33%), ε ≈ 0.03 at mid-training (ep 750)
     # Final episodes have minimal exploration (ε ≈ 0.001) → pure exploitation
     # This ensures strong exploration early, smooth transition, and stable convergence
-    schedule: exponential    # linear | exponential | constant | custom
+    schedule: linear    # linear | exponential | constant | custom
     start: 1.0
-    end: 0.01              # Very low minimum for pure exploitation at end
+    end: 0.0              # Very low minimum for pure exploitation at end
     decay: null             # Auto-calculated to reach 'end' across training
     values: []              # only for custom
 
@@ -133,7 +133,7 @@ agents:
     efficiency: 0.98
 
   wind:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15 # antes 0.15 → ahora más suave y estable
@@ -161,19 +161,19 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
     limits:
-      capacity_ah: 8800
+      capacity_ah: 880
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
       # Initial SOC is now ALWAYS random per episode (as per mandatory changes)
       # Random initial SOC sampled from U[initial_soc_min, initial_soc_max]
-      initial_soc_min: 0.0
+      initial_soc_min: 1.0
       initial_soc_max: 1.0
       p_charge_max: 300000
       p_discharge_max: 300000
 
   grid:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15 # antes 0.15 → ahora más suave y estable
@@ -189,7 +189,7 @@ agents:
       export_allowed: false
 
   load:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15  # Learning rate: 0.15 para convergencia suave y estable
@@ -225,7 +225,7 @@ agents:
       # Current value: 2000 W represents 24% of average demand
       # This value is safe (< min_demand) and provides meaningful load control
       # Alternative: 2187 W (90% of min_demand) for maximum controllable load
-      p_load: 4000
+      p_load: 250
 
       # comfort_threshold: Maximum acceptable electricity price (EUR/MWh)
       # MANDATORY condition for load to turn OFF - price must exceed this threshold

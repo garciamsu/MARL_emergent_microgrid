@@ -5,6 +5,11 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import pandas as pd
 import numpy as np
+import sys
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from core.csv_handler import read_result_csv
 
 
 def clear_directories(short: bool = True) -> Dict[str, List[str]]:
@@ -125,7 +130,7 @@ def load_episode_csvs(
     dfs = []
     for f in files:
         try:
-            df = pd.read_csv(f)
+            df = read_result_csv(f)
             dfs.append(df)
         except Exception as e:
             print(f"⚠️  No se pudo cargar {f}: {e}")
@@ -161,7 +166,7 @@ def load_all_episodes_metrics(
         ep_num = int(ep_match.group(1))
         
         try:
-            df = pd.read_csv(file_path)
+            df = read_result_csv(file_path)
         except Exception as e:
             print(f"⚠️  Error cargando {file_path}: {e}")
             continue

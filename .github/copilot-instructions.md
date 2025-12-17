@@ -133,12 +133,44 @@ python analysis_tools/test_stability_analysis.py
 - **Manejo robusto de heterogeneidad**: Soporta Q-tables de tamaños variables entre agentes y episodios (padding automático).
 - **Interpretación clara**: Umbrales y guías de interpretación incluidos en documentación y plots.
 
+## Manejo de CSV y Formato de Datos
+
+El proyecto utiliza un sistema **estandarizado** para el manejo de archivos CSV que previene conflictos con símbolos decimales:
+
+### Formato Estandarizado
+- **INPUT (datasets)**: Formato europeo - `sep=';'`, `decimal=','`
+  - Ubicación: `assets/datasets/*.csv`
+  - Función: `read_dataset_csv()` de `core/csv_handler.py`
+- **OUTPUT (results)**: Formato internacional - `sep=','`, `decimal='.'`
+  - Ubicación: `results/**/*.csv`
+  - Funciones: `write_result_csv()` y `read_result_csv()` de `core/csv_handler.py`
+
+### Reglas Obligatorias
+1. **NUNCA** usar `pd.read_csv()` o `.to_csv()` directamente en código de producción
+2. **SIEMPRE** usar las funciones del módulo `core/csv_handler.py`:
+   - `read_dataset_csv()` - para leer datasets de entrada
+   - `read_result_csv()` - para leer archivos de resultados
+   - `write_result_csv()` - para escribir archivos de resultados
+3. **VALIDAR** cambios ejecutando: `python scripts/validate_csv_consistency.py`
+
+### Archivos Actualizados (No Modificar sin Justificación)
+Los siguientes archivos ya usan el formato estandarizado:
+- `core/environment.py`, `core/simulation.py`
+- `analysis_tools/A_data_check.py`, `C_collect_episodes.py`, `D_compute_metrics.py`, `E_accumulated_reward.py`, `E_graph_episode.py`, `utils.py`, `stability_analysis.py`
+- `scripts/hyperparameter_search.py`, `validate_load_agent.py`
+
+### Documentación
+- **Guía completa**: `docs/CSV_FORMAT_STANDARDIZATION.md`
+- **Resumen de cambios**: `docs/CSV_STANDARDIZATION_SUMMARY.md`
+- **Validación**: `scripts/validate_csv_consistency.py`
+
 ## Cómo Extender de Forma Segura
 
 - Al añadir funcionalidades, prioriza:
   - Nuevos campos de configuración en `configs/default.yaml`.
   - Helpers pequeños y enfocados en `core/utils.py`, `utils/discretization.py` o `analysis_tools/utils.py`.
   - Reutilizar el sistema de logging y las utilidades de limpieza existentes en lugar de scripts ad‑hoc.
+  - **Usar siempre `core/csv_handler.py`** para leer/escribir CSVs (ver sección anterior).
 - Evita romper la compatibilidad hacia atrás de los formatos de CSV/log; los scripts de `analysis_tools/` dependen de su esquema actual.
 
 Si alguna asunción arquitectónica no es evidente (flujo de recompensas, manejo de datasets o registro de agentes), revisa en conjunto `core/environment.py`, `core/rewards.py` y el paquete `agents/` antes de hacer refactors grandes.

@@ -27,8 +27,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
-import os
+from typing import Dict, List, Tuple, Anyimport sys
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from core.csv_handler import write_result_csvimport os
 
 
 class BellmanContractionStabilityAnalyzer:
@@ -171,7 +173,7 @@ class BellmanContractionStabilityAnalyzer:
             "delta_v": self.delta_v_per_episode
         })
         
-        df.to_csv(output_path, index=False)
+        write_result_csv(df, output_path)
         print(f"✅ Bellman contraction stability metrics saved to {output_path}")
         
         return output_path
@@ -411,7 +413,7 @@ class ConsensusStabilityAnalyzer:
             "consensus_deviation": self.consensus_deviation_per_episode
         })
         
-        df.to_csv(output_path, index=False)
+        write_result_csv(df, output_path)
         print(f"✅ Consensus stability metrics saved to {output_path}")
         
         return output_path

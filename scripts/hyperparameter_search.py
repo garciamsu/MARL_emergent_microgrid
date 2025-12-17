@@ -36,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.simulation import run_training
 from configs.loader import load_config
 from core.utils import set_global_seed
+from core.csv_handler import read_result_csv, write_result_csv
 
 
 class HyperparameterSearcher:
@@ -156,7 +157,7 @@ class HyperparameterSearcher:
             Dictionary with imbalance metrics
         """
         try:
-            df = pd.read_csv(evolution_file)
+            df = read_result_csv(evolution_file)
             
             if 'env_energy_balance' not in df.columns:
                 return {
@@ -382,7 +383,7 @@ class HyperparameterSearcher:
             if idx % 10 == 0 or idx == total_experiments:
                 df_results = pd.DataFrame(results)
                 interim_file = self.run_dir / "results_interim.csv"
-                df_results.to_csv(interim_file, index=False)
+                write_result_csv(df_results, interim_file)
                 print(f"\n💾 Saved interim results ({idx}/{total_experiments} experiments)")
         
         # Create final results DataFrame
@@ -390,7 +391,7 @@ class HyperparameterSearcher:
         
         # Save final results
         final_file = self.run_dir / "results_final.csv"
-        df_results.to_csv(final_file, index=False)
+        write_result_csv(df_results, final_file)
         
         print(f"\n{'='*80}")
         print(f"✅ Search Completed")

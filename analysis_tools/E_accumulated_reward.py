@@ -41,7 +41,14 @@ import sys
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+# Ensure UTF-8 output for Windows consoles
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 from configs.loader import load_config
+from core.csv_handler import read_result_csv, write_result_csv
 
 
 # --- PLOT CONFIGURATION ---
@@ -85,7 +92,7 @@ def load_episode_rewards(rewards_file: str = "results/logs/episode_rewards.csv")
         print("Please run training first to generate episode_rewards.csv")
         return None
     
-    df = pd.read_csv(rewards_file)
+    df = read_result_csv(rewards_file)
     print(f"✅ Loaded episode rewards: {len(df)} episodes")
     
     # Validate structure
@@ -193,7 +200,7 @@ def verify_episode_rewards(df: pd.DataFrame, sample_size: int = 8, verbose: bool
             continue
         
         # Load episode evolution data
-        ep_df = pd.read_csv(ep_file)
+        ep_df = read_result_csv(ep_file)
         
         # Find reward columns
         reward_cols = [col for col in ep_df.columns if col.startswith('reward_')]

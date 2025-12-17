@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from configs.loader import load_config
+from core.csv_handler import read_dataset_csv, read_result_csv
 
 
 def validate_dataset(dataset_path: str) -> bool:
@@ -34,7 +35,7 @@ def validate_dataset(dataset_path: str) -> bool:
         return False
     
     try:
-        df = pd.read_csv(dataset_path, sep="[;,]", engine="python", decimal=".")
+        df = read_dataset_csv(dataset_path)
     except Exception as e:
         print(f"❌ ERROR leyendo dataset: {e}")
         return False
@@ -104,7 +105,7 @@ def validate_evolution_columns(pattern: str = "results/evolution/episode_*.csv")
     # Validar primer episodio
     sample_file = files[0]
     try:
-        df = pd.read_csv(sample_file)
+        df = read_result_csv(sample_file)
     except Exception as e:
         print(f"❌ ERROR leyendo {sample_file}: {e}")
         return False
@@ -134,12 +135,13 @@ def validate_evolution_columns(pattern: str = "results/evolution/episode_*.csv")
     
     print(f"✅ Episodios válidos con columnas requeridas.")
     
-    # Verificar que env_demand_power > 0 siempre
-    zero_demand = (df["env_demand_power"] == 0).sum()
+    # Verificar que env_demand_power > 0 siempre (excluyendo step=-1, que es el estado inicial)
+    df_active = df[df["step"] >= 0]  # Excluir estado inicial (step=-1)
+    zero_demand = (df_active["env_demand_power"] == 0).sum()
     if zero_demand > 0:
-        print(f"⚠️  ADVERTENCIA: {zero_demand} filas con env_demand_power = 0 en {sample_file}")
+        print(f"⚠️  ADVERTENCIA: {zero_demand} filas con env_demand_power = 0 en pasos activos (muestra: {sample_file})")
     else:
-        print(f"✅ env_demand_power > 0 en todas las filas (muestra: {sample_file})")
+        print(f"✅ env_demand_power > 0 en todas las filas de pasos activos (muestra: {sample_file})")
     
     return True
 

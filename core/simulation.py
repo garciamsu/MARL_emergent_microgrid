@@ -30,6 +30,7 @@ from core.utils import (
     load_q_tables,
 )
 from utils.discretization import digitize_clip, discretize_ternary
+from core.csv_handler import write_result_csv
 
 
 def make_epsilon_scheduler(cfg: dict, episodes: int):
@@ -192,16 +193,18 @@ def run_training(config):
             start = 0
         else:
             # Training: random contiguous window for each episode
-            if full_dataset_length >= episode_window_hours:
+            if full_dataset_length > episode_window_hours:
                 start = np.random.randint(0, full_dataset_length - episode_window_hours)
                 episode_data = env.full_dataset.iloc[start:start + episode_window_hours].copy()
             else:
-                # Fallback: if dataset is shorter than configured window, use full dataset
+                # Fallback: if dataset is shorter or equal to configured window, use full dataset
                 episode_data = env.full_dataset.copy()
-                logger.warning(
-                    "Dataset shorter than configured window (%d hours). Using full dataset for episode %d.",
-                    episode_window_hours, episode
-                )
+                start = 0
+                if full_dataset_length < episode_window_hours:
+                    logger.warning(
+                        "Dataset shorter than configured window (%d vs %d hours). Using full dataset for episode %d.",
+                        full_dataset_length, episode_window_hours, episode
+                    )
         
         # ==============================================
         # 2. Generate random initial SOC for battery
@@ -494,12 +497,11 @@ def run_training(config):
 
         if is_offline and offline_run is not None:
             # Offline evaluation: write a dedicated CSV under results/evolution/offline
-            os.makedirs("results/evolution/offline", exist_ok=True)
             offline_path = f"results/evolution/offline/episode_offline_{offline_run}.csv"
-            episode_df.to_csv(offline_path, index=False)
+            write_result_csv(episode_df, offline_path)
         else:
             # Training: keep existing naming convention used by analysis_tools
-            episode_df.to_csv(f"results/evolution/episode_{episode}.csv", index=False)
+            write_result_csv(episode_df, f"results/evolution/episode_{episode}.csv")
         results.append(episode_df)
         
         # 8. Store episode reward for each agent
@@ -561,7 +563,7 @@ def run_training(config):
     rewards_csv_path = "results/logs/episode_rewards.csv"
     rewards_excel_path = "results/logs/episode_rewards.xlsx"
     
-    episode_rewards_df.to_csv(rewards_csv_path, index=False)
+    write_result_csv(episode_rewards_df, rewards_csv_path)
     
     # Calculate statistics for Excel
     rewards_stats = episode_rewards_df.drop('episode', axis=1).describe()

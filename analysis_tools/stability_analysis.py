@@ -23,14 +23,18 @@ These metrics provide empirical validation of theoretical convergence
 guarantees in multi-agent settings.
 """
 
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from pathlib import Path
-from typing import Dict, List, Tuple, Anyimport sys
 
+# Add project root to path for standalone execution
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from core.csv_handler import write_result_csvimport os
+
+from core.csv_handler import write_result_csv
 
 
 class BellmanContractionStabilityAnalyzer:

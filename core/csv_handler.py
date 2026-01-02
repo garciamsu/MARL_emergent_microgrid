@@ -30,8 +30,8 @@ class CSVConfig:
     INPUT_ENCODING = "utf-8"     # Encoding for input files
     
     # Output configuration (writing results)
-    OUTPUT_SEP = ","            # Column separator for output files (standard CSV)
-    OUTPUT_DECIMAL = "."         # Decimal separator for output files (international)
+    OUTPUT_SEP = ";"            # Column separator for output files (standard CSV)
+    OUTPUT_DECIMAL = ","         # Decimal separator for output files (international)
     OUTPUT_ENCODING = "utf-8"    # Encoding for output files
     OUTPUT_FLOAT_FORMAT = "%.6f" # Float precision for output files
     

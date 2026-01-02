@@ -2,8 +2,8 @@
 # General mode
 # ==============================================================
 
-mode: offline         # train | offline
-offline_run: 46      # set run_id if mode=offline
+mode: train          # train | offline
+offline_run: 45      # set run_id if mode=offline
 
 # ==============================================================
 # Offline mode parameters (evaluation / exploitation only)
@@ -26,7 +26,7 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 1500            # number of training episodes
+  episodes: 1000            # number of training episodes
   dt_h: 1.0                 # step size in hours (must divide 1.0 exactly)
   seed: 46                  # random seed for reproducibility
   dataset: training_v1.csv  # Dataset file located in assets/datasets/
@@ -129,13 +129,13 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
     limits:
-      capacity_ah: 880
+      capacity_ah: 20000
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
       # Initial SOC is now ALWAYS random per episode (as per mandatory changes)
       # Random initial SOC sampled from U[initial_soc_min, initial_soc_max]
-      initial_soc_min: 1.0
+      initial_soc_min: 0.0
       initial_soc_max: 1.0
       p_charge_max: 300000
       p_discharge_max: 300000

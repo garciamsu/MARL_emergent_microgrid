@@ -91,7 +91,7 @@ io:
 agents:
 
   solar:
-    count: 1
+    count: 0
     policy:
       type: tabular_ql
       alpha: 0.15 # antes 0.15 → ahora más suave y estable
@@ -104,7 +104,7 @@ agents:
       - {var: solar_potential,  source: local,   bins: auto}
 
   wind:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15 # antes 0.15 → ahora más suave y estable
@@ -141,7 +141,7 @@ agents:
       p_discharge_max: 300000
 
   grid:
-    count: 0
+    count: 1
     policy:
       type: tabular_ql
       alpha: 0.15 # antes 0.15 → ahora más suave y estable

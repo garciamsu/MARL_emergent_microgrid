@@ -2,8 +2,8 @@
 # General mode
 # ==============================================================
 
-mode: train        # train | offline
-offline_run: 45  # set run_id if mode=offline
+mode: offline         # train | offline
+offline_run: 46      # set run_id if mode=offline
 
 # ==============================================================
 # Offline mode parameters (evaluation / exploitation only)
@@ -11,7 +11,7 @@ offline_run: 45  # set run_id if mode=offline
 
 offline:
   # Dataset for offline operation (must exist in assets/datasets/)
-  dataset: training_v1.csv
+  dataset: microgrid_dataset_8d_hourly_comparative_quantite.csv
 
   # Number of episodes in offline mode. Typically 1 long episode
   # that spans the entire offline dataset.
@@ -19,27 +19,27 @@ offline:
 
   # Epsilon used during offline operation (constant schedule).
   # Should be very small to favor pure exploitation.
-  epsilon: 1
+  epsilon: 0.05
 
 # ==============================================================
 # Simulation parameters
 # ==============================================================
 
 simulation:
-  episodes: 500        # number of training episodes
-  dt_h: 1.0            # step size in hours (must divide 1.0 exactly)
-  seed: 46          # random seed for reproducibility
-  dataset: microgrid_dataset_8d_hourly_comparative_quantite.csv
+  episodes: 1500            # number of training episodes
+  dt_h: 1.0                 # step size in hours (must divide 1.0 exactly)
+  seed: 46                  # random seed for reproducibility
+  dataset: training_v1.csv  # Dataset file located in assets/datasets/
   
   # Episode window size in hours (contiguous random window from dataset)
   # Each episode uses a random contiguous window of this size
   # Must be <= dataset length. Default: 48 hours (2 days)
-  episode_window_hours: 191
+  episode_window_hours: 96
 
   # Power unit conversion factor (kW/kWh to W/Wh)
   # Applied to: solar_power_*, wind_power_*, demand columns
   # Excludes: price, Datetime columns
-  power_scale_factor: 1
+  power_scale_factor: 1000.0  # 1000.0 for kW to W, 1.0 for W to W
 
   # Maximum power value for simulation (design limit / physical constraint)
   # Used for discretization bins and normalization. Units: W (after scaling)
@@ -56,7 +56,7 @@ simulation:
     # This ensures strong exploration early, smooth transition, and stable convergence
     schedule: linear    # linear | exponential | constant | custom
     start: 1.0
-    end: 0.0              # Very low minimum for pure exploitation at end
+    end: 0.05               # Very low minimum for pure exploitation at end
     decay: null             # Auto-calculated to reach 'end' across training
     values: []              # only for custom
 

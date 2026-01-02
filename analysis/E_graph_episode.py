@@ -12,6 +12,40 @@ from pathlib import Path
 # Add root to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.csv_handler import read_result_csv
+from configs.loader import load_config
+
+
+def get_power_unit_label():
+    """
+    Determine the correct power unit label based on power_scale_factor in config.
+    
+    Returns the appropriate unit string for power measurements:
+    - If power_scale_factor = 1000.0: data is scaled from kW to W → label = 'W'
+    - If power_scale_factor = 1.0: data remains in kW → label = 'kW'
+    - For other factors, calculate the appropriate unit
+    """
+    try:
+        cfg = load_config()
+        scale_factor = cfg.get("simulation", {}).get("power_scale_factor", 1.0)
+    except Exception:
+        scale_factor = 1.0
+    
+    # Base unit in dataset is kW. After scaling by power_scale_factor:
+    # factor=1000.0 → kW * 1000 = W
+    # factor=1.0 → kW (unchanged)
+    # factor=0.001 → MW
+    if abs(scale_factor - 1000.0) < 1e-9:
+        return "W"
+    elif abs(scale_factor - 1.0) < 1e-9:
+        return "kW"
+    elif abs(scale_factor - 0.001) < 1e-9:
+        return "MW"
+    elif scale_factor > 1.0:
+        # Scaled up from kW
+        return "W" if scale_factor >= 100 else "kW"
+    else:
+        # Scaled down from kW
+        return "MW" if scale_factor <= 0.01 else "kW"
 
 
 # --- CONFIGURACIÓN PRINCIPAL ---
@@ -70,17 +104,18 @@ AXIS_FONT_SIZE = 11
 
 # --- CONFIGURACIÓN DE LOS PANELES ---
 # (Las etiquetas 'label' ahora solo se usarán para la LEYENDA, no para los ejes)
+# NOTE: {power_unit} will be replaced dynamically based on power_scale_factor
 PLOT_CONFIG = {
     'panel_1': {
         'title': '(A)',
         'color': '#FFA500',
-        'left_Y': {'column': 'potential_solar#0', 'label': 'Potential solar (kW)'},
+        'left_Y': {'column': 'potential_solar#0', 'label': 'Potential solar ({power_unit})'},
         'right_Y': {'column': 'action_solar#0', 'label': 'Solar state'}
     },
     'panel_2': {
         'title': '(B)',
         'color': '#87CEEB',
-        'left_Y': {'column': 'potential_wind#0', 'label': 'Potential wind (kW)'},
+        'left_Y': {'column': 'potential_wind#0', 'label': 'Potential wind ({power_unit})'},
         'right_Y': {'column': 'action_wind#0', 'label': 'Wind state'}
     },
     'panel_3': {
@@ -98,12 +133,12 @@ PLOT_CONFIG = {
     'panel_5': {
         'title': '(E)',
         'color': '#FF0000',
-        'left_Y': {'column': 'env_demand_power', 'label': 'Demand (kW)'},
+        'left_Y': {'column': 'env_demand_power', 'label': 'Demand ({power_unit})'},
         'right_Y': {'column': 'action_load#0', 'label': 'Load state'}
     },
     'panel_6': {
         'title': '(F)',
-        'left_Y': {'column': 'env_energy_balance', 'label': 'Energy Balance (kW)'},
+        'left_Y': {'column': 'env_energy_balance', 'label': 'Energy Balance ({power_unit})'},
         'color_positive': '#28A745', 
         'color_negative': '#FF0000',
         # Etiquetas para la nueva leyenda del Panel 6
@@ -111,6 +146,56 @@ PLOT_CONFIG = {
         'label_negative': 'Deficit (-)'
     }
 }
+
+
+def get_active_panels(df, config):
+    """
+    Filter out panels that have no data and return only active panels.
+    
+    A panel is considered to have data if at least one of its columns
+    (left_Y or right_Y) exists in the dataframe.
+    
+    Returns:
+        list of tuples: [(panel_key, panel_config), ...] for panels with data
+    """
+    active_panels = []
+    for panel_key, panel_config in config.items():
+        has_data = False
+        
+        # Check left_Y column
+        if 'left_Y' in panel_config:
+            col = panel_config['left_Y']['column']
+            if col in df.columns and not df[col].isna().all():
+                has_data = True
+        
+        # Check right_Y column
+        if 'right_Y' in panel_config:
+            col = panel_config['right_Y']['column']
+            if col in df.columns and not df[col].isna().all():
+                has_data = True
+        
+        if has_data:
+            active_panels.append((panel_key, panel_config))
+    
+    return active_panels
+
+
+def apply_power_unit_labels(config):
+    """
+    Replace {power_unit} placeholder in all label strings with the actual unit.
+    Returns a deep copy of the config with substituted labels.
+    """
+    import copy
+    power_unit = get_power_unit_label()
+    new_config = copy.deepcopy(config)
+    
+    for panel_key, panel_cfg in new_config.items():
+        if 'left_Y' in panel_cfg and 'label' in panel_cfg['left_Y']:
+            panel_cfg['left_Y']['label'] = panel_cfg['left_Y']['label'].format(power_unit=power_unit)
+        if 'right_Y' in panel_cfg and 'label' in panel_cfg['right_Y']:
+            panel_cfg['right_Y']['label'] = panel_cfg['right_Y']['label'].format(power_unit=power_unit)
+    
+    return new_config
 
 
 def _build_time_ticks(time_steps: np.ndarray, max_ticks: int = 50):
@@ -151,17 +236,42 @@ def plot_episode_dynamics(base_dir, episode_num, config):
 
     print(f"✅ Archivo cargado: {file_path} ({len(df)} filas)")
 
+    # Apply power unit labels based on config
+    config_with_units = apply_power_unit_labels(config)
+    
+    # Filter out panels without data and get only active panels
+    active_panels = get_active_panels(df, config_with_units)
+    
+    if not active_panels:
+        print("⚠️  No hay paneles con datos disponibles para graficar.")
+        return
+    
+    num_panels = len(active_panels)
+    print(f"📊 Paneles activos: {num_panels} de {len(config)}")
+
     time_steps = np.arange(len(df))
 
     matplotlib.use('Agg')
     plt.style.use('seaborn-v0_8-paper')
 
-    fig, axes = plt.subplots(nrows=6, ncols=1, sharex=True, figsize=(15, 10))
+    # Create figure with only the number of active panels
+    fig, axes = plt.subplots(nrows=num_panels, ncols=1, sharex=True, 
+                              figsize=(15, 2 + num_panels * 1.5))
+    
+    # Handle case of single panel (axes is not a list)
+    if num_panels == 1:
+        axes = [axes]
 
-    for i, (panel_key, panel_config) in enumerate(config.items()):
+    # Dynamic title labels: A, B, C, D, E, F...
+    title_letters = [chr(ord('A') + i) for i in range(num_panels)]
+
+    for i, (panel_key, panel_config) in enumerate(active_panels):
         ax = axes[i]
         color = panel_config.get('color', '#000000')
-        ax.set_title(panel_config['title'], loc='center',
+        
+        # Dynamic title based on position
+        dynamic_title = f"({title_letters[i]})"
+        ax.set_title(dynamic_title, loc='center',
                      fontweight=AXIS_FONT_WEIGHT, fontsize=14)
         ax.grid(True, linestyle='--', alpha=0.6)
 
@@ -310,16 +420,41 @@ if __name__ == "__main__":
                 print(f"  ⚠️  Archivo vacío o ilegible: {csv_path}")
                 continue
 
+            # Apply power unit labels based on config
+            config_with_units = apply_power_unit_labels(PLOT_CONFIG)
+            
+            # Filter out panels without data and get only active panels
+            active_panels = get_active_panels(df_off, config_with_units)
+            
+            if not active_panels:
+                print(f"  ⚠️  No hay paneles con datos para offline_run={run_id}")
+                continue
+            
+            num_panels = len(active_panels)
+            print(f"  📊 Paneles activos: {num_panels} de {len(PLOT_CONFIG)}")
+
             time_steps = np.arange(len(df_off))
             matplotlib.use('Agg')
             plt.style.use('seaborn-v0_8-paper')
 
-            fig, axes = plt.subplots(nrows=6, ncols=1, sharex=True, figsize=(15, 10))
+            # Create figure with only the number of active panels
+            fig, axes = plt.subplots(nrows=num_panels, ncols=1, sharex=True, 
+                                      figsize=(15, 2 + num_panels * 1.5))
+            
+            # Handle case of single panel (axes is not a list)
+            if num_panels == 1:
+                axes = [axes]
+            
+            # Dynamic title labels: A, B, C, D, E, F...
+            title_letters = [chr(ord('A') + i) for i in range(num_panels)]
 
-            for i, (panel_key, panel_config) in enumerate(PLOT_CONFIG.items()):
+            for i, (panel_key, panel_config) in enumerate(active_panels):
                 ax = axes[i]
                 color = panel_config.get('color', '#000000')
-                ax.set_title(panel_config['title'], loc='center',
+                
+                # Dynamic title based on position
+                dynamic_title = f"({title_letters[i]})"
+                ax.set_title(dynamic_title, loc='center',
                              fontweight=AXIS_FONT_WEIGHT, fontsize=14)
                 ax.grid(True, linestyle='--', alpha=0.6)
 

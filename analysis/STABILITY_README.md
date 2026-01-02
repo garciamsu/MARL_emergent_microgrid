@@ -10,10 +10,10 @@ Two stability analysis tools for distributed MARL systems:
 
 ```bash
 # Step 1: Collect Q-table snapshots during training
-python analysis_tools/collect_qtables_per_episode.py
+python analysis/collect_qtables_per_episode.py
 
 # Step 2: Run stability analysis
-python analysis_tools/run_stability_analysis.py
+python analysis/run_stability_analysis.py
 ```
 
 ## 📂 Files
@@ -61,7 +61,7 @@ D(k) = (1/N) * Σ_i || V_i(k) - V_avg(k) ||_2
 
 Run the test suite:
 ```bash
-python analysis_tools/test_stability_analysis.py
+python analysis/test_stability_analysis.py
 ```
 
 Expected: All tests pass (validated on synthetic data)

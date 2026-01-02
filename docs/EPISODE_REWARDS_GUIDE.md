@@ -171,7 +171,7 @@ To verify the implementation is correct:
 python main.py
 
 # 2. Complete analysis (validation + all visualizations)
-python analysis_tools/E_accumulated_reward.py
+python analysis/E_accumulated_reward.py
 ```
 
 ### Python API

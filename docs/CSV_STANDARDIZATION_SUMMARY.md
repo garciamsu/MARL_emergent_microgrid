@@ -41,7 +41,7 @@ write_result_csv(episode_rewards_df, rewards_csv_path)
 
 **Razón**: Garantizar que la búsqueda de hiperparámetros use formato consistente.
 
-#### `analysis_tools/E_graph_episode.py`
+#### `analysis/E_graph_episode.py`
 **Cambios**:
 1. **Función `read_csv_auto()`**: Simplificada para usar directamente `read_result_csv()`
 ```python
@@ -88,12 +88,12 @@ python scripts/validate_csv_consistency.py
 
 Los siguientes archivos ya estaban correctamente implementados:
 - ✅ `core/environment.py` - Usa `read_dataset_csv()`
-- ✅ `analysis_tools/A_data_check.py` - Usa `read_dataset_csv()` y `read_result_csv()`
-- ✅ `analysis_tools/C_collect_episodes.py` - Usa `write_result_csv()`
-- ✅ `analysis_tools/D_compute_metrics.py` - Usa `read_result_csv()` y `write_result_csv()`
-- ✅ `analysis_tools/E_accumulated_reward.py` - Usa `read_result_csv()`
-- ✅ `analysis_tools/utils.py` - Usa `read_result_csv()`
-- ✅ `analysis_tools/stability_analysis.py` - Usa `write_result_csv()`
+- ✅ `analysis/A_data_check.py` - Usa `read_dataset_csv()` y `read_result_csv()`
+- ✅ `analysis/C_collect_episodes.py` - Usa `write_result_csv()`
+- ✅ `analysis/D_compute_metrics.py` - Usa `read_result_csv()` y `write_result_csv()`
+- ✅ `analysis/E_accumulated_reward.py` - Usa `read_result_csv()`
+- ✅ `analysis/utils.py` - Usa `read_result_csv()`
+- ✅ `analysis/stability_analysis.py` - Usa `write_result_csv()`
 - ✅ `scripts/validate_load_agent.py` - Usa `read_dataset_csv()`
 
 ## Verificación

@@ -8,7 +8,7 @@ Two independent stability analysis methods have been successfully implemented fo
 
 ## What Was Implemented
 
-### 1. Core Analysis Module (`analysis_tools/stability_analysis.py`)
+### 1. Core Analysis Module (`analysis/stability_analysis.py`)
 
 **Two analyzer classes:**
 
@@ -30,7 +30,7 @@ Two independent stability analysis methods have been successfully implemented fo
 
 ---
 
-### 2. Data Collection Script (`analysis_tools/collect_qtables_per_episode.py`)
+### 2. Data Collection Script (`analysis/collect_qtables_per_episode.py`)
 
 **Purpose:**
 - Runs training and collects Q-table snapshots per episode
@@ -44,7 +44,7 @@ Two independent stability analysis methods have been successfully implemented fo
 
 ---
 
-### 3. Standalone Analysis Runner (`analysis_tools/run_stability_analysis.py`)
+### 3. Standalone Analysis Runner (`analysis/run_stability_analysis.py`)
 
 **Purpose:**
 - Executes both stability analyses on collected data
@@ -58,7 +58,7 @@ Load Q-tables → Run Bellman Analysis → Run Consensus Analysis → Generate R
 
 ---
 
-### 4. Validation Suite (`analysis_tools/test_stability_analysis.py`)
+### 4. Validation Suite (`analysis/test_stability_analysis.py`)
 
 **Tests:**
 - ✅ Metric computation correctness
@@ -101,7 +101,7 @@ Load Q-tables → Run Bellman Analysis → Run Consensus Analysis → Generate R
 ### 3. Updated Project Documentation
 
 **Files updated:**
-- `analysis_tools/README.md`: Added stability analysis section
+- `analysis/README.md`: Added stability analysis section
 - `.github/copilot-instructions.md`: Documented new capabilities
 
 ---
@@ -110,7 +110,7 @@ Load Q-tables → Run Bellman Analysis → Run Consensus Analysis → Generate R
 
 ### Step 1: Data Collection
 ```bash
-python analysis_tools/collect_qtables_per_episode.py
+python analysis/collect_qtables_per_episode.py
 ```
 - Uses configuration from `configs/default.yaml`
 - Runs standard training loop
@@ -118,7 +118,7 @@ python analysis_tools/collect_qtables_per_episode.py
 
 ### Step 2: Analysis Execution
 ```bash
-python analysis_tools/run_stability_analysis.py
+python analysis/run_stability_analysis.py
 ```
 - Loads Q-table history
 - Computes both stability metrics
@@ -302,7 +302,7 @@ If using these metrics in research:
 For issues or questions:
 1. Check `docs/STABILITY_ANALYSIS.md` (comprehensive guide)
 2. Check `docs/STABILITY_ANALYSIS_QUICK_REF.md` (quick reference)
-3. Run validation: `python analysis_tools/test_stability_analysis.py`
+3. Run validation: `python analysis/test_stability_analysis.py`
 4. Review examples in documentation
 
 ---
@@ -329,6 +329,6 @@ For issues or questions:
 ---
 
 **Next steps for users:**
-1. Run data collection: `python analysis_tools/collect_qtables_per_episode.py`
-2. Run analysis: `python analysis_tools/run_stability_analysis.py`
+1. Run data collection: `python analysis/collect_qtables_per_episode.py`
+2. Run analysis: `python analysis/run_stability_analysis.py`
 3. Interpret results using `docs/STABILITY_ANALYSIS.md`

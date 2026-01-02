@@ -10,7 +10,7 @@ Prerequisites:
     Run collect_qtables_per_episode.py first to generate Q-table history.
 
 Usage:
-    python analysis_tools/run_stability_analysis.py
+    python analysis/run_stability_analysis.py
 
 Output:
     - results/stability/bellman_contraction_stability.csv
@@ -25,12 +25,12 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from analysis_tools.stability_analysis import (
+from analysis.stability_analysis import (
     BellmanContractionStabilityAnalyzer,
     ConsensusStabilityAnalyzer,
     run_both_stability_analyses
 )
-from analysis_tools.collect_qtables_per_episode import load_qtables_history
+from analysis.collect_qtables_per_episode import load_qtables_history
 
 
 def main():
@@ -44,7 +44,7 @@ def main():
     
     if not input_path.exists():
         print(f"\n[ERROR] Q-table history not found at {input_path}")
-        print(f"\nFirst run: python analysis_tools/collect_qtables_per_episode.py")
+        print(f"\nFirst run: python analysis/collect_qtables_per_episode.py")
         sys.exit(1)
     
     print(f"\nLoading Q-table history from {input_path}...")

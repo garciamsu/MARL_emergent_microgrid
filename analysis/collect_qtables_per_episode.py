@@ -8,7 +8,7 @@ The script creates a deep copy of each agent's Q-table at the end of each
 episode, storing them for later analysis.
 
 Usage:
-    python analysis_tools/collect_qtables_per_episode.py
+    python analysis/collect_qtables_per_episode.py
 
 Output:
     - Q-table snapshots saved to results/stability/qtables_per_episode.npz
@@ -300,7 +300,7 @@ def main():
     print(f"   Episodes collected: {len(qtables_per_episode)}")
     print(f"   Output file: {output_path}")
     print(f"\nNext step: Run stability analysis")
-    print(f"   python analysis_tools/run_stability_analysis.py")
+    print(f"   python analysis/run_stability_analysis.py")
     
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ Proporcionar un flujo de análisis **manual** y **secuencial** que permite:
 ## 📂 Estructura del Directorio
 
 ```
-analysis_tools/
+analysis/
 ├── README.md                      # 📖 Esta guía
 ├── __init__.py                    # Paquete Python
 ├── utils.py                       # Utilidades: carga de CSVs, discretización
@@ -49,7 +49,7 @@ analysis_tools/
 Verifica que el dataset contenga las columnas necesarias y que los episodios previos (si existen) tengan la estructura correcta.
 
 ```bash
-python analysis_tools/A_data_check.py
+python analysis/A_data_check.py
 ```
 
 **Salida esperada:**
@@ -61,10 +61,10 @@ python analysis_tools/A_data_check.py
 
 ### **Paso 2: Ejecutar Entrenamiento** (`B_run_training.py`)
 
-Ejecuta `main.py` con la configuración definida en `configs/default.yaml`. La limpieza de `results/` está delegada a `main.py` (usa `analysis_tools.utils.clear_directories`).
+Ejecuta `main.py` con la configuración definida en `configs/default.yaml`. La limpieza de `results/` está delegada a `main.py` (usa `analysis.utils.clear_directories`).
 
 ```bash
-python analysis_tools/B_run_training.py
+python analysis/B_run_training.py
 ```
 
 **Parámetros clave (leídos de `configs/default.yaml`):**
@@ -112,7 +112,7 @@ episode_rewards.append(episode_reward)  # Guardar al final
 Agrupa todos los episodios en un único CSV con métricas por episodio (recompensas totales, tasas de activación, etc.).
 
 ```bash
-python analysis_tools/C_collect_episodes.py
+python analysis/C_collect_episodes.py
 ```
 
 **Salida:**
@@ -128,7 +128,7 @@ python analysis_tools/C_collect_episodes.py
 Calcula métricas operativas y de aprendizaje para todos los episodios e imprime resumen en consola con evaluación PASS/FAIL según umbrales configurados.
 
 ```bash
-python analysis_tools/D_compute_metrics.py
+python analysis/D_compute_metrics.py
 ```
 
 **Métricas Operativas (por episodio):**
@@ -169,7 +169,7 @@ analysis:
 Genera análisis de recompensas acumuladas a través de los episodios para visualizar tendencias de aprendizaje.
 
 ```bash
-python analysis_tools/E_accumulated_reward.py
+python analysis/E_accumulated_reward.py
 ```
 
 **Funcionalidad:**
@@ -206,7 +206,7 @@ python analysis_tools/E_accumulated_reward.py
 Crea gráficos clave en formato SVG para análisis visual.
 
 ```bash
-python analysis_tools/E_plot_metrics.py
+python analysis/E_plot_metrics.py
 ```
 
 **Gráficos generados en `results/plots/`:**
@@ -289,22 +289,22 @@ agents:
 
 ```bash
 # 1. Validar datos
-python analysis_tools/A_data_check.py
+python analysis/A_data_check.py
 
 # 2. Editar configs/default.yaml según el experimento
 nano configs/default.yaml  # Ajustar episodes, epsilon, rewards, etc.
 
 # 3. Ejecutar entrenamiento
-python analysis_tools/B_run_training.py
+python analysis/B_run_training.py
 
 # 4. Consolidar episodios
-python analysis_tools/C_collect_episodes.py
+python analysis/C_collect_episodes.py
 
 # 5. Calcular métricas y revisar PASS/FAIL
-python analysis_tools/D_compute_metrics.py
+python analysis/D_compute_metrics.py
 
 # 6. Generar gráficos
-python analysis_tools/E_plot_metrics.py
+python analysis/E_plot_metrics.py
 
 # 7. Revisar plots en results/plots/*.svg
 ```
@@ -316,7 +316,7 @@ python analysis_tools/E_plot_metrics.py
 Para ejecutar todos los pasos de forma secuencial y automática:
 
 ```bash
-python analysis_tools/run_full_pipeline.py
+python analysis/run_full_pipeline.py
 ```
 
 **Secuencia de ejecución:**
@@ -417,10 +417,10 @@ Mide convergencia de funciones de valor entre episodios consecutivos:
 
 ```bash
 # Paso 1: Recolectar Q-tables por episodio
-python analysis_tools/collect_qtables_per_episode.py
+python analysis/collect_qtables_per_episode.py
 
 # Paso 2: Ejecutar análisis de estabilidad
-python analysis_tools/run_stability_analysis.py
+python analysis/run_stability_analysis.py
 ```
 
 **Métrica:** `ΔV(k) = max_i || V_i(k+1) - V_i(k) ||_∞`
@@ -457,7 +457,7 @@ Mide consenso entre agentes:
 - **Agentes**: `agents/base_agent.py`, `agents/*_agent.py`
 - **Políticas**: `core/policies.py`, `core/rewards.py`
 - **Config**: `configs/default.yaml`, `configs/loader.py`
-- **Análisis de Estabilidad**: `analysis_tools/stability_analysis.py`, `docs/STABILITY_ANALYSIS.md`
+- **Análisis de Estabilidad**: `analysis/stability_analysis.py`, `docs/STABILITY_ANALYSIS.md`
 - **Instrucciones generales**: `.github/copilot-instructions.md`
 
 ---

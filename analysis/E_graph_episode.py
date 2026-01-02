@@ -21,7 +21,7 @@ except NameError:
     # Fallback para entornos interactivos (como Jupyter)
     SCRIPT_DIR = os.getcwd()
 
-# 🔧 Corrección: el CSV está un nivel arriba de analysis_tools/
+# 🔧 Corrección: el CSV está un nivel arriba de analysis/
 BASE_DIRECTORY = os.path.join(SCRIPT_DIR, "..", "results", "evolution")
 
 # Directorio base para episodios offline (evaluación/explotación)

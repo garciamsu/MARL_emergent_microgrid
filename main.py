@@ -4,7 +4,7 @@ import agents  # noqa: F401  (populate registry via side effects)
 import core.policies  # noqa: F401
 import core.rewards  # noqa: F401
 
-from analysis_tools.utils import clear_directories
+from analysis.utils import clear_directories
 from core.simulation import run_training
 from configs.loader import load_config
 

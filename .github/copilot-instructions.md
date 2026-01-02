@@ -15,7 +15,7 @@ El código es completamente orientado a objetos; cada componente físico es un a
 - `agents/*.py`: clases concretas de agentes (solar, eólica, batería, red, carga) registradas mediante decoradores; implementan `update_power` y ganchos de política.
 - `core/rewards.py`: cálculo centralizado de recompensas impulsado por la configuración YAML (`agents.<type>.reward`). Los agentes no implementan su propia función de recompensa.
 - `utils/discretization.py`: utilidades de discretización de estado‑acción; las Q‑tables son tabulares sobre estos espacios discretos.
-- `analysis_tools/`: análisis post‑hoc (chequeos de datos, corridas de entrenamiento, métricas, gráficos) que asumen los formatos actuales de CSV/log.
+- `analysis/`: análisis post‑hoc (chequeos de datos, corridas de entrenamiento, métricas, gráficos) que asumen los formatos actuales de CSV/log.
 
 ## Datos, Paso de Tiempo y Episodios
 
@@ -32,7 +32,7 @@ El código es completamente orientado a objetos; cada componente físico es un a
   - `agents.<type>.reward`: pesos y parámetros de recompensa consumidos en `core/rewards.py`.
   - `agents.battery.limits.*`: límites de SOC y comportamiento del SOC inicial por episodio.
   - `discretization.*`: número de bins y rangos usados por `utils/discretization.py`.
-  - `stability.window`: tamaño de ventana para promedios móviles en análisis (usado por `analysis_tools/E_accumulated_reward.py`).
+  - `stability.window`: tamaño de ventana para promedios móviles en análisis (usado por `analysis/E_accumulated_reward.py`).
   - `io.results_dir`: directorio base para todos los archivos de salida (usado por `core/simulation.py` y scripts de análisis).
 - Al añadir nuevas opciones, extiende este YAML y léelo en `configs/loader.py` o `core/utils` en lugar de usar constantes hard‑codeadas.
 - **Principio**: Evita valores hardcodeados; lee siempre desde `default.yaml` cuando el parámetro afecta múltiples módulos o análisis.
@@ -46,7 +46,7 @@ El código es completamente orientado a objetos; cada componente físico es un a
   3. Reiniciar entorno y agentes, luego avanzar el episodio (1 paso por hora).
   4. Seleccionar acciones con política epsilon‑greedy (`policies/epsilon_greedy.py`) y actualizar Q‑tables.
   5. Registrar la evolución en `results/evolution/episode_<n>.csv` y el estado general en `results/logs/`.
-- No cambies los nombres de archivos ni la estructura de directorios en `results/` sin actualizar también los scripts en `analysis_tools/`.
+- No cambies los nombres de archivos ni la estructura de directorios en `results/` sin actualizar también los scripts en `analysis/`.
 
 ## Recompensas y Agentes
 
@@ -75,7 +75,7 @@ Las respuestas generadas por GitHub Copilot u otros agentes de IA para este repo
 ## Herramientas y Flujos de Trabajo
 
 - Self‑check rápido: `python scripts/self_check.py` (corrida corta de validación).
-- Pipeline completo y análisis: `analysis_tools/run_full_pipeline.py` y scripts individuales en `analysis_tools/`.
+- Pipeline completo y análisis: `analysis/run_full_pipeline.py` y scripts individuales en `analysis/`.
 - Tests de humo con pytest (cuando existan): `pytest -q` o `python -m pytest -k smoke -q` desde la raíz del repositorio.
 
 ## Análisis de Estabilidad MARL (Nuevo)
@@ -84,10 +84,10 @@ El repositorio ahora incluye herramientas de análisis de estabilidad para siste
 
 ### Módulos de Análisis de Estabilidad
 
-- `analysis_tools/stability_analysis.py`: Clases analizadoras para estudios de estabilidad (Bellman y Consenso).
-- `analysis_tools/collect_qtables_per_episode.py`: Recolecta snapshots de Q-tables por episodio durante el entrenamiento.
-- `analysis_tools/run_stability_analysis.py`: Ejecuta ambos análisis de estabilidad sobre datos recolectados.
-- `analysis_tools/test_stability_analysis.py`: Suite de validación con datos sintéticos.
+- `analysis/stability_analysis.py`: Clases analizadoras para estudios de estabilidad (Bellman y Consenso).
+- `analysis/collect_qtables_per_episode.py`: Recolecta snapshots de Q-tables por episodio durante el entrenamiento.
+- `analysis/run_stability_analysis.py`: Ejecuta ambos análisis de estabilidad sobre datos recolectados.
+- `analysis/test_stability_analysis.py`: Suite de validación con datos sintéticos.
 
 ### Dos Estudios de Estabilidad
 
@@ -105,13 +105,13 @@ El repositorio ahora incluye herramientas de análisis de estabilidad para siste
 
 ```bash
 # 1. Recolectar Q-tables por episodio
-python analysis_tools/collect_qtables_per_episode.py
+python analysis/collect_qtables_per_episode.py
 
 # 2. Ejecutar análisis de estabilidad
-python analysis_tools/run_stability_analysis.py
+python analysis/run_stability_analysis.py
 
 # 3. Validar implementación (opcional)
-python analysis_tools/test_stability_analysis.py
+python analysis/test_stability_analysis.py
 ```
 
 ### Salidas
@@ -124,7 +124,7 @@ python analysis_tools/test_stability_analysis.py
 
 - **Guía completa**: `docs/STABILITY_ANALYSIS.md` (fundamentos teóricos, interpretación, uso avanzado).
 - **Referencia rápida**: `docs/STABILITY_ANALYSIS_QUICK_REF.md` (comandos, umbrales, troubleshooting).
-- **Integración en pipeline**: Ver `analysis_tools/README.md` sección "Análisis de Estabilidad".
+- **Integración en pipeline**: Ver `analysis/README.md` sección "Análisis de Estabilidad".
 
 ### Características Clave
 
@@ -157,7 +157,7 @@ El proyecto utiliza un sistema **estandarizado** para el manejo de archivos CSV 
 ### Archivos Actualizados (No Modificar sin Justificación)
 Los siguientes archivos ya usan el formato estandarizado:
 - `core/environment.py`, `core/simulation.py`
-- `analysis_tools/A_data_check.py`, `C_collect_episodes.py`, `D_compute_metrics.py`, `E_accumulated_reward.py`, `E_graph_episode.py`, `utils.py`, `stability_analysis.py`
+- `analysis/A_data_check.py`, `C_collect_episodes.py`, `D_compute_metrics.py`, `E_accumulated_reward.py`, `E_graph_episode.py`, `utils.py`, `stability_analysis.py`
 - `scripts/hyperparameter_search.py`, `validate_load_agent.py`
 
 ### Documentación
@@ -169,9 +169,9 @@ Los siguientes archivos ya usan el formato estandarizado:
 
 - Al añadir funcionalidades, prioriza:
   - Nuevos campos de configuración en `configs/default.yaml`.
-  - Helpers pequeños y enfocados en `core/utils.py`, `utils/discretization.py` o `analysis_tools/utils.py`.
+  - Helpers pequeños y enfocados en `core/utils.py`, `utils/discretization.py` o `analysis/utils.py`.
   - Reutilizar el sistema de logging y las utilidades de limpieza existentes en lugar de scripts ad‑hoc.
   - **Usar siempre `core/csv_handler.py`** para leer/escribir CSVs (ver sección anterior).
-- Evita romper la compatibilidad hacia atrás de los formatos de CSV/log; los scripts de `analysis_tools/` dependen de su esquema actual.
+- Evita romper la compatibilidad hacia atrás de los formatos de CSV/log; los scripts de `analysis/` dependen de su esquema actual.
 
 Si alguna asunción arquitectónica no es evidente (flujo de recompensas, manejo de datasets o registro de agentes), revisa en conjunto `core/environment.py`, `core/rewards.py` y el paquete `agents/` antes de hacer refactors grandes.

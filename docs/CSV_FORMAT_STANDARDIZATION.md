@@ -135,13 +135,13 @@ info = CSVConfig.get_system_info()
 - ✅ `core/simulation.py` - Episode evolution writing
 
 ### Analysis Tools
-- ✅ `analysis_tools/A_data_check.py` - Dataset and episode validation
-- ✅ `analysis_tools/C_collect_episodes.py` - Episode consolidation
-- ✅ `analysis_tools/D_compute_metrics.py` - Metrics computation
-- ✅ `analysis_tools/E_accumulated_reward.py` - Reward analysis
-- ✅ `analysis_tools/E_graph_episode.py` - Episode visualization
-- ✅ `analysis_tools/utils.py` - Utility functions
-- ✅ `analysis_tools/stability_analysis.py` - Stability metrics
+- ✅ `analysis/A_data_check.py` - Dataset and episode validation
+- ✅ `analysis/C_collect_episodes.py` - Episode consolidation
+- ✅ `analysis/D_compute_metrics.py` - Metrics computation
+- ✅ `analysis/E_accumulated_reward.py` - Reward analysis
+- ✅ `analysis/E_graph_episode.py` - Episode visualization
+- ✅ `analysis/utils.py` - Utility functions
+- ✅ `analysis/stability_analysis.py` - Stability metrics
 
 ### Scripts
 - ✅ `scripts/validate_load_agent.py` - Load agent validation
@@ -327,13 +327,13 @@ This validates:
 **Files Updated for Consistency:**
 - `core/environment.py` - Dataset loading
 - `core/simulation.py` - Episode and reward file writing
-- `analysis_tools/A_data_check.py` - Dataset validation
-- `analysis_tools/C_collect_episodes.py` - Episode collection
-- `analysis_tools/D_compute_metrics.py` - Metrics computation
-- `analysis_tools/E_accumulated_reward.py` - Reward analysis
-- `analysis_tools/E_graph_episode.py` - Episode plotting
-- `analysis_tools/utils.py` - Utility functions
-- `analysis_tools/stability_analysis.py` - Stability analysis
+- `analysis/A_data_check.py` - Dataset validation
+- `analysis/C_collect_episodes.py` - Episode collection
+- `analysis/D_compute_metrics.py` - Metrics computation
+- `analysis/E_accumulated_reward.py` - Reward analysis
+- `analysis/E_graph_episode.py` - Episode plotting
+- `analysis/utils.py` - Utility functions
+- `analysis/stability_analysis.py` - Stability analysis
 - `scripts/hyperparameter_search.py` - Hyperparameter search
 - `scripts/validate_load_agent.py` - Agent validation
 

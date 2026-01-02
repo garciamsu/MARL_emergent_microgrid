@@ -221,7 +221,7 @@ def recommend_optimal_values(demand_min, demand_mean, price_data):
     print(f"  2. Update agents.load.limits.p_load to {recommended_p_load}")
     print(f"  3. Update agents.load.limits.comfort_threshold to {p67:.1f}")
     print(f"  4. Re-train agents to learn new behavior")
-    print(f"  5. Validate results using analysis_tools scripts")
+    print(f"  5. Validate results using analysis scripts")
 
 
 def main():

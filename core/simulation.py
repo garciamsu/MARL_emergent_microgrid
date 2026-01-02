@@ -488,7 +488,7 @@ def run_training(config):
             offline_path = f"results/evolution/offline/episode_offline_{offline_run}.csv"
             write_result_csv(episode_df, offline_path)
         else:
-            # Training: keep existing naming convention used by analysis_tools
+            # Training: keep existing naming convention used by analysis
             write_result_csv(episode_df, f"results/evolution/episode_{episode}.csv")
         results.append(episode_df)
         

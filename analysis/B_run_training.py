@@ -40,7 +40,7 @@ def main():
     epsilon_cfg = config['simulation']['epsilon']
     print(f"   Epsilon: schedule={epsilon_cfg['schedule']}, start={epsilon_cfg['start']}, end={epsilon_cfg['end']}")
     
-    print(f"\n🧹 Limpieza de results/: delegada a main.py (analysis_tools.utils.clear_directories)")
+    print(f"\n🧹 Limpieza de results/: delegada a main.py (analysis.utils.clear_directories)")
     print(f"\n▶️  Ejecutando main.py...\n")
     
     # Ejecutar main.py con Python del entorno actual

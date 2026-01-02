@@ -102,7 +102,7 @@ The consensus metric measures how closely agents' value representations align wi
 ### Module Structure
 
 ```
-analysis_tools/
+analysis/
 ├── stability_analysis.py              # Core analyzer classes
 ├── collect_qtables_per_episode.py     # Data collection script
 └── run_stability_analysis.py          # Standalone runner
@@ -143,7 +143,7 @@ Analyzes stability via distributed consensus among agents.
 Run a training session and collect Q-table snapshots per episode:
 
 ```bash
-python analysis_tools/collect_qtables_per_episode.py
+python analysis/collect_qtables_per_episode.py
 ```
 
 This script:
@@ -165,7 +165,7 @@ The script uses standard configuration from `configs/default.yaml`:
 Execute both stability analyses on collected data:
 
 ```bash
-python analysis_tools/run_stability_analysis.py
+python analysis/run_stability_analysis.py
 ```
 
 This script:
@@ -323,7 +323,7 @@ Typical size: ~10-50 MB per 1000 episodes (depends on state-action space).
 
 ### Relationship to Other Analysis Tools
 
-This stability analysis complements existing tools in `analysis_tools/`:
+This stability analysis complements existing tools in `analysis/`:
 
 - `B_run_training.py`: Standard training (can use this instead)
 - `D_compute_metrics.py`: Episode-level metrics (complements stability)
@@ -336,11 +336,11 @@ This stability analysis complements existing tools in `analysis_tools/`:
 ### Programmatic Usage
 
 ```python
-from analysis_tools.stability_analysis import (
+from analysis.stability_analysis import (
     BellmanContractionStabilityAnalyzer,
     ConsensusStabilityAnalyzer
 )
-from analysis_tools.collect_qtables_per_episode import load_qtables_history
+from analysis.collect_qtables_per_episode import load_qtables_history
 
 # Load data
 qtables = load_qtables_history("results/stability/qtables_per_episode.npz")
@@ -377,7 +377,7 @@ class CustomStabilityAnalyzer(BellmanContractionStabilityAnalyzer):
 
 **Solution:** Run data collection first:
 ```bash
-python analysis_tools/collect_qtables_per_episode.py
+python analysis/collect_qtables_per_episode.py
 ```
 
 ### Issue: "No Q-table data found"

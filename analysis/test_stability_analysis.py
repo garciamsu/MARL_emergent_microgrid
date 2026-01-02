@@ -16,7 +16,7 @@ import numpy as np
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from analysis_tools.stability_analysis import (
+from analysis.stability_analysis import (
     BellmanContractionStabilityAnalyzer,
     ConsensusStabilityAnalyzer
 )
@@ -256,8 +256,8 @@ def main():
         print("\n💡 The stability analysis implementation is validated.")
         print("   Ready for use with real training data.")
         print("\n📝 Next steps:")
-        print("   1. python analysis_tools/collect_qtables_per_episode.py")
-        print("   2. python analysis_tools/run_stability_analysis.py")
+        print("   1. python analysis/collect_qtables_per_episode.py")
+        print("   2. python analysis/run_stability_analysis.py")
         
         return 0
         

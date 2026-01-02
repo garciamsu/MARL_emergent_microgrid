@@ -45,7 +45,7 @@ for episode in range(num_episodes):
 - `results/logs/episode_rewards.csv`: CSV with columns [episode, agent1, agent2, ...]
 - `results/logs/episode_rewards.xlsx`: Excel with Episode Rewards and Statistics sheets
 
-### 2. Comprehensive Analysis Tool (`analysis_tools/E_accumulated_reward.py`)
+### 2. Comprehensive Analysis Tool (`analysis/E_accumulated_reward.py`)
 
 **Purpose**: Complete reward analysis, validation, and visualization
 
@@ -61,7 +61,7 @@ for episode in range(num_episodes):
 
 **Usage**:
 ```bash
-python analysis_tools/E_accumulated_reward.py
+python analysis/E_accumulated_reward.py
 ```
 
 **Outputs**:
@@ -89,7 +89,7 @@ Comprehensive guide covering:
 python main.py
 
 # 2. Complete analysis (validation + all visualizations)
-python analysis_tools/E_accumulated_reward.py
+python analysis/E_accumulated_reward.py
 ```
 
 ### Python API
@@ -172,7 +172,7 @@ plt.plot(episodes, cumulative_rewards)  # Would be cumsum of episode_rewards
 - `core/simulation.py`: Added episode reward tracking and export
 
 ### Created
-- `analysis_tools/E_accumulated_reward.py`: Complete analysis, validation & visualization tool
+- `analysis/E_accumulated_reward.py`: Complete analysis, validation & visualization tool
 - `docs/EPISODE_REWARDS_GUIDE.md`: Comprehensive documentation
 - `docs/EPISODE_REWARDS_SUMMARY.md`: This file
 

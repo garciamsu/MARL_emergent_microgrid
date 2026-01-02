@@ -4,10 +4,10 @@
 
 ```bash
 # Step 1: Collect Q-table history
-python analysis_tools/collect_qtables_per_episode.py
+python analysis/collect_qtables_per_episode.py
 
 # Step 2: Run stability analysis
-python analysis_tools/run_stability_analysis.py
+python analysis/run_stability_analysis.py
 ```
 
 ---
@@ -108,8 +108,8 @@ agents:
 ## Programmatic Usage
 
 ```python
-from analysis_tools.stability_analysis import run_both_stability_analyses
-from analysis_tools.collect_qtables_per_episode import load_qtables_history
+from analysis.stability_analysis import run_both_stability_analyses
+from analysis.collect_qtables_per_episode import load_qtables_history
 
 # Load data
 qtables = load_qtables_history("results/stability/qtables_per_episode.npz")

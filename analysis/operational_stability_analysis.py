@@ -47,8 +47,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.csv_handler import read_result_csv, write_result_csv
 
 # Reuse existing (already-implemented) learning stability analyzers (methods 1–2)
-from analysis_tools.collect_qtables_per_episode import load_qtables_history
-from analysis_tools.stability_analysis import (
+from analysis.collect_qtables_per_episode import load_qtables_history
+from analysis.stability_analysis import (
     BellmanContractionStabilityAnalyzer as _BellmanContractionStabilityAnalyzer,
     ConsensusStabilityAnalyzer as _ConsensusStabilityAnalyzer,
 )
@@ -571,7 +571,7 @@ class BellmanStabilityAnalyzer:
     """Bellman Update Stability (Learning Stability) - Method 1.
 
     This is a thin wrapper around the already-implemented
-    `BellmanContractionStabilityAnalyzer` in analysis_tools/stability_analysis.py.
+    `BellmanContractionStabilityAnalyzer` in analysis/stability_analysis.py.
 
     Metric:
         ΔV(k) = max_i || V_i(k+1) - V_i(k) ||_∞
@@ -604,7 +604,7 @@ class ConsensusStabilityAnalyzer:
     """Consensus Stability (Mean-Square Disagreement) - Method 2.
 
     This is a thin wrapper around the already-implemented
-    `ConsensusStabilityAnalyzer` in analysis_tools/stability_analysis.py.
+    `ConsensusStabilityAnalyzer` in analysis/stability_analysis.py.
 
     Metric family:
         V_avg(k) = (1/M) Σ_i V_i(k)

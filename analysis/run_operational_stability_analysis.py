@@ -1,7 +1,7 @@
 """Standalone runner for operational stability analyses (methods 3–6).
 
 Usage:
-    python analysis_tools/run_operational_stability_analysis.py
+    python analysis/run_operational_stability_analysis.py
 
 This script is post-training only:
 - Reads `results/evolution/episode_<k>.csv`
@@ -23,7 +23,7 @@ import pandas as pd
 # Add project root to path for standalone execution
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from analysis_tools.operational_stability_analysis import (
+from analysis.operational_stability_analysis import (
     EVOLUTION_DIR_DEFAULT,
     RESULTS_DIR_DEFAULT,
     BellmanStabilityAnalyzer,

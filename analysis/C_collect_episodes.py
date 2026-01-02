@@ -13,7 +13,7 @@ from pathlib import Path
 # Añadir raíz al path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from analysis_tools.utils import load_all_episodes_metrics
+from analysis.utils import load_all_episodes_metrics
 from configs.loader import load_config
 from core.csv_handler import write_result_csv
 

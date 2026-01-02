@@ -162,7 +162,7 @@ def main():
     latest_path, ep_num = _find_latest_episode_file()
     if not latest_path or ep_num < 0:
         print("\n[ERROR] No se encontraron episodios en results/evolution/.")
-        print("   Ejecuta primero analysis_tools/B_run_training.py o main.py")
+        print("   Ejecuta primero analysis/B_run_training.py o main.py")
         sys.exit(1)
 
     print(f"\n[INFO] Usando episodio mas reciente: episode_{ep_num}.csv")

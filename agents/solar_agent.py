@@ -1,8 +1,7 @@
-import numpy as np
-import math
+"""Solar agent implementing binary action for PV power injection."""
+
 from agents.base_agent import BaseAgent
 from core.registry import register_agent
-from utils.discretization import digitize_clip
 
 
 @register_agent("solar")

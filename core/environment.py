@@ -1,8 +1,12 @@
 import os
+import logging
 import pandas as pd
 import numpy as np
 from utils.discretization import digitize_clip
 from core.csv_handler import read_dataset_csv
+
+# Module-level logger
+logger = logging.getLogger("marl")
 
 
 class MultiAgentEnv:
@@ -54,22 +58,30 @@ class MultiAgentEnv:
 
         # Get maximum power value from config (design limit / physical constraint)
         self.max_value = float(config.get("simulation", {}).get("max_power", 300000.0))
-        print(f"Maximum power value from config: {self.max_value}")
+        logger.info("Maximum power value from config: %.1f", self.max_value)
 
         # Get maximum price value from config (design limit / physical constraint)
         self.max_price = float(config.get("simulation", {}).get("max_price", 200.0))
-        print(f"Maximum price value from config: {self.max_price}")
+        logger.info("Maximum price value from config: %.1f", self.max_price)
 
         self.price_bins = np.linspace(0, 1, self.num_price_bins)
         self.power_bins = np.linspace(0, 1, self.num_power_bins)
         self.delta_bins = np.linspace(-1, 1, self.num_delta_bins)
 
-        # Create price bins using comfort_threshold from load agent config
-        # If comfort_threshold is defined, create asymmetric bins: [0, threshold, max_price]
-        # This creates two categories: "cheap" (below threshold) and "expensive" (above threshold)
+        # Create price bins using comfort_threshold from load agent config (if available)
+        # If comfort_threshold is defined and load agent is active, create asymmetric bins
+        # Otherwise, use default linear bins for price discretization
         comfort_threshold = config.get("agents", {}).get("load", {}).get("limits", {}).get("comfort_threshold")
-        self.price_bins = np.array([0, float(comfort_threshold), self.max_price])
-        print(f"Price bins (asymmetric): [0, {comfort_threshold}, {self.max_price}] EUR/MWh")
+        load_count = config.get("agents", {}).get("load", {}).get("count", 0)
+        
+        if comfort_threshold is not None and load_count > 0:
+            # Asymmetric bins: [0, threshold, max_price] for binary "cheap/expensive"
+            self.price_bins = np.array([0, float(comfort_threshold), self.max_price])
+            logger.info("Price bins (asymmetric): [0, %.1f, %.1f] EUR/MWh", comfort_threshold, self.max_price)
+        else:
+            # Default linear bins when no load agent or no comfort_threshold
+            self.price_bins = np.linspace(0, self.max_price, self.num_price_bins + 1)
+            logger.info("Price bins (linear): %s EUR/MWh", self.price_bins)
 
         # Store full dataset for random window selection
         self.full_dataset = self.dataset.copy()

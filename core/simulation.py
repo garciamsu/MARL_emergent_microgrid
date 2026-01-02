@@ -1,6 +1,6 @@
 """High-level training loop for the multi-agent microgrid.
 
-    main()if __name__ == "__main__":    print("\n" + "="*80)            sys.exit(1)        traceback.print_exc()        import traceback        print(f"\n❌ ERROR: {e}")    except Exception as e:                        print(f"\n❌ Metadata file NOT found")        else:                                print(f"   Windows used more than once: {len(repeated_windows)}")                repeated_windows = non_summary[non_summary['frequency'] > 1]                                print(f"   Average frequency: {non_summary['frequency'].mean():.2f}")                print(f"   Min frequency: {non_summary['frequency'].min()}")                print(f"   Max frequency: {non_summary['frequency'].max()}")                print(f"   Unique windows: {len(non_summary)}")                print(f"\n\n📊 Statistics:")            if len(non_summary) > 0:            non_summary = window_frequency[window_frequency['window_start_index'] != 'SUMMARY']            # Statistics                        print(window_frequency.head(15).to_string(index=False))            print(f"   Showing windows sorted by frequency (most used first):")            print(f"\n\n📈 Window Frequency Analysis Sheet:")                        print(episode_details.head(10).to_string(index=False))            print(f"   Total episodes: {len(episode_details)}")            print(f"\n📊 Episode Details Sheet:")                        window_frequency = pd.read_excel(metadata_path, sheet_name='Window Frequency', engine='openpyxl')            episode_details = pd.read_excel(metadata_path, sheet_name='Episode Details', engine='openpyxl')            # Read both sheets                        print(f"\n✅ Metadata file created: {metadata_path}")        if metadata_path.exists():        metadata_path = Path("results/logs/episode_metadata.xlsx")                print("\n✅ Training completed!")                agents, results = run_training(config)    try:        print(f"   Dataset: {config['simulation']['dataset']}\n")    print(f"\n📋 Running {config['simulation']['episodes']} episodes")        config['simulation']['episodes'] = 20  # Test with 20 episodes    original_episodes = config['simulation']['episodes']    config = load_config()        print("="*80)    print("🧪 Testing Window Frequency Analysis")    print("="*80)def main():from core.simulation import run_trainingfrom configs.loader import load_configsys.path.insert(0, str(Path(__file__).parent))import pandas as pdfrom pathlib import Pathimport sysThe current implementation performs an episodic tabular Q-learning procedure
+The current implementation performs an episodic tabular Q-learning procedure
 over a fixed historical dataset (no stochastic environment transitions beyond
 what the dataset provides). Each agent:
 
@@ -29,7 +29,7 @@ from core.utils import (
     save_q_tables,
     load_q_tables,
 )
-from utils.discretization import digitize_clip, discretize_ternary
+from utils.discretization import digitize_clip
 from core.csv_handler import write_result_csv
 
 
@@ -319,7 +319,7 @@ def run_training(config):
 
         # 1. Epsilon update using scheduler
         epsilon = scheduler(episode, epsilon)
-        print(30*"*")
+
         # Use actual episode data length, stop before last index for next_state calculation
         episode_steps = env.max_steps - 1
         for index in range(episode_steps):
@@ -359,23 +359,15 @@ def run_training(config):
             # Store base demand for load agent to use
             env.base_demand = base_demand_from_dataset
 
-            # Update discretized indices
-            #env.renewable_potential_idx = digitize_clip(env.renewable_potential, env.power_bins)
-            #env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
-            #env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
-            #env.grid_power_idx = 1  if env.grid_power > 0 else 0
-
             # PHASE 1: Update renewable agents (solar, wind)
             for agent in agents.values():
                 if "solar" in agent.name.lower():
                     agent.update_power(env)
-                    #env.renewable_potential += agent.potential
                     env.renewable_power += agent.power
                     env.total_power += agent.power
 
                 if "wind" in agent.name.lower():
                     agent.update_power(env)
-                    #env.renewable_potential += agent.potential
                     env.renewable_power += agent.power
                     env.total_power += agent.power
 
@@ -429,12 +421,8 @@ def run_training(config):
             env.demand_power_idx = digitize_clip(env.demand_power, env.power_bins)
             env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
             env.energy_balance_idx = digitize_clip(env.energy_balance, env.power_bins)
-            env.grid_power_idx = 1  if env.grid_power > 0 else 0
-            env.delta_ph =  env.renewable_potential - env.demand_power
-            env.delta_ph_norm = env.delta_ph / env.max_value
-            # Discretize delta_ph_norm to ternary state: -1 (deficit), 0 (balanced), 1 (surplus)
-            # Threshold of 0.01 means values in [-0.01, 0.01] are considered balanced (0)
-            env.delta_ph_idx = discretize_ternary(env.delta_ph_norm, threshold=0.01)
+            env.grid_power_idx = 1 if env.grid_power > 0 else 0
+            # Note: delta_ph is calculated in base_agent.get_discretized_state() to avoid duplication
 
 
             # Step log: Append environment globals at the end (preserve insertion order)

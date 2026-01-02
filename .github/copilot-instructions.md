@@ -33,6 +33,7 @@ El código es completamente orientado a objetos; cada componente físico es un a
   - `agents.battery.limits.*`: límites de SOC y comportamiento del SOC inicial por episodio.
   - `discretization.*`: número de bins y rangos usados por `utils/discretization.py`.
   - `stability.window`: tamaño de ventana para promedios móviles en análisis (usado por `analysis_tools/E_accumulated_reward.py`).
+  - `io.results_dir`: directorio base para todos los archivos de salida (usado por `core/simulation.py` y scripts de análisis).
 - Al añadir nuevas opciones, extiende este YAML y léelo en `configs/loader.py` o `core/utils` en lugar de usar constantes hard‑codeadas.
 - **Principio**: Evita valores hardcodeados; lee siempre desde `default.yaml` cuando el parámetro afecta múltiples módulos o análisis.
 

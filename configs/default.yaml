@@ -60,11 +60,6 @@ simulation:
     decay: null             # Auto-calculated to reach 'end' across training
     values: []              # only for custom
 
-validation:
-  enabled: true
-  episodes: 20
-  epsilon: 0.0
-
 # ==============================================================
 # Discretization parameters
 # ==============================================================
@@ -80,36 +75,14 @@ discretization:
 # ==============================================================
 
 stability:
-  window: 100
-  metric: IAE
-  reference: median50
-  tolerance: 1.10
+  window: 100  # Used for rolling window calculations in stability analysis
 
 # ==============================================================
 # I/O and results
 # ==============================================================
 
 io:
-  export: true
-  results_dir: results
-  plots_dir: plots
-  evolution_dir: evolution
-  checkpoints_dir: checkpoints
-  metrics_file: metrics_episode.xlsx
-  export_plots_format: svg
-
-# ==============================================================
-# Metrics to compute
-# ==============================================================
-
-metrics:
-  - IAE
-  - ISE
-  - Var_dif
-  - REP
-  - GEP
-  - Q_norm
-  - Mean_Rewards
+  results_dir: results  # Base directory for all output files
 
 # ==============================================================
 # Agents and their configurations
@@ -125,12 +98,10 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultSolarReward
-      params: {theta: 1, beta: 1, nu: 1, xi: 1}
+      params: {theta: 1, beta: 1, nu: 1}
     state_space:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: solar_potential,  source: local,   bins: auto}
-    p_max: 300000
-    efficiency: 0.98
 
   wind:
     count: 0
@@ -140,13 +111,10 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultWindReward
-      params: {theta: 1, beta: 1, nu: 1, xi: 1}
+      params: {theta: 1, beta: 1, nu: 1}
     state_space:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: solar_potential,  source: local,   bins: auto}
-    limits:
-      p_max: 300000
-      efficiency: 0.95
 
   battery:
     count: 1
@@ -156,7 +124,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultBatteryReward
-      params: {psi: 1, sigma: 1, nu: 1, beta: 1, xi: 1, mu: 1}
+      params: {psi: 1, nu: 1, beta: 1}
     state_space:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
@@ -180,7 +148,7 @@ agents:
       gamma: 0.95
     reward:
       type: DefaultGridReward
-      params: {psi: 1, beta: 1, nu: 1, xi: 1}
+      params: {psi: 1, beta: 1, nu: 1}
     state_space:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
@@ -196,21 +164,11 @@ agents:
       gamma: 0.95 # Discount factor: 0.95 valora fuertemente recompensas futuras
     reward:
       type: DefaultLoadReward
-      # Reward parameters (hyperparameters for dynamic reward modulation):
-      #   sigma: Scale factor for CORRECT behavior reward
-      #          - OFF when price > comfort_threshold (demand response)
-      #          - ON when internal energy available (renewable/battery)
-      #   psi: Scale factor for INCORRECT behavior penalty (higher to emphasize)
-      #        - ON when price > comfort_threshold (ignoring price signal)
-      #   nu: Scale factor for MISSED OPPORTUNITY penalty
-      #       - OFF when internal energy available and price acceptable
-      #   beta: Neutral/small reward for acceptable import from grid
-      #         - ON when price <= comfort_threshold but no internal energy
-      # 
-      # Dynamic modulation: All rewards are scaled by economic_signal
-      # economic_signal = (base_demand / demand_max) × (price / price_max)
-      # This reflects the instantaneous economic impact of the decision
-      params: {sigma: 1, psi: 1, nu: 1, beta: 1}
+      # Reward parameters:
+      #   psi: Scale factor for CORRECT behavior reward
+      #   beta: Scale factor for INCORRECT behavior penalty
+      #   nu: Scale factor for neutral/edge cases
+      params: {psi: 1, nu: 1, beta: 1}
     state_space:
       - {var: pu_power,   source: env,     bins: auto}
       - {var: cm,         source: local,   bins: auto}

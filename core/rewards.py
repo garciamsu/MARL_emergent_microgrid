@@ -12,11 +12,17 @@ class RewardFn:
 
 @register_reward("DefaultSolarReward")
 class DefaultSolarReward(RewardFn):
+    """Reward function for solar agent.
+    
+    Note: Currently uses fixed rewards based on state-action pairs.
+    Parameters theta, beta, nu are reserved for future dynamic scaling.
+    """
 
     def __init__(self, theta=1.0, beta=1.0, nu=1.0, **kwargs):
-        self.theta = theta  # escala dinámica principal
-        self.beta = beta    # castigos dinámicos
-        self.nu = nu        # balance suave 0.3
+        # Reserved for future use - currently rewards are fixed
+        self.theta = theta
+        self.beta = beta
+        self.nu = nu
 
     def compute(self, agent, env, state_tuple):
         delta_ph_idx, pv_idx = state_tuple
@@ -40,8 +46,14 @@ class DefaultSolarReward(RewardFn):
 
 @register_reward("DefaultWindReward")
 class DefaultWindReward(RewardFn):
+    """Reward function for wind agent.
+    
+    Note: Currently uses fixed rewards based on state-action pairs.
+    Parameters theta, beta, nu are reserved for future dynamic scaling.
+    """
 
     def __init__(self, theta=1.0, beta=1.0, nu=1.0, **kwargs):
+        # Reserved for future use - currently rewards are fixed
         self.theta = theta
         self.beta = beta
         self.nu = nu
@@ -51,7 +63,7 @@ class DefaultWindReward(RewardFn):
         reward = 0.0
 
         if delta_ph_idx > 0 and agent.action == 1:
-            reward = 1 * 1 if pw_idx > 0 else -1
+            reward = 1 * (1 if pw_idx > 0 else -1)
         elif delta_ph_idx > 0 and agent.action == 0:
             reward = -1
         elif delta_ph_idx < 0 and agent.action == 0:
@@ -66,6 +78,13 @@ class DefaultWindReward(RewardFn):
 
 @register_reward("DefaultBatteryReward")
 class DefaultBatteryReward(RewardFn):
+    """Reward function for battery agent.
+    
+    Parameters:
+        psi: Scale factor for correct behavior rewards (discharge on deficit, charge on surplus)
+        beta: Scale factor for incorrect behavior penalties
+        nu: Scale factor for neutral/idle behavior
+    """
 
     def __init__(self, psi=1.0, beta=1.0, nu=0.3, **kwargs):
         self.psi = psi
@@ -103,8 +122,15 @@ class DefaultBatteryReward(RewardFn):
 
 @register_reward("DefaultGridReward")
 class DefaultGridReward(RewardFn):
+    """Reward function for grid agent.
+    
+    Parameters:
+        psi: Scale factor for correct import behavior (import only when needed)
+        beta: Scale factor for incorrect import behavior penalties
+        nu: Scale factor for correct non-import behavior
+    """
 
-    def __init__(self, psi=1.0, beta=1.0, nu=1, **kwargs):
+    def __init__(self, psi=1.0, beta=1.0, nu=1.0, **kwargs):
         self.psi = psi
         self.beta = beta
         self.nu = nu
@@ -132,6 +158,13 @@ class DefaultGridReward(RewardFn):
 
 @register_reward("DefaultLoadReward")
 class DefaultLoadReward(RewardFn):
+    """Reward function for controllable load agent.
+    
+    Parameters:
+        psi: Scale factor for correct behavior (ON when cheap/available, OFF when expensive)
+        beta: Scale factor for incorrect behavior penalties
+        nu: Scale factor for neutral/edge case rewards
+    """
 
     def __init__(self, psi=1.0, beta=1.0, nu=0.3, **kwargs):
         self.psi = psi

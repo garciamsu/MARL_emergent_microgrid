@@ -428,19 +428,21 @@ def _analyze_single_qtable(config: dict, spec: QTableSpec, output_dir: Path) -> 
         expected_match_note = "No aplica (no hubo estados con expectativa fuerte)"
 
     # Plots
+    # NOTE: Avoid '#' in filenames. In HTML/img src, '#' is treated as a fragment delimiter.
     agent_tag = f"{spec.agent}#{spec.instance}"
+    safe_tag = f"{spec.agent}_{spec.instance}"
     labels = _state_labels(dense.states_unique)
-    _plot_q_heatmap(dense, labels, spec.agent, output_dir / f"q_heatmap_{agent_tag}.png")
-    _plot_q_histogram(q_values, spec.agent, output_dir / f"q_hist_{agent_tag}.png")
+    _plot_q_heatmap(dense, labels, spec.agent, output_dir / f"q_heatmap_{safe_tag}.png")
+    _plot_q_histogram(q_values, spec.agent, output_dir / f"q_hist_{safe_tag}.png")
     _plot_greedy_action_bar(
         greedy_action_counts,
         spec.agent,
         dense.actions_unique,
-        output_dir / f"greedy_actions_{agent_tag}.png",
+        output_dir / f"greedy_actions_{safe_tag}.png",
     )
 
     if expected_match_rate is not None:
-        _plot_expected_match(expected_match_rate, spec.agent, output_dir / f"expected_match_{agent_tag}.png")
+        _plot_expected_match(expected_match_rate, spec.agent, output_dir / f"expected_match_{safe_tag}.png")
 
     recommendations = _recommendations_for_agent(
         agent=spec.agent,
@@ -808,11 +810,12 @@ def _write_html_report(
     per_agent_html = []
     for a in analyses:
         tag = f"{a.spec.agent}#{a.spec.instance}"
+        safe_tag = f"{a.spec.agent}_{a.spec.instance}"
 
-        heatmap = f"q_heatmap_{tag}.png"
-        hist = f"q_hist_{tag}.png"
-        actions = f"greedy_actions_{tag}.png"
-        exp = f"expected_match_{tag}.png"
+        heatmap = f"q_heatmap_{safe_tag}.png"
+        hist = f"q_hist_{safe_tag}.png"
+        actions = f"greedy_actions_{safe_tag}.png"
+        exp = f"expected_match_{safe_tag}.png"
 
         recs = "".join([f"<li>{r}</li>" for r in a.recommendations])
 

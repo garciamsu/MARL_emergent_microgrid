@@ -67,77 +67,46 @@ class BaseAgent:
     def get_discretized_state(self, env, index):
         """Construct the discretized state tuple for this agent.
 
-        Iterates over the declarative ``state_space`` configuration and pulls
-        values from either local dataset columns, environment global attributes
-        or internal indices.
+        IMPORTANT: This method assumes env.load_timestep_data(index) has already
+        been called for the current timestep, OR that env.update_delta_ph() has
+        been called after any renewable potential consumption.
+        
+        In the dynamic state paradigm, each agent observes the CURRENT state of
+        the environment, which includes the effects of previous agents' actions
+        in the execution sequence (stigmergic consumption of renewable_potential).
+        
+        The delta_ph observed here represents:
+        - For first agent (solar): full potential - demand
+        - For subsequent agents: remaining potential - demand (after prior consumption)
         """
-
+        from utils.discretization import discretize_ternary
+        
         state_values = []
-
-        """
-        for state in self.state_space:
-            if state["source"] == "local":
-                # Example: var_wind_0 (if agent name is wind#0 and var = "var")
-                var_name = f"{state['var']}_{self.name.split('#')[1]}"
-                value = self.get_dataset(var_name, index)
-            elif state["source"] == "global":
-                # Use global index/state from environment
-                value = env.get_value(state["var"])
-            elif state["source"] == "self":
-                # Use agent's own index/state
-                value = self.idx
-            elif state["source"] == "external":
-                # Use external value from environment
-                value = getattr(env, state["var"])
-            else:
-                # Use environment value
-                value = env.get_dataset(state["var"], index)
-
-            state_values.append(value)
-        """
-        # Use episode_data (random window) if available, otherwise fall back to full dataset
-        data_source = env.episode_data if env.episode_data is not None else env.dataset
-        row = data_source.iloc[index]
-
-        env.solar_potential = row["solar_potential"]
-        env.solar_potential_norm = env.solar_potential / env.max_value
-        env.solar_potential_idx = 1 if env.solar_potential_norm  > 0.0 else 0
-        env.wind_potential = row["wind_potential"]
-        env.wind_potential_norm = env.wind_potential / env.max_value
-        env.wind_potential_idx = 1 if env.wind_potential_norm  > 0.0 else 0
-        env.price = row["price"]
-        env.demand_power = row["demand"]
-        env.renewable_potential = env.solar_potential + env.wind_potential
-
 
         for state in self.state_space:
             
             var = state.get("var")
 
             if var == "delta_ph":
-               env.delta_ph =  env.renewable_potential - env.demand_power
-               env.delta_ph_norm = env.delta_ph / env.max_value
-               # Discretize delta_ph_norm to ternary state: -1 (deficit), 0 (balanced), 1 (surplus)
-               env.delta_ph_idx = discretize_ternary(env.delta_ph_norm, threshold=0.01)
-               value = env.delta_ph_idx
+                # Use the CURRENT delta_ph from environment (dynamically updated)
+                # No recalculation here - env maintains the stigmergic state
+                value = env.delta_ph_idx
             elif var == "solar_potential":
-               value = env.solar_potential_idx
+                value = env.solar_potential_idx
             elif var == "wind_potential":
-               value = env.wind_potential_idx
+                value = env.wind_potential_idx
             elif var == "soc":
                 value = self.idx
             elif var == "pu_power":
-                grid_power_norm = env.grid_power / env.max_value
-                grid_power_idx = 1 if grid_power_norm  > 0.00 else 0
+                grid_power_norm = env.grid_power / env.max_value if env.max_value > 0 else 0
+                grid_power_idx = 1 if grid_power_norm > 0.00 else 0
                 value = grid_power_idx
             elif var == "cm":
                 # Use comfort_threshold from price_bins (loaded from YAML)
                 # price_bins = [0, comfort_threshold, max_price] creates binary discretization
-                env.price_norm  = env.price / env.max_price
-                env.price_idx = digitize_clip(env.price, env.price_bins)
                 value = env.price_idx
             else:  # Default to 'env'
-                value = -999 # Valor por defecto si no se reconoce la variable
+                value = -999  # Default value if variable not recognized
 
             state_values.append(value)
 

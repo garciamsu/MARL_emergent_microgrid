@@ -48,6 +48,39 @@ El código es completamente orientado a objetos; cada componente físico es un a
   5. Registrar la evolución en `results/evolution/episode_<n>.csv` y el estado general en `results/logs/`.
 - No cambies los nombres de archivos ni la estructura de directorios en `results/` sin actualizar también los scripts en `analysis/`.
 
+## Paradigma de Estado Dinámico con Consumo Estigmérgico
+
+El sistema implementa un **flujo de estado dinámico** donde la variable estigmérgica `delta_ph` se actualiza conforme cada agente consume su porción del potencial renovable:
+
+### Flujo de Ejecución por Paso
+1. **FASE 0**: `env.load_timestep_data(index)` - Carga demand, price, potenciales del dataset
+2. **FASE 1**: Solar observa → decide → ejecuta → consume potencial → recalcula delta_ph
+3. **FASE 2**: Wind observa (ve delta_ph reducido) → decide → ejecuta → consume potencial
+4. **FASE 3**: Battery observa → decide → ejecuta
+5. **FASE 4**: Grid observa → decide → ejecuta (cubre déficit residual)
+6. **FASE 5**: Load observa → decide → ejecuta (demand response)
+
+### Variable Estigmérgica: delta_ph
+- **Definición**: `delta_ph = renewable_potential - demand_power`
+- **Comportamiento**: Se actualiza dinámicamente tras cada agente renovable
+- **Semántica**:
+  - Positivo → Potencial excedente disponible
+  - Cero → Balance exacto
+  - Negativo → Déficit de potencial
+
+### Métodos Clave en Environment
+- `load_timestep_data(index)`: Carga datos base del dataset (DEBE llamarse primero)
+- `update_delta_ph()`: Recalcula delta_ph con valores actuales
+- `consume_renewable_potential(power, source)`: Reduce potencial tras inyección renovable
+
+### Columnas en CSV de Evolución
+- `env_delta_ph_initial`: delta_ph antes de cualquier acción
+- `env_delta_ph_final`: delta_ph después de consumo estigmérgico
+- `env_delta_ph_norm`, `env_delta_ph_idx`: Valores normalizados y discretizados
+
+### Documentación Detallada
+- **Guía completa**: `docs/DYNAMIC_STATE_PARADIGM.md`
+
 ## Recompensas y Agentes
 
 - Las recompensas están centralizadas: modifica siempre la lógica en `core/rewards.py` y en las secciones YAML correspondientes, nunca dentro de las clases de agentes.

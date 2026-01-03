@@ -26,9 +26,9 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 1000            # number of training episodes
+  episodes: 10              # number of training episodes
   dt_h: 1.0                 # step size in hours (must divide 1.0 exactly)
-  seed: 46                  # random seed for reproducibility
+  seed: 1                   # random seed for reproducibility
   dataset: training_v1.csv  # Dataset file located in assets/datasets/
   
   # Episode window size in hours (contiguous random window from dataset)

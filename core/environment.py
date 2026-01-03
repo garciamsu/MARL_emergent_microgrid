@@ -215,3 +215,102 @@ class MultiAgentEnv:
             self.total_power_idx = digitize_clip(self.total_power, self.power_bins)
             return self.total_power_idx
         return 0
+
+    def load_timestep_data(self, index: int) -> None:
+        """Load base data from dataset for the current timestep.
+        
+        This method MUST be called at the START of each timestep, BEFORE any
+        agent observes state or takes action. It initializes:
+        - Base demand and price from dataset
+        - Solar and wind potentials from dataset
+        - Initial renewable_potential (sum of solar + wind)
+        - Initial delta_ph calculation
+        
+        The renewable_potential will be dynamically reduced as each renewable
+        agent consumes its portion (stigmergic paradigm).
+        
+        Args:
+            index: Current timestep index within episode_data.
+        """
+        from utils.discretization import discretize_ternary
+        
+        data_source = self.episode_data if self.episode_data is not None else self.dataset
+        row = data_source.iloc[index]
+        
+        # Load base values from dataset
+        self.base_demand = row["demand"]
+        self.demand_power = row["demand"]
+        self.price = row["price"]
+        self.price_norm = self.price / self.max_price if self.max_price > 0 else 0
+        self.price_idx = digitize_clip(self.price, self.price_bins)
+        
+        # Load renewable potentials from dataset
+        self.solar_potential = row["solar_potential"]
+        self.solar_potential_norm = self.solar_potential / self.max_value if self.max_value > 0 else 0
+        self.solar_potential_idx = 1 if self.solar_potential_norm > 0.0 else 0
+        
+        self.wind_potential = row["wind_potential"]
+        self.wind_potential_norm = self.wind_potential / self.max_value if self.max_value > 0 else 0
+        self.wind_potential_idx = 1 if self.wind_potential_norm > 0.0 else 0
+        
+        # Initialize renewable_potential as sum of all renewable sources
+        # This is the STIGMERGIC variable that will be consumed by agents
+        self.renewable_potential = self.solar_potential + self.wind_potential
+        self.renewable_potential_idx = digitize_clip(
+            self.renewable_potential / self.max_value if self.max_value > 0 else 0,
+            self.power_bins
+        )
+        
+        # Calculate initial delta_ph (stigmergic balance signal)
+        self.update_delta_ph()
+        
+        logger.debug(
+            "Timestep %d loaded: demand=%.1f, price=%.2f, solar_pot=%.1f, wind_pot=%.1f, delta_ph=%.1f",
+            index, self.demand_power, self.price, self.solar_potential, self.wind_potential, self.delta_ph
+        )
+
+    def update_delta_ph(self) -> None:
+        """Recalculate delta_ph based on current renewable_potential and demand.
+        
+        delta_ph = renewable_potential - demand_power
+        
+        This is the core STIGMERGIC signal that agents observe. As renewable
+        agents consume their potential, this value changes, affecting decisions
+        of subsequent agents in the execution order.
+        
+        The delta_ph represents:
+        - Positive: Potential surplus (more renewable potential than demand)
+        - Zero: Balanced (potential matches demand)
+        - Negative: Potential deficit (demand exceeds renewable potential)
+        """
+        from utils.discretization import discretize_ternary
+        
+        self.delta_ph = self.renewable_potential - self.demand_power
+        self.delta_ph_norm = self.delta_ph / self.max_value if self.max_value > 0 else 0
+        self.delta_ph_idx = discretize_ternary(self.delta_ph_norm, threshold=0.01)
+
+    def consume_renewable_potential(self, power_consumed: float, source: str = "unknown") -> None:
+        """Reduce renewable_potential after an agent consumes its portion.
+        
+        This implements the stigmergic consumption model: when a renewable agent
+        injects power, that portion is no longer available as "potential" for
+        subsequent agents to consider in their decision-making.
+        
+        Args:
+            power_consumed: Amount of power consumed/injected by the agent (W).
+            source: Name of the agent consuming (for logging).
+        """
+        self.renewable_potential -= power_consumed
+        self.renewable_potential = max(0, self.renewable_potential)  # Cannot go negative
+        self.renewable_potential_idx = digitize_clip(
+            self.renewable_potential / self.max_value if self.max_value > 0 else 0,
+            self.power_bins
+        )
+        
+        # Recalculate delta_ph with updated potential
+        self.update_delta_ph()
+        
+        logger.debug(
+            "Agent %s consumed %.1f W, remaining potential=%.1f, new delta_ph=%.1f",
+            source, power_consumed, self.renewable_potential, self.delta_ph
+        )

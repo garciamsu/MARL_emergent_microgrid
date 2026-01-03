@@ -324,17 +324,17 @@ def run_training(config):
         episode_steps = env.max_steps - 1
         for index in range(episode_steps):
 
-            # Reset power accumulators
+            # ==============================================
+            # PHASE 0: Load timestep data from dataset FIRST
+            # This initializes: demand, price, potentials, delta_ph
+            # MUST happen before any agent observes or acts
+            # ==============================================
+            env.load_timestep_data(index)
+            
+            # Reset power accumulators (actual power, not potential)
             env.total_power = 0.0
             env.renewable_power = 0.0
-            env.renewable_potential = 0.0
             env.grid_power = 0.0
-
-            # 1. Discretized state per agent
-            state = {
-                name: agent.get_discretized_state(env, index)
-                for name, agent in agents.items()
-            }
 
             # Step log: environment global variables and per-agent fields
             step_record = {
@@ -343,61 +343,97 @@ def run_training(config):
                 "epsilon": epsilon
             }
 
-            # 2. Choose action per agent
-            for agent in agents.values():
-                agent.choose_action(state[agent.name], epsilon)
+            # Store initial delta_ph for logging (before any agent acts)
+            delta_ph_initial = env.delta_ph
 
-            # 3. Environment update based on agent actions
-            # Sequential update order: Renewables → Load → Battery → Grid
+            # ==============================================
+            # DYNAMIC STATE PARADIGM: Sequential Observe-Decide-Execute
+            # Each agent observes the CURRENT state (including effects of
+            # previous agents' consumption), decides, and executes.
+            # The renewable_potential decreases as agents consume it.
+            # ==============================================
+            
+            # Dictionary to store states as agents observe them
+            state = {}
 
-            # Load base demand and price from episode data (configurable window)
-            data_source = env.episode_data if env.episode_data is not None else env.dataset
-            base_demand_from_dataset = data_source.iloc[index]["demand"]
-            env.get_dataset("demand", index)
-            env.get_dataset("price", index)
-
-            # Store base demand for load agent to use
-            env.base_demand = base_demand_from_dataset
-
-            # PHASE 1: Update renewable agents (solar, wind)
+            # PHASE 1: SOLAR agents (first priority)
             for agent in agents.values():
                 if "solar" in agent.name.lower():
+                    # 1. Observe current state (with current delta_ph)
+                    state[agent.name] = agent.get_discretized_state(env, index)
+                    
+                    # 2. Choose action based on observed state
+                    agent.choose_action(state[agent.name], epsilon)
+                    
+                    # 3. Execute action
                     agent.update_power(env)
                     env.renewable_power += agent.power
                     env.total_power += agent.power
+                    
+                    # 4. Consume renewable potential (stigmergic update)
+                    env.consume_renewable_potential(agent.power, agent.name)
 
+            # PHASE 2: WIND agents (second priority)
+            for agent in agents.values():
                 if "wind" in agent.name.lower():
+                    # 1. Observe current state (delta_ph now reflects solar consumption)
+                    state[agent.name] = agent.get_discretized_state(env, index)
+                    
+                    # 2. Choose action based on observed state
+                    agent.choose_action(state[agent.name], epsilon)
+                    
+                    # 3. Execute action
                     agent.update_power(env)
                     env.renewable_power += agent.power
                     env.total_power += agent.power
+                    
+                    # 4. Consume renewable potential (stigmergic update)
+                    env.consume_renewable_potential(agent.power, agent.name)
 
-            # PHASE 2: Update battery agent (reacts to balance)
+            # PHASE 3: BATTERY agents (react to renewable balance)
             for agent in agents.values():
                 if "battery" in agent.name.lower():
+                    # 1. Observe current state (delta_ph reflects remaining potential)
+                    state[agent.name] = agent.get_discretized_state(env, index)
+                    
+                    # 2. Choose action based on observed state
+                    agent.choose_action(state[agent.name], epsilon)
+                    
+                    # 3. Execute action
                     agent.update_power(env)
-                    # Battery can charge (negative) or discharge (positive)
                     env.soc_state = agent.action
                     if agent.power >= 0:
                         env.total_power += agent.power
                     else:
                         env.demand_power += abs(agent.power)
 
-            # PHASE 3: Update grid agent (last resort)
+            # PHASE 4: GRID agents (last resort, covers residual deficit)
             for agent in agents.values():
                 if "grid" in agent.name.lower():
+                    # 1. Observe current state
+                    state[agent.name] = agent.get_discretized_state(env, index)
+                    
+                    # 2. Choose action based on observed state
+                    agent.choose_action(state[agent.name], epsilon)
+                    
+                    # 3. Execute action
                     agent.update_power(env)
-                    # Grid only imports (positive power)
                     if agent.power > 0:
                         env.grid_power = agent.power
                         env.total_power += agent.power
 
-            # PHASE 4: Update load agent (can reduce demand)
+            # PHASE 5: LOAD agents (demand response)
             for agent in agents.values():
                 if "load" in agent.name.lower():
+                    # 1. Observe current state
+                    state[agent.name] = agent.get_discretized_state(env, index)
+                    
+                    # 2. Choose action based on observed state
+                    agent.choose_action(state[agent.name], epsilon)
+                    
+                    # 3. Execute action
                     agent.update_power(env)
-                    # Load power is negative (consumption)
                     env.demand_power -= agent.power
-                    # Price state reflects affordability vs comfort threshold
                     env.price_idx = 1 if env.price > load_comfort_threshold else 0
 
             # Step log: Per-agent variables (safe defaults if attribute is missing)
@@ -411,18 +447,16 @@ def run_training(config):
                     step_record[f"soc_idx_{name}"] = getattr(agent, "idx", None)
                     env.soc = getattr(agent, "soc", 0.0)
 
-            # Update environment global variables
+            # Update environment global variables (final balance after all agents)
             env.energy_balance = env.total_power - env.demand_power
             env.delta_power_idx = "surplus" if env.energy_balance >= 0 else "deficit"
 
             # Update discretized indices
-            env.renewable_potential_idx = digitize_clip(env.renewable_potential, env.power_bins)
             env.renewable_power_idx = digitize_clip(env.renewable_power, env.power_bins)
             env.demand_power_idx = digitize_clip(env.demand_power, env.power_bins)
             env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
             env.energy_balance_idx = digitize_clip(env.energy_balance, env.power_bins)
             env.grid_power_idx = 1 if env.grid_power > 0 else 0
-            # Note: delta_ph is calculated in base_agent.get_discretized_state() to avoid duplication
 
 
             # Step log: Append environment globals at the end (preserve insertion order)
@@ -441,12 +475,19 @@ def run_training(config):
                 "env_grid_power_idx": env.grid_power_idx,
                 "env_energy_balance": env.energy_balance,
                 "env_energy_balance_idx": env.energy_balance_idx,
-                "env_delta_ph": env.delta_ph,
+                "env_delta_ph_initial": delta_ph_initial,
+                "env_delta_ph_final": env.delta_ph,
                 "env_delta_ph_norm": env.delta_ph_norm,
                 "env_delta_ph_idx": env.delta_ph_idx,
             })
 
-            # 4. Next state
+            # ==============================================
+            # NEXT STATE CALCULATION
+            # For Q-learning, next_state uses data from timestep t+1
+            # This includes: new potentials from dataset + current SOC
+            # ==============================================
+            env.load_timestep_data(index + 1)
+            
             next_state = {
                 name: agent.get_discretized_state(env, index + 1)
                 for name, agent in agents.items()

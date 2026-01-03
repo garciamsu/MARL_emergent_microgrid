@@ -83,6 +83,11 @@ class MultiAgentEnv:
             self.price_bins = np.linspace(0, self.max_price, self.num_price_bins + 1)
             logger.info("Price bins (linear): %s EUR/MWh", self.price_bins)
 
+        # Q-table initialization value (optimistic initialization)
+        # Higher values encourage exploration of unvisited state-action pairs
+        self.q_init_value = config.get("simulation", {}).get("q_init_value", 0.0)
+        logger.info("Q-table initialization value: %.2f", self.q_init_value)
+
         # Store full dataset for random window selection
         self.full_dataset = self.dataset.copy()
 

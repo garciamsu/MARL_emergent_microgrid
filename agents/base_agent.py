@@ -144,7 +144,10 @@ class BaseAgent:
         - bins == 'auto' o ausente -> len(env.power_bins)
         - Caso especial SOC: si var in {'soc','soc_idx'} y existe self.battery_soc_bins -> len(self.battery_soc_bins)
         - Caso especial price: si var == 'price' -> len(env.price_bins)
-        Construye el producto cartesiano de los rangos y crea entradas con 0.0.
+        Construye el producto cartesiano de los rangos y crea entradas con valor inicial.
+        
+        Uses optimistic initialization (positive initial Q-values) to encourage
+        exploration of unvisited state-action pairs during early training.
         """
         dims = []
         for desc in (self.state_space or []):
@@ -186,9 +189,12 @@ class BaseAgent:
             self.q_table = {}
             return
 
-        self.q_table = {state: {a: 0.0 for a in self.actions} for state in product(*dims)}
+        # Optimistic initialization: start with small positive values
+        # This encourages exploration of unvisited actions
+        init_value = getattr(env, 'q_init_value', 0.0)
+        self.q_table = {state: {a: init_value for a in self.actions} for state in product(*dims)}
         agent_type = self.name.split("#")[0] if "#" in self.name else self.name
         print(
             f"Agente {agent_type}: tamaño actual (número de estados visitados): "
-            f"{len(self.q_table)}"
+            f"{len(self.q_table)}, init_value={init_value}"
         )

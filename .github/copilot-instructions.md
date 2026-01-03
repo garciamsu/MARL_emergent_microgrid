@@ -211,6 +211,15 @@ Los siguientes archivos ya usan el formato estandarizado:
 - **Resumen de cambios**: `docs/CSV_STANDARDIZATION_SUMMARY.md`
 - **Validación**: `scripts/validate_csv_consistency.py`
 
+## Mecanismos de Seguridad y Fallback
+
+### Inicialización Optimista de Q-tables
+Las Q-tables se inicializan con un valor configurable para incentivar exploración:
+
+- **Configuración**: `simulation.q_init_value` (default: 5.0)
+- **Efecto**: Valores altos incentivan exploración de acciones no probadas
+- **Rango típico**: 0.0 (neutral) a 10.0 (muy optimista)
+
 ## Cómo Extender de Forma Segura
 
 - Al añadir funcionalidades, prioriza:

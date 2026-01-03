@@ -26,7 +26,7 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 1500            # number of training episodes
+  episodes: 2500            # number of training episodes (increased for better convergence)
   dt_h: 1.0                 # step size in hours (must divide 1.0 exactly)
   seed: 44                  # random seed for reproducibility
   dataset: training_v1.csv  # Dataset file located in assets/datasets/
@@ -59,6 +59,11 @@ simulation:
     end: 0.0                # Very low minimum for pure exploitation at end
     decay: null             # Auto-calculated to reach 'end' across training
     values: []              # only for custom
+
+  # Q-table initialization value (optimistic initialization)
+  # Higher values encourage exploration of unvisited state-action pairs
+  # Typical range: 0.0 (neutral) to 10.0 (very optimistic)
+  q_init_value: 5.0
 
 # ==============================================================
 # Discretization parameters

@@ -2,8 +2,8 @@
 # General mode
 # ==============================================================
 
-mode: train          # train | offline
-offline_run: 45      # set run_id if mode=offline
+mode: offline          # train | offline
+offline_run: 44      # set run_id if mode=offline
 
 # ==============================================================
 # Offline mode parameters (evaluation / exploitation only)
@@ -26,9 +26,9 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 10              # number of training episodes
+  episodes: 1500            # number of training episodes
   dt_h: 1.0                 # step size in hours (must divide 1.0 exactly)
-  seed: 1                   # random seed for reproducibility
+  seed: 44                  # random seed for reproducibility
   dataset: training_v1.csv  # Dataset file located in assets/datasets/
   
   # Episode window size in hours (contiguous random window from dataset)
@@ -56,7 +56,7 @@ simulation:
     # This ensures strong exploration early, smooth transition, and stable convergence
     schedule: linear    # linear | exponential | constant | custom
     start: 1.0
-    end: 0.05               # Very low minimum for pure exploitation at end
+    end: 0.0                # Very low minimum for pure exploitation at end
     decay: null             # Auto-calculated to reach 'end' across training
     values: []              # only for custom
 
@@ -129,7 +129,7 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
     limits:
-      capacity_ah: 20000
+      capacity_ah: 500000
       v_nom: 48
       soc_min: 0.0
       soc_max: 1.0
@@ -137,8 +137,8 @@ agents:
       # Random initial SOC sampled from U[initial_soc_min, initial_soc_max]
       initial_soc_min: 0.0
       initial_soc_max: 1.0
-      p_charge_max: 300000
-      p_discharge_max: 300000
+      p_charge_max: 400000
+      p_discharge_max: 400000
 
   grid:
     count: 1
@@ -153,7 +153,7 @@ agents:
       - {var: delta_ph,         source: env,     bins: auto}
       - {var: soc,              source: local,   bins: auto}
     limits:
-      p_max: 300000
+      p_max: 400000
       export_allowed: false
 
   load:

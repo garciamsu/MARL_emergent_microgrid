@@ -144,6 +144,10 @@ class MultiAgentEnv:
         self.delta_ph = 0
         self.delta_ph_norm = 0
         self.delta_ph_idx = 0
+        # Real balance: actual power (renewable_power - demand) for battery/grid rewards
+        self.real_balance = 0
+        self.real_balance_norm = 0
+        self.real_balance_idx = 0
         self.solar_potential = 0
         self.wind_potential = 0
         self.solar_potential_norm = 0
@@ -282,12 +286,22 @@ class MultiAgentEnv:
         - Positive: Potential surplus (more renewable potential than demand)
         - Zero: Balanced (potential matches demand)
         - Negative: Potential deficit (demand exceeds renewable potential)
+        
+        Additionally updates real_balance which represents the actual power balance
+        (renewable_power - demand_power) for use by battery and grid agents.
         """
         from utils.discretization import discretize_ternary
         
+        # Stigmergic signal: uses remaining POTENTIAL (for renewable coordination)
         self.delta_ph = self.renewable_potential - self.demand_power
         self.delta_ph_norm = self.delta_ph / self.max_value if self.max_value > 0 else 0
         self.delta_ph_idx = discretize_ternary(self.delta_ph_norm, threshold=0.01)
+        
+        # Real balance: uses actual POWER injected (for battery/grid rewards)
+        # This is the actual surplus/deficit based on power already committed to the system
+        self.real_balance = self.renewable_power - self.demand_power
+        self.real_balance_norm = self.real_balance / self.max_value if self.max_value > 0 else 0
+        self.real_balance_idx = discretize_ternary(self.real_balance_norm, threshold=0.01)
 
     def consume_renewable_potential(self, power_consumed: float, source: str = "unknown") -> None:
         """Reduce renewable_potential after an agent consumes its portion.

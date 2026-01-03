@@ -479,7 +479,20 @@ def run_training(config):
                 "env_delta_ph_final": env.delta_ph,
                 "env_delta_ph_norm": env.delta_ph_norm,
                 "env_delta_ph_idx": env.delta_ph_idx,
+                # Real balance (actual power) for battery/grid reward evaluation
+                "env_real_balance": env.real_balance,
+                "env_real_balance_norm": env.real_balance_norm,
+                "env_real_balance_idx": env.real_balance_idx,
             })
+
+            # ==============================================
+            # SAVE CURRENT REAL BALANCE FOR REWARDS
+            # Must capture before loading next timestep data
+            # ==============================================
+            # Save current real_balance for reward calculation
+            # (will be overwritten by load_timestep_data)
+            env._reward_real_balance_idx = env.real_balance_idx
+            env._reward_real_balance_norm = env.real_balance_norm
 
             # ==============================================
             # NEXT STATE CALCULATION

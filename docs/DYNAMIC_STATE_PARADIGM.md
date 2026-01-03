@@ -151,6 +151,79 @@ Ven el estado final del sistema, actuando como respaldo.
 Los scripts en `analysis/` deberían funcionar sin cambios. Si alguno usaba `env_delta_ph`, ahora puede usar:
 - `env_delta_ph_initial` para el valor pre-acciones
 - `env_delta_ph_final` para el valor post-acciones
+- `env_real_balance` para el balance real de potencia (renovable - demanda)
+
+## Señales Diferenciadas por Tipo de Agente
+
+### Problema Detectado
+Tras implementar el consumo estigmérgico, se identificó una discrepancia crítica:
+- **delta_ph (estigmérgico)**: Calculado como `renewable_potential - demand` → Se vuelve NEGATIVO después de que los renovables "consumen" su potencial
+- **real_balance**: Calculado como `renewable_power - demand` → Refleja el balance REAL de potencia inyectada
+
+**Ejemplo del problema:**
+```
+Step 0:
+  delta_ph_initial = +86,623 W (SURPLUS de potencial)
+  Wind inyecta 108,453 W
+  Después de consume_renewable_potential():
+    delta_ph_final = -21,830 W (DEFICIT de potencial restante)
+  
+  Pero la realidad física:
+    real_balance = 108,453 - 76,214 = +32,239 W (SURPLUS real)
+```
+
+La batería veía `delta_ph = -21,830` (deficit) pero el balance real era `+32,239` (surplus). Esto causaba que recibiera **penalización** por cargar correctamente.
+
+### Solución: Diferenciación por Tipo de Agente
+
+Se implementó el concepto de **señales diferenciadas**:
+
+| Tipo de Agente | Señal para Recompensa | Justificación |
+|----------------|----------------------|---------------|
+| **Solar, Wind** | `delta_ph` (estigmérgico) | Coordinan acceso al potencial renovable |
+| **Battery, Grid** | `real_balance` (potencia real) | Responden al balance físico real |
+
+### Nuevas Variables en Environment
+
+```python
+# Señal estigmérgica (para renovables)
+env.delta_ph = env.renewable_potential - env.demand_power
+env.delta_ph_norm = delta_ph / max_value
+env.delta_ph_idx = discretize_ternary(delta_ph_norm)
+
+# Balance real (para batería/grid)
+env.real_balance = env.renewable_power - env.demand_power
+env.real_balance_norm = real_balance / max_value
+env.real_balance_idx = discretize_ternary(real_balance_norm)
+```
+
+### Cambios en Funciones de Recompensa
+
+**DefaultBatteryReward** y **DefaultGridReward** ahora usan `real_balance_idx`:
+```python
+def compute(self, agent, env, state_tuple):
+    # Usa balance REAL en lugar de delta_ph estigmérgico
+    real_balance_idx = getattr(env, 'real_balance_idx', 0)
+    
+    if real_balance_idx > 0 and agent.action == 1:  # Surplus → carga correcta
+        reward = +self.psi * (1 - soc_norm)
+    # ...
+```
+
+### Columnas Adicionales en CSV
+
+- `env_real_balance`: Balance real en Watts
+- `env_real_balance_norm`: Balance normalizado [-1, 1]
+- `env_real_balance_idx`: Índice discretizado {-1, 0, +1}
+
+### Verificación
+
+Para verificar que la batería ahora recibe recompensa correcta:
+```python
+# Cuando hay surplus real Y la batería carga:
+assert real_balance_idx > 0 and battery.action == 1
+# → reward debe ser POSITIVO
+```
 
 ## Ejemplo de Ejecución
 

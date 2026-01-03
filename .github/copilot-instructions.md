@@ -68,15 +68,28 @@ El sistema implementa un **flujo de estado dinámico** donde la variable estigm�
   - Cero → Balance exacto
   - Negativo → Déficit de potencial
 
+### Balance Real: real_balance
+- **Definición**: `real_balance = renewable_power - demand_power`
+- **Uso**: Para recompensas de batería y grid (no estigmérgico)
+- **Justificación**: La batería/grid responden al balance físico real, no al potencial restante
+
+### Señales Diferenciadas por Tipo de Agente
+| Agente | Señal para Recompensa | Razón |
+|--------|----------------------|-------|
+| Solar, Wind | `delta_ph` (estigmérgico) | Coordinan acceso al potencial renovable |
+| Battery, Grid | `real_balance` (potencia real) | Responden al balance físico real |
+
 ### Métodos Clave en Environment
 - `load_timestep_data(index)`: Carga datos base del dataset (DEBE llamarse primero)
-- `update_delta_ph()`: Recalcula delta_ph con valores actuales
+- `update_delta_ph()`: Recalcula delta_ph y real_balance con valores actuales
 - `consume_renewable_potential(power, source)`: Reduce potencial tras inyección renovable
 
 ### Columnas en CSV de Evolución
 - `env_delta_ph_initial`: delta_ph antes de cualquier acción
 - `env_delta_ph_final`: delta_ph después de consumo estigmérgico
 - `env_delta_ph_norm`, `env_delta_ph_idx`: Valores normalizados y discretizados
+- `env_real_balance`: Balance real de potencia (renewables - demand)
+- `env_real_balance_norm`, `env_real_balance_idx`: Valores normalizados y discretizados
 
 ### Documentación Detallada
 - **Guía completa**: `docs/DYNAMIC_STATE_PARADIGM.md`

@@ -80,6 +80,10 @@ class DefaultWindReward(RewardFn):
 class DefaultBatteryReward(RewardFn):
     """Reward function for battery agent.
     
+    Uses REAL BALANCE (renewable_power - demand) instead of stigmergic delta_ph.
+    This ensures the battery is rewarded/penalized based on actual power availability,
+    not on remaining potential after stigmergic consumption.
+    
     Parameters:
         psi: Scale factor for correct behavior rewards (discharge on deficit, charge on surplus)
         beta: Scale factor for incorrect behavior penalties
@@ -92,26 +96,35 @@ class DefaultBatteryReward(RewardFn):
         self.nu = nu
 
     def compute(self, agent, env, state_tuple):
-        delta_ph, soc = state_tuple
+        # Use REAL BALANCE instead of stigmergic delta_ph from state
+        # This ensures battery is evaluated on actual power availability
+        # Note: Use _reward_real_balance_* saved before loading next timestep data
+        real_balance_idx = getattr(env, '_reward_real_balance_idx', getattr(env, 'real_balance_idx', 0))
+        real_balance_norm = getattr(env, '_reward_real_balance_norm', getattr(env, 'real_balance_norm', 0.0))
+        
+        _, soc = state_tuple  # Still use SOC from state tuple
         soc_norm = agent.soc
         reward = 0.0
 
-        if delta_ph < 0 and agent.action == 2 and soc > 0:
-            reward = +self.psi * abs(env.delta_ph_norm) * soc_norm
+        # Deficit scenario: discharge is correct, charge is wrong
+        if real_balance_idx < 0 and agent.action == 2 and soc > 0:
+            reward = +self.psi * abs(real_balance_norm) * soc_norm
 
-        elif delta_ph < 0 and agent.action == 1:
+        elif real_balance_idx < 0 and agent.action == 1:
             reward = -self.beta * 1
 
-        elif delta_ph < 0 and agent.action == 0:
+        elif real_balance_idx < 0 and agent.action == 0:
             reward = -self.nu * 1
 
-        elif delta_ph > 0  and agent.action == 1:
+        # Surplus scenario: charge is correct, discharge is wrong
+        elif real_balance_idx > 0 and agent.action == 1:
             reward = +self.psi * 1 * (1 - soc_norm)
 
-        elif delta_ph > 0 and agent.action == 2:
+        elif real_balance_idx > 0 and agent.action == 2:
             reward = -self.beta * 1
 
-        elif delta_ph == 0 and agent.action == 0:
+        # Balanced scenario: idle is correct
+        elif real_balance_idx == 0 and agent.action == 0:
             reward = +self.nu
 
         else:
@@ -123,6 +136,10 @@ class DefaultBatteryReward(RewardFn):
 @register_reward("DefaultGridReward")
 class DefaultGridReward(RewardFn):
     """Reward function for grid agent.
+    
+    Uses REAL BALANCE (renewable_power - demand) instead of stigmergic delta_ph.
+    This ensures grid import decisions are evaluated based on actual power availability,
+    not on remaining potential after stigmergic consumption.
     
     Parameters:
         psi: Scale factor for correct import behavior (import only when needed)
@@ -136,23 +153,30 @@ class DefaultGridReward(RewardFn):
         self.nu = nu
 
     def compute(self, agent, env, state_tuple):
-        delta_ph, soc_idx = state_tuple
+        # Use REAL BALANCE instead of stigmergic delta_ph from state
+        # Grid should import only when there's actual deficit after all renewables
+        # Note: Use _reward_real_balance_* saved before loading next timestep data
+        real_balance_idx = getattr(env, '_reward_real_balance_idx', getattr(env, 'real_balance_idx', 0))
+        
+        _, soc_idx = state_tuple  # Still use SOC from state tuple
         soc = env.soc_state
         reward = 0.0
 
-        
-        if delta_ph < 0 and soc == 0 and agent.action == 1:
+        # True deficit AND no battery charge: import is correct
+        if real_balance_idx < 0 and soc == 0 and agent.action == 1:
             reward = self.psi * 1
-        elif delta_ph < 0 and soc == 0 and agent.action == 0:
+        # True deficit AND no battery charge: not importing is wrong
+        elif real_balance_idx < 0 and soc == 0 and agent.action == 0:
             reward = -self.beta * 1
-        elif (delta_ph > 0 or soc > 0) and agent.action == 1:
+        # Surplus OR battery has charge: importing is wrong
+        elif (real_balance_idx > 0 or soc > 0) and agent.action == 1:
             reward = -self.beta * 1
-        elif (delta_ph > 0 or soc > 0) and agent.action == 0:
-            reward = self.nu*1
+        # Surplus OR battery has charge: not importing is correct
+        elif (real_balance_idx > 0 or soc > 0) and agent.action == 0:
+            reward = self.nu * 1
         else:
             reward = -0.25
         
-        #print(f"\n delta_ph {delta_ph} soc {soc} agent.action {agent.action} reward {reward}")
         return reward
 
 

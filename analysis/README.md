@@ -49,7 +49,7 @@ analysis/
 Verifica que el dataset contenga las columnas necesarias y que los episodios previos (si existen) tengan la estructura correcta.
 
 ```bash
-python analysis/A_data_check.py
+python analysis/operative/A_data_check.py
 ```
 
 **Salida esperada:**
@@ -61,10 +61,10 @@ python analysis/A_data_check.py
 
 ### **Paso 2: Ejecutar Entrenamiento** (`B_run_training.py`)
 
-Ejecuta `main.py` con la configuración definida en `configs/default.yaml`. La limpieza de `results/` está delegada a `main.py` (usa `analysis.utils.clear_directories`).
+Ejecuta `main.py` con la configuración definida en `configs/default.yaml`. La limpieza de `results/` está delegada a `main.py` (usa `analysis.common.utils.clear_directories`).
 
 ```bash
-python analysis/B_run_training.py
+python analysis/operative/B_run_training.py
 ```
 
 **Parámetros clave (leídos de `configs/default.yaml`):**
@@ -112,7 +112,7 @@ episode_rewards.append(episode_reward)  # Guardar al final
 Agrupa todos los episodios en un único CSV con métricas por episodio (recompensas totales, tasas de activación, etc.).
 
 ```bash
-python analysis/C_collect_episodes.py
+python analysis/operative/C_collect_episodes.py
 ```
 
 **Salida:**
@@ -128,7 +128,7 @@ python analysis/C_collect_episodes.py
 Calcula métricas operativas y de aprendizaje para todos los episodios e imprime resumen en consola con evaluación PASS/FAIL según umbrales configurados.
 
 ```bash
-python analysis/D_compute_metrics.py
+python analysis/operative/D_compute_metrics.py
 ```
 
 **Métricas Operativas (por episodio):**
@@ -169,7 +169,7 @@ analysis:
 Genera análisis de recompensas acumuladas a través de los episodios para visualizar tendencias de aprendizaje.
 
 ```bash
-python analysis/E_accumulated_reward.py
+python analysis/operative/E_accumulated_reward.py
 ```
 
 **Funcionalidad:**
@@ -289,22 +289,22 @@ agents:
 
 ```bash
 # 1. Validar datos
-python analysis/A_data_check.py
+python analysis/operative/A_data_check.py
 
 # 2. Editar configs/default.yaml según el experimento
 nano configs/default.yaml  # Ajustar episodes, epsilon, rewards, etc.
 
 # 3. Ejecutar entrenamiento
-python analysis/B_run_training.py
+python analysis/operative/B_run_training.py
 
 # 4. Consolidar episodios
-python analysis/C_collect_episodes.py
+python analysis/operative/C_collect_episodes.py
 
 # 5. Calcular métricas y revisar PASS/FAIL
-python analysis/D_compute_metrics.py
+python analysis/operative/D_compute_metrics.py
 
 # 6. Generar gráficos
-python analysis/E_plot_metrics.py
+python analysis/operative/E_graph_episode.py
 
 # 7. Revisar plots en results/plots/*.svg
 ```
@@ -457,7 +457,7 @@ Mide consenso entre agentes:
 - **Agentes**: `agents/base_agent.py`, `agents/*_agent.py`
 - **Políticas**: `core/policies.py`, `core/rewards.py`
 - **Config**: `configs/default.yaml`, `configs/loader.py`
-- **Análisis de Estabilidad**: `analysis/stability_analysis.py`, `docs/STABILITY_ANALYSIS.md`
+- **Análisis de Estabilidad**: `analysis/stability/stability_analysis.py`, `docs/STABILITY_ANALYSIS.md`
 - **Instrucciones generales**: `.github/copilot-instructions.md`
 
 ---

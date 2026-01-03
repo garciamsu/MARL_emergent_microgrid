@@ -336,7 +336,7 @@ This stability analysis complements existing tools in `analysis/`:
 ### Programmatic Usage
 
 ```python
-from analysis.stability_analysis import (
+from analysis.stability.stability_analysis import (
     BellmanContractionStabilityAnalyzer,
     ConsensusStabilityAnalyzer
 )

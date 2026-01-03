@@ -34,9 +34,10 @@ def run_script(script_name: str, script_path: Path) -> bool:
     print("="*80)
 
     try:
+        project_root = Path(__file__).resolve().parent.parent
         result = subprocess.run(
             [sys.executable, str(script_path)],
-            cwd=str(script_path.parent.parent),
+            cwd=str(project_root),
             check=True,
             capture_output=False
         )
@@ -73,8 +74,8 @@ def main():
     print("  6. E_graph_episode.py        - Episode graphs")
     print("\n" + "="*80)
     
-    # Define scripts directory
-    scripts_dir = Path(__file__).parent
+    # Define scripts directory (operative step scripts live here)
+    scripts_dir = Path(__file__).parent / "operative"
     
     # Define pipeline scripts in execution order
     pipeline = [
@@ -128,3 +129,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

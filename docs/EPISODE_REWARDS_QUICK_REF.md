@@ -143,7 +143,7 @@ assert abs(manual_sum - stored) < 1e-6  # Should match
 |------|---------|  
 | `core/simulation.py` | Implementation |
 | `results/logs/episode_rewards.csv` | Output data |
-| `analysis/E_accumulated_reward.py` | Complete Analysis, Validation & Visualization |
+| `analysis/operative/E_accumulated_reward.py` | Complete Analysis, Validation & Visualization |
 | `docs/EPISODE_REWARDS_GUIDE.md` | Full documentation |## Commands
 
 ```bash
@@ -151,7 +151,7 @@ assert abs(manual_sum - stored) < 1e-6  # Should match
 python main.py
 
 # Comprehensive analysis (includes validation, statistics, and all plots)
-python analysis/E_accumulated_reward.py
+python analysis/operative/E_accumulated_reward.py
 ```
 
 ## One-Line Summary

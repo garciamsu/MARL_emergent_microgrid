@@ -108,7 +108,7 @@ agents:
 ## Programmatic Usage
 
 ```python
-from analysis.stability_analysis import run_both_stability_analyses
+from analysis.stability.stability_analysis import run_both_stability_analyses
 from analysis.collect_qtables_per_episode import load_qtables_history
 
 # Load data

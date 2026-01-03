@@ -231,7 +231,7 @@ Notas:
 - Semilla global: `simulation.seed` (controla Python, NumPy y Torch si disponible).
 - Logger central: `core.utils.build_logger()` genera archivo en `results/logs/`.
 - Cada episodio registra `epsilon` residual.
-- Limpieza previa: `analysis.utils.clear_directories()`.
+- Limpieza previa: `analysis.common.utils.clear_directories()`.
 
 ---
 
@@ -313,7 +313,7 @@ python scripts/self_check.py
 python -m pytest -k smoke -q
 
 # Limpieza manual (opcional)
-python -c "from analysis.utils import clear_directories; clear_directories()"
+python -c "from analysis.common.utils import clear_directories; clear_directories()"
 ```
 
 ---

@@ -32,7 +32,7 @@ El código es completamente orientado a objetos; cada componente físico es un a
   - `agents.<type>.reward`: pesos y parámetros de recompensa consumidos en `core/rewards.py`.
   - `agents.battery.limits.*`: límites de SOC y comportamiento del SOC inicial por episodio.
   - `discretization.*`: número de bins y rangos usados por `utils/discretization.py`.
-  - `stability.window`: tamaño de ventana para promedios móviles en análisis (usado por `analysis/E_accumulated_reward.py`).
+  - `stability.window`: tamaño de ventana para promedios móviles en análisis (usado por `analysis/operative/E_accumulated_reward.py`).
   - `io.results_dir`: directorio base para todos los archivos de salida (usado por `core/simulation.py` y scripts de análisis).
 - Al añadir nuevas opciones, extiende este YAML y léelo en `configs/loader.py` o `core/utils` en lugar de usar constantes hard‑codeadas.
 - **Principio**: Evita valores hardcodeados; lee siempre desde `default.yaml` cuando el parámetro afecta múltiples módulos o análisis.
@@ -130,10 +130,10 @@ El repositorio ahora incluye herramientas de análisis de estabilidad para siste
 
 ### Módulos de Análisis de Estabilidad
 
-- `analysis/stability_analysis.py`: Clases analizadoras para estudios de estabilidad (Bellman y Consenso).
+- `analysis/stability/stability_analysis.py`: Clases analizadoras para estudios de estabilidad (Bellman y Consenso).
 - `analysis/collect_qtables_per_episode.py`: Recolecta snapshots de Q-tables por episodio durante el entrenamiento.
 - `analysis/run_stability_analysis.py`: Ejecuta ambos análisis de estabilidad sobre datos recolectados.
-- `analysis/test_stability_analysis.py`: Suite de validación con datos sintéticos.
+- `analysis/tests/test_stability_analysis.py`: Suite de validación con datos sintéticos.
 
 ### Dos Estudios de Estabilidad
 
@@ -203,7 +203,7 @@ El proyecto utiliza un sistema **estandarizado** para el manejo de archivos CSV 
 ### Archivos Actualizados (No Modificar sin Justificación)
 Los siguientes archivos ya usan el formato estandarizado:
 - `core/environment.py`, `core/simulation.py`
-- `analysis/A_data_check.py`, `C_collect_episodes.py`, `D_compute_metrics.py`, `E_accumulated_reward.py`, `E_graph_episode.py`, `utils.py`, `stability_analysis.py`
+- `analysis/operative/A_data_check.py`, `analysis/operative/C_collect_episodes.py`, `analysis/operative/D_compute_metrics.py`, `analysis/operative/E_accumulated_reward.py`, `analysis/operative/E_graph_episode.py`, `analysis/common/utils.py`, `analysis/stability/stability_analysis.py`
 - `scripts/hyperparameter_search.py`, `validate_load_agent.py`
 
 ### Documentación
@@ -224,7 +224,7 @@ Las Q-tables se inicializan con un valor configurable para incentivar exploraci�
 
 - Al añadir funcionalidades, prioriza:
   - Nuevos campos de configuración en `configs/default.yaml`.
-  - Helpers pequeños y enfocados en `core/utils.py`, `utils/discretization.py` o `analysis/utils.py`.
+  - Helpers pequeños y enfocados en `core/utils.py`, `utils/discretization.py` o `analysis/common/utils.py`.
   - Reutilizar el sistema de logging y las utilidades de limpieza existentes en lugar de scripts ad‑hoc.
   - **Usar siempre `core/csv_handler.py`** para leer/escribir CSVs (ver sección anterior).
 - Evita romper la compatibilidad hacia atrás de los formatos de CSV/log; los scripts de `analysis/` dependen de su esquema actual.

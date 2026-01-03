@@ -8,7 +8,7 @@ Two independent stability analysis methods have been successfully implemented fo
 
 ## What Was Implemented
 
-### 1. Core Analysis Module (`analysis/stability_analysis.py`)
+### 1. Core Analysis Module (`analysis/stability/stability_analysis.py`)
 
 **Two analyzer classes:**
 

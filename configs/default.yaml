@@ -2,7 +2,7 @@
 # General mode
 # ==============================================================
 
-mode: offline          # train | offline
+mode: offline        # train | offline
 offline_run: 44      # set run_id if mode=offline
 
 # ==============================================================
@@ -63,7 +63,7 @@ simulation:
   # Q-table initialization value (optimistic initialization)
   # Higher values encourage exploration of unvisited state-action pairs
   # Typical range: 0.0 (neutral) to 10.0 (very optimistic)
-  q_init_value: 5.0
+  q_init_value: 0.0
 
 # ==============================================================
 # Discretization parameters

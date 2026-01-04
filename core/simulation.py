@@ -324,6 +324,7 @@ def run_training(config):
         episode_steps = env.max_steps - 1
         for index in range(episode_steps):
 
+            env.renewable_potential = 0.0
             # ==============================================
             # PHASE 0: Load timestep data from dataset FIRST
             # This initializes: demand, price, potentials, delta_ph
@@ -619,5 +620,22 @@ def run_training(config):
         run_id = str(config.get("simulation", {}).get("seed", "default"))
         ckpt_dir = save_q_tables(agents, config.get("io", {}).get("results_dir", "results"), run_id)
         logger.info("Q-tables saved to checkpoints directory: %s", ckpt_dir)
+
+    # Auto-generate episode dynamics plot if enabled in config
+    io_cfg = config.get("io", {})
+    if io_cfg.get("auto_plot_episode_dynamics", False) and not is_offline:
+        results_dir = io_cfg.get("results_dir", "results")
+        logger.info("Generating episode dynamics plot for last episode...")
+        try:
+            # Lazy import to avoid matplotlib initialization issues during module load
+            from analysis.operative.E_graph_episode import generate_episode_dynamics_plot
+            # Plot the last episode (num_episodes - 1 is 0-indexed)
+            generate_episode_dynamics_plot(
+                episode_num=num_episodes - 1,
+                results_dir=results_dir
+            )
+            logger.info("Episode dynamics plot generated successfully")
+        except Exception as e:
+            logger.warning("Failed to generate episode dynamics plot: %s", e)
 
     return agents, results

@@ -2,8 +2,8 @@
 # General mode
 # ==============================================================
 
-mode: offline        # train | offline
-offline_run: 44      # set run_id if mode=offline
+mode: train          # train | offline
+offline_run: 43      # set run_id if mode=offline
 
 # ==============================================================
 # Offline mode parameters (evaluation / exploitation only)
@@ -26,11 +26,11 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 2500            # number of training episodes (increased for better convergence)
+  episodes: 1500            # number of training episodes (increased for better convergence)
   dt_h: 1.0                 # step size in hours (must divide 1.0 exactly)
-  seed: 44                  # random seed for reproducibility
+  seed: 43                  # random seed for reproducibility
   dataset: training_v1.csv  # Dataset file located in assets/datasets/
-  
+
   # Episode window size in hours (contiguous random window from dataset)
   # Each episode uses a random contiguous window of this size
   # Must be <= dataset length. Default: 48 hours (2 days)
@@ -88,6 +88,10 @@ stability:
 
 io:
   results_dir: results  # Base directory for all output files
+  
+  # Automatically generate episode_dynamics plot at the end of training
+  # When true, generates results/plots/episode_dynamics.svg for the last episode
+  auto_plot_episode_dynamics: true
 
 # ==============================================================
 # Agents and their configurations
@@ -118,8 +122,8 @@ agents:
       type: DefaultWindReward
       params: {theta: 1, beta: 1, nu: 1}
     state_space:
-      - {var: delta_ph,         source: env,     bins: auto}
-      - {var: solar_potential,  source: local,   bins: auto}
+      - {var: delta_ph,         source: env,    ins: auto}
+      - {var: wind_potential,  source: local,   bins: auto}
 
   battery:
     count: 1

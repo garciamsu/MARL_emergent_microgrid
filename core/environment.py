@@ -36,6 +36,13 @@ class MultiAgentEnv:
         # Power scaling factor from configuration (kW/kWh to W/Wh)
         self.power_scale_factor = config["simulation"].get("power_scale_factor", 1000.0)
 
+        # Enabled renewable sources (driven by YAML agent counts)
+        agents_cfg = config.get("agents", {}) or {}
+        self.solar_count = int(agents_cfg.get("solar", {}).get("count", 0) or 0)
+        self.wind_count = int(agents_cfg.get("wind", {}).get("count", 0) or 0)
+        self.solar_enabled = self.solar_count > 0
+        self.wind_enabled = self.wind_count > 0
+
         # Simulation time step in hours (used for SOC integration)
         self.dt_h = config.get("simulation", {}).get("dt_h", 1.0)
 
@@ -253,12 +260,14 @@ class MultiAgentEnv:
         self.price_norm = self.price / self.max_price if self.max_price > 0 else 0
         self.price_idx = digitize_clip(self.price, self.price_bins)
         
-        # Load renewable potentials from dataset
-        self.solar_potential = row["solar_potential"]
+        # Load renewable potentials from dataset (respect agent enable flags)
+        raw_solar_potential = row.get("solar_potential", 0.0)
+        self.solar_potential = raw_solar_potential if self.solar_enabled else 0.0
         self.solar_potential_norm = self.solar_potential / self.max_value if self.max_value > 0 else 0
         self.solar_potential_idx = 1 if self.solar_potential_norm > 0.0 else 0
         
-        self.wind_potential = row["wind_potential"]
+        raw_wind_potential = row.get("wind_potential", 0.0)
+        self.wind_potential = raw_wind_potential if self.wind_enabled else 0.0
         self.wind_potential_norm = self.wind_potential / self.max_value if self.max_value > 0 else 0
         self.wind_potential_idx = 1 if self.wind_potential_norm > 0.0 else 0
         
@@ -278,7 +287,7 @@ class MultiAgentEnv:
             index, self.demand_power, self.price, self.solar_potential, self.wind_potential, self.delta_ph
         )
 
-    def update_delta_ph(self) -> None:
+    def update_delta_ph(self, power_consumed: float = 0.0) -> None:
         """Recalculate delta_ph based on current renewable_potential and demand.
         
         delta_ph = renewable_potential - demand_power
@@ -298,7 +307,7 @@ class MultiAgentEnv:
         from utils.discretization import discretize_ternary
         
         # Stigmergic signal: uses remaining POTENTIAL (for renewable coordination)
-        self.delta_ph = self.renewable_potential - self.demand_power
+        self.delta_ph = (self.renewable_potential - self.demand_power) - power_consumed
         self.delta_ph_norm = self.delta_ph / self.max_value if self.max_value > 0 else 0
         self.delta_ph_idx = discretize_ternary(self.delta_ph_norm, threshold=0.01)
         
@@ -319,15 +328,16 @@ class MultiAgentEnv:
             power_consumed: Amount of power consumed/injected by the agent (W).
             source: Name of the agent consuming (for logging).
         """
-        self.renewable_potential -= power_consumed
-        self.renewable_potential = max(0, self.renewable_potential)  # Cannot go negative
-        self.renewable_potential_idx = digitize_clip(
-            self.renewable_potential / self.max_value if self.max_value > 0 else 0,
-            self.power_bins
-        )
         
+        #self.renewable_potential -= power_consumed
+        #self.renewable_potential = max(0.0, self.renewable_potential)  # Cannot go negative
+        #self.renewable_potential_idx = digitize_clip(
+        #    self.renewable_potential / self.max_value if self.max_value > 0 else 0,
+        #    self.power_bins,
+        #)
+
         # Recalculate delta_ph with updated potential
-        self.update_delta_ph()
+        self.update_delta_ph(power_consumed)
         
         logger.debug(
             "Agent %s consumed %.1f W, remaining potential=%.1f, new delta_ph=%.1f",

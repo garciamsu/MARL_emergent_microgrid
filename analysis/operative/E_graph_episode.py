@@ -214,8 +214,25 @@ def _build_time_ticks(time_steps: np.ndarray, max_ticks: int = 50):
     return time_steps[::step]
 
 
-def plot_episode_dynamics(base_dir, episode_num, config):
-    """Crea el gráfico del episodio de entrenamiento y guarda un SVG."""
+def plot_episode_dynamics(base_dir, episode_num, config, output_path=None):
+    """
+    Crea el gráfico del episodio de entrenamiento y guarda un SVG.
+    
+    Args:
+        base_dir: Directory containing episode CSV files
+        episode_num: Episode number to plot
+        config: Panel configuration dictionary (PLOT_CONFIG)
+        output_path: Optional output path. If None, uses OUTPUT_FILENAME global.
+    """
+    # Use global OUTPUT_FILENAME if no output_path provided
+    if output_path is None:
+        output_path = OUTPUT_FILENAME
+    
+    # Ensure output directory exists
+    output_dir = os.path.dirname(output_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+    
     # Buscar el archivo
     file_path = os.path.join(base_dir, f'episode_{episode_num}.csv')
     if not os.path.exists(file_path):
@@ -373,10 +390,13 @@ def plot_episode_dynamics(base_dir, episode_num, config):
     plt.tight_layout(pad=1.0, rect=[0, 0, 0.85, 0.98]) # <-- Ajustado rect[2] a 0.85
 
     try:
-        plt.savefig(OUTPUT_FILENAME, format='svg', dpi=300, bbox_inches='tight')
-        print(f"\n✅ ¡Gráfica guardada correctamente en:\n{OUTPUT_FILENAME}")
+        plt.savefig(output_path, format='svg', dpi=300, bbox_inches='tight')
+        print(f"\n✅ ¡Gráfica guardada correctamente en:\n{output_path}")
     except Exception as e:
         print(f"❌ Error al guardar la gráfica: {e}")
+    finally:
+        plt.close()
+
 
 def read_csv_auto(file_path):
     """
@@ -390,6 +410,58 @@ def read_csv_auto(file_path):
     except Exception as e:
         print(f"❌ Error al leer CSV: {e}")
         return None
+
+
+def generate_episode_dynamics_plot(
+    episode_num: int = None,
+    results_dir: str = "results",
+    output_path: str = None
+) -> bool:
+    """
+    Public API to generate episode dynamics plot.
+    
+    This function can be called from simulation.py or any external module
+    to generate the episode dynamics visualization.
+    
+    Args:
+        episode_num: Episode number to plot. If None, uses the latest episode.
+        results_dir: Base results directory (default: "results")
+        output_path: Full path for output SVG. If None, uses default location.
+        
+    Returns:
+        bool: True if plot was generated successfully, False otherwise.
+    """
+    try:
+        # Determine evolution directory
+        evolution_dir = os.path.join(results_dir, "evolution")
+        
+        # Auto-detect latest episode if not specified
+        if episode_num is None:
+            episode_num = get_latest_episode_number(evolution_dir)
+            if episode_num is None:
+                print("⚠️  No episodes found for plotting")
+                return False
+        
+        # Determine output path
+        if output_path is None:
+            plots_dir = os.path.join(results_dir, "plots")
+            os.makedirs(plots_dir, exist_ok=True)
+            output_path = os.path.join(plots_dir, "episode_dynamics.svg")
+        else:
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        print(f"📊 Generating episode dynamics plot for episode {episode_num}...")
+        
+        # Call the main plotting function with default config and output path
+        plot_episode_dynamics(evolution_dir, episode_num, PLOT_CONFIG, output_path)
+        
+        print(f"✅ Episode dynamics plot generated: {output_path}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error generating episode dynamics plot: {e}")
+        return False
+
 
 if __name__ == "__main__":
     output_dir = os.path.dirname(OUTPUT_FILENAME)

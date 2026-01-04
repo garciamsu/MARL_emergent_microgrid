@@ -361,15 +361,15 @@ def run_training(config):
                 if "solar" in agent.name.lower():
                     # 1. Observe current state (with current delta_ph)
                     state[agent.name] = agent.get_discretized_state(env, index)
-                    
+
                     # 2. Choose action based on observed state
                     agent.choose_action(state[agent.name], epsilon)
-                    
+
                     # 3. Execute action
                     agent.update_power(env)
                     env.renewable_power += agent.power
                     env.total_power += agent.power
-                    
+
                     # 4. Consume renewable potential (stigmergic update)
                     env.consume_renewable_potential(agent.power, agent.name)
 
@@ -378,15 +378,15 @@ def run_training(config):
                 if "wind" in agent.name.lower():
                     # 1. Observe current state (delta_ph now reflects solar consumption)
                     state[agent.name] = agent.get_discretized_state(env, index)
-                    
+
                     # 2. Choose action based on observed state
                     agent.choose_action(state[agent.name], epsilon)
-                    
+
                     # 3. Execute action
                     agent.update_power(env)
                     env.renewable_power += agent.power
                     env.total_power += agent.power
-                    
+
                     # 4. Consume renewable potential (stigmergic update)
                     env.consume_renewable_potential(agent.power, agent.name)
 
@@ -395,10 +395,10 @@ def run_training(config):
                 if "battery" in agent.name.lower():
                     # 1. Observe current state (delta_ph reflects remaining potential)
                     state[agent.name] = agent.get_discretized_state(env, index)
-                    
+
                     # 2. Choose action based on observed state
                     agent.choose_action(state[agent.name], epsilon)
-                    
+
                     # 3. Execute action
                     agent.update_power(env)
                     env.soc_state = agent.action
@@ -412,10 +412,10 @@ def run_training(config):
                 if "grid" in agent.name.lower():
                     # 1. Observe current state
                     state[agent.name] = agent.get_discretized_state(env, index)
-                    
+
                     # 2. Choose action based on observed state
                     agent.choose_action(state[agent.name], epsilon)
-                    
+
                     # 3. Execute action
                     agent.update_power(env)
                     if agent.power > 0:
@@ -427,10 +427,10 @@ def run_training(config):
                 if "load" in agent.name.lower():
                     # 1. Observe current state
                     state[agent.name] = agent.get_discretized_state(env, index)
-                    
+
                     # 2. Choose action based on observed state
                     agent.choose_action(state[agent.name], epsilon)
-                    
+
                     # 3. Execute action
                     agent.update_power(env)
                     env.demand_power -= agent.power
@@ -457,7 +457,6 @@ def run_training(config):
             env.total_power_idx = digitize_clip(env.total_power, env.power_bins)
             env.energy_balance_idx = digitize_clip(env.energy_balance, env.power_bins)
             env.grid_power_idx = 1 if env.grid_power > 0 else 0
-
 
             # Step log: Append environment globals at the end (preserve insertion order)
             step_record.update({
@@ -500,7 +499,7 @@ def run_training(config):
             # This includes: new potentials from dataset + current SOC
             # ==============================================
             env.load_timestep_data(index + 1)
-            
+
             next_state = {
                 name: agent.get_discretized_state(env, index + 1)
                 for name, agent in agents.items()
@@ -519,7 +518,7 @@ def run_training(config):
 
                 # Compute timestep reward
                 timestep_reward = agent.reward_fn.compute(agent, env, state_tuple)
-                
+
                 # Accumulate timestep reward into episode reward
                 current_episode_reward[name] += timestep_reward
 
@@ -532,8 +531,6 @@ def run_training(config):
 
             evolution.append(step_record)
 
-
-
         # 7. Save episode data
         episode_df = pd.DataFrame(evolution)
 
@@ -545,7 +542,7 @@ def run_training(config):
             # Training: keep existing naming convention used by analysis
             write_result_csv(episode_df, f"results/evolution/episode_{episode}.csv")
         results.append(episode_df)
-        
+
         # 8. Store episode reward for each agent
         # Append the final episode reward (sum of all timestep rewards for this episode)
         for name in agents.keys():
@@ -563,21 +560,21 @@ def run_training(config):
     metadata_df = pd.DataFrame(episode_metadata)
     os.makedirs("results/logs", exist_ok=True)
     metadata_excel_path = "results/logs/episode_metadata.xlsx"
-    
+
     # Create frequency analysis of windows
     window_frequency = metadata_df.groupby(['window_start_index', 'window_end_index']).agg(
         frequency=('episode', 'count'),
         episodes=('episode', lambda x: ', '.join(map(str, sorted(x))))
     ).reset_index()
     window_frequency = window_frequency.sort_values('frequency', ascending=False).reset_index(drop=True)
-    
+
     # Calculate statistics
     total_episodes = len(metadata_df)
     unique_windows = len(window_frequency)
     max_frequency = window_frequency['frequency'].max()
     min_frequency = window_frequency['frequency'].min()
     avg_frequency = window_frequency['frequency'].mean()
-    
+
     # Add summary row
     summary_data = {
         'window_start_index': ['SUMMARY'],
@@ -587,12 +584,12 @@ def run_training(config):
     }
     summary_df = pd.DataFrame(summary_data)
     window_frequency_with_summary = pd.concat([window_frequency, summary_df], ignore_index=True)
-    
+
     # Write to Excel with multiple sheets
     with pd.ExcelWriter(metadata_excel_path, engine='openpyxl') as writer:
         metadata_df.to_excel(writer, sheet_name='Episode Details', index=False)
         window_frequency_with_summary.to_excel(writer, sheet_name='Window Frequency', index=False)
-    
+
     logger.info("Episode metadata saved to %s", metadata_excel_path)
     logger.info("Window frequency analysis: %d unique windows used across %d episodes", unique_windows, total_episodes)
 
@@ -600,20 +597,20 @@ def run_training(config):
     # Create DataFrame with episode rewards (one row per episode, one column per agent)
     episode_rewards_df = pd.DataFrame(episode_rewards)
     episode_rewards_df.insert(0, 'episode', range(num_episodes))
-    
+
     # Save to CSV and Excel
     rewards_csv_path = "results/logs/episode_rewards.csv"
     rewards_excel_path = "results/logs/episode_rewards.xlsx"
-    
+
     write_result_csv(episode_rewards_df, rewards_csv_path)
-    
+
     # Calculate statistics for Excel
     rewards_stats = episode_rewards_df.drop('episode', axis=1).describe()
-    
+
     with pd.ExcelWriter(rewards_excel_path, engine='openpyxl') as writer:
         episode_rewards_df.to_excel(writer, sheet_name='Episode Rewards', index=False)
         rewards_stats.to_excel(writer, sheet_name='Statistics')
-    
+
     logger.info("Episode rewards saved to %s and %s", rewards_csv_path, rewards_excel_path)
 
     # Persist Q-tables after training runs only (not offline evaluation)

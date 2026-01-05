@@ -131,7 +131,7 @@ class MultiAgentEnv:
             self.initial_soc = initial_soc
         
         # Reset continuous variables
-        self.renewable_potential = 0
+        self.renewable_potential = 0.0
         self.renewable_power = 0
         self.demand_power = 0
         self.base_demand = 0  # Base demand from dataset (before load agent modulation)
@@ -307,7 +307,7 @@ class MultiAgentEnv:
         from utils.discretization import discretize_ternary
         
         # Stigmergic signal: uses remaining POTENTIAL (for renewable coordination)
-        self.delta_ph = (self.renewable_potential - self.demand_power) - power_consumed
+        self.delta_ph = self.renewable_potential - (self.demand_power - power_consumed)
         self.delta_ph_norm = self.delta_ph / self.max_value if self.max_value > 0 else 0
         self.delta_ph_idx = discretize_ternary(self.delta_ph_norm, threshold=0.01)
         
@@ -329,12 +329,12 @@ class MultiAgentEnv:
             source: Name of the agent consuming (for logging).
         """
         
-        #self.renewable_potential -= power_consumed
-        #self.renewable_potential = max(0.0, self.renewable_potential)  # Cannot go negative
-        #self.renewable_potential_idx = digitize_clip(
-        #    self.renewable_potential / self.max_value if self.max_value > 0 else 0,
-        #    self.power_bins,
-        #)
+        self.renewable_potential -= power_consumed
+        self.renewable_potential = max(0.0, self.renewable_potential)  # Cannot go negative
+        self.renewable_potential_idx = digitize_clip(
+            self.renewable_potential / self.max_value if self.max_value > 0 else 0,
+            self.power_bins,
+        )
 
         # Recalculate delta_ph with updated potential
         self.update_delta_ph(power_consumed)

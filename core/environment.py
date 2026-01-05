@@ -307,7 +307,7 @@ class MultiAgentEnv:
         from utils.discretization import discretize_ternary
         
         # Stigmergic signal: uses remaining POTENTIAL (for renewable coordination)
-        self.delta_ph = self.renewable_potential - (self.demand_power - power_consumed)
+        self.delta_ph = self.renewable_potential - self.demand_power
         self.delta_ph_norm = self.delta_ph / self.max_value if self.max_value > 0 else 0
         self.delta_ph_idx = discretize_ternary(self.delta_ph_norm, threshold=0.01)
         
@@ -317,29 +317,3 @@ class MultiAgentEnv:
         self.real_balance_norm = self.real_balance / self.max_value if self.max_value > 0 else 0
         self.real_balance_idx = discretize_ternary(self.real_balance_norm, threshold=0.01)
 
-    def consume_renewable_potential(self, power_consumed: float, source: str = "unknown") -> None:
-        """Reduce renewable_potential after an agent consumes its portion.
-        
-        This implements the stigmergic consumption model: when a renewable agent
-        injects power, that portion is no longer available as "potential" for
-        subsequent agents to consider in their decision-making.
-        
-        Args:
-            power_consumed: Amount of power consumed/injected by the agent (W).
-            source: Name of the agent consuming (for logging).
-        """
-        
-        self.renewable_potential -= power_consumed
-        self.renewable_potential = max(0.0, self.renewable_potential)  # Cannot go negative
-        self.renewable_potential_idx = digitize_clip(
-            self.renewable_potential / self.max_value if self.max_value > 0 else 0,
-            self.power_bins,
-        )
-
-        # Recalculate delta_ph with updated potential
-        self.update_delta_ph(power_consumed)
-        
-        logger.debug(
-            "Agent %s consumed %.1f W, remaining potential=%.1f, new delta_ph=%.1f",
-            source, power_consumed, self.renewable_potential, self.delta_ph
-        )

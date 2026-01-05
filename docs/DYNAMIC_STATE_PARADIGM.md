@@ -95,17 +95,6 @@ def update_delta_ph(self) -> None:
     self.delta_ph_idx = discretize_ternary(self.delta_ph_norm, threshold=0.01)
 ```
 
-#### `consume_renewable_potential(power_consumed: float, source: str)`
-Reduce el potencial renovable después de que un agente consume su porción.
-
-```python
-def consume_renewable_potential(self, power_consumed: float, source: str) -> None:
-    """Reduce renewable_potential after an agent consumes its portion."""
-    self.renewable_potential -= power_consumed
-    self.renewable_potential = max(0, self.renewable_potential)
-    self.update_delta_ph()  # Recalcula delta_ph
-```
-
 ### 2. `agents/base_agent.py`
 
 **Modificación en `get_discretized_state()`:**
@@ -118,7 +107,6 @@ def consume_renewable_potential(self, power_consumed: float, source: str) -> Non
 **Cambios en el bucle principal:**
 - Añadida FASE 0: `env.load_timestep_data(index)` al inicio de cada paso
 - Fusión de observe-decide-execute por fase de agente
-- Llamada a `env.consume_renewable_potential()` después de renovables
 - Nuevo cálculo de `next_state` usando `env.load_timestep_data(index + 1)`
 
 **Nuevas columnas en CSV de evolución:**
@@ -165,9 +153,6 @@ Tras implementar el consumo estigmérgico, se identificó una discrepancia crít
 Step 0:
   delta_ph_initial = +86,623 W (SURPLUS de potencial)
   Wind inyecta 108,453 W
-  Después de consume_renewable_potential():
-    delta_ph_final = -21,830 W (DEFICIT de potencial restante)
-  
   Pero la realidad física:
     real_balance = 108,453 - 76,214 = +32,239 W (SURPLUS real)
 ```

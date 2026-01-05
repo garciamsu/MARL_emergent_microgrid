@@ -344,9 +344,6 @@ def run_training(config):
                 "epsilon": epsilon
             }
 
-            # Store initial delta_ph for logging (before any agent acts)
-            delta_ph_initial = env.delta_ph
-
             # ==============================================
             # DYNAMIC STATE PARADIGM: Sequential Observe-Decide-Execute
             # Each agent observes the CURRENT state (including effects of
@@ -371,8 +368,6 @@ def run_training(config):
                     env.renewable_power += agent.power
                     env.total_power += agent.power
 
-                    # 4. Consume renewable potential (stigmergic update)
-                    env.consume_renewable_potential(agent.power, agent.name)
 
             # PHASE 2: WIND agents (second priority)
             for agent in agents.values():
@@ -387,9 +382,6 @@ def run_training(config):
                     agent.update_power(env)
                     env.renewable_power += agent.power
                     env.total_power += agent.power
-
-                    # 4. Consume renewable potential (stigmergic update)
-                    env.consume_renewable_potential(agent.power, agent.name)
 
             # PHASE 3: BATTERY agents (react to renewable balance)
             for agent in agents.values():
@@ -475,8 +467,7 @@ def run_training(config):
                 "env_grid_power_idx": env.grid_power_idx,
                 "env_energy_balance": env.energy_balance,
                 "env_energy_balance_idx": env.energy_balance_idx,
-                "env_delta_ph_initial": delta_ph_initial,
-                "env_delta_ph_final": env.delta_ph,
+                "env_delta_ph": env.delta_ph,
                 "env_delta_ph_norm": env.delta_ph_norm,
                 "env_delta_ph_idx": env.delta_ph_idx,
                 # Real balance (actual power) for battery/grid reward evaluation

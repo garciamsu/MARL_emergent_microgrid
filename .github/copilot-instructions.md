@@ -82,7 +82,7 @@ El sistema implementa un **flujo de estado dinámico** donde la variable estigm�
 ### Métodos Clave en Environment
 - `load_timestep_data(index)`: Carga datos base del dataset (DEBE llamarse primero)
 - `update_delta_ph()`: Recalcula delta_ph y real_balance con valores actuales
-- `consume_renewable_potential(power, source)`: Reduce potencial tras inyección renovable
+
 
 ### Columnas en CSV de Evolución
 - `env_delta_ph_initial`: delta_ph antes de cualquier acción

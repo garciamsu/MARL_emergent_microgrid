@@ -1,0 +1,156 @@
+<!doctype html>
+    <html lang="es">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Q-table Analysis - checkpoint 45</title>
+      <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+    h1, h2, h3 { margin-bottom: 8px; }
+    .muted { color: #555; }
+    .card { border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; margin: 12px 0; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; font-size: 13px; }
+    th { background: #f6f6f6; text-align: left; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+    .good { background: #e7f7ee; color: #0f5132; }
+    .warn { background: #fff4e5; color: #7a4b00; }
+    .bad { background: #fde8e8; color: #842029; }
+    details summary { cursor: pointer; font-weight: bold; }
+    .bullet { margin: 6px 0 6px 16px; }
+    </style>
+    </head>
+    <body>
+      <h1>Reporte de análisis de Q-tables</h1>
+      <p class="muted">Checkpoint: <code>/home/dev/Visual Studio Code/ULA/MARL_emergent_microgrid/results/checkpoints/45</code></p>
+      <div class="card">
+        <h2>Resumen ejecutivo</h2>
+        <ul class="bullet"><li>grid#0: política no alinea bien con reward (66.7%).</li></ul>
+        <p class="muted">Archivo de métricas: <code>qtable_metrics_summary.csv</code></p>
+        <table><thead><tr><th>Agente</th><th>Estados únicos</th><th>Acciones</th><th>Cobertura estados</th><th>Completitud (estados con todas las acciones)</th><th>Entropía media (softmax(Q))</th><th>Gap greedy p50</th><th>Coherencia con reward</th><th>Salud</th></tr></thead><tbody><tr><td>battery#0</td><td>9</td><td>3</td><td>100.0%</td><td>100.0%</td><td>1.038</td><td>1.023</td><td>71.4%</td><td><span class="tag good">GOOD</span></td></tr><tr><td>grid#0</td><td>9</td><td>2</td><td>100.0%</td><td>100.0%</td><td>0.544</td><td>2.298</td><td>66.7%</td><td><span class="tag good">GOOD</span></td></tr><tr><td>wind#0</td><td>6</td><td>2</td><td>100.0%</td><td>100.0%</td><td>0.686</td><td>0.000</td><td>100.0%</td><td><span class="tag good">GOOD</span></td></tr></tbody></table>
+      </div>
+
+      
+        <div class="card">
+          <h2>Análisis multi-agente</h2>
+          <p class="muted">Distribución de acción greedy condicionada en <code>delta_ph_idx</code> (heurístico).</p>
+          <p><img src="multiagent_delta_actions.png" alt="Multi-agent delta actions" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+        </div>
+        
+
+      <div class="card">
+        <h2>Detalle por agente</h2>
+        
+            <details class="card">
+              <summary>battery#0</summary>
+              <p class="muted">Archivo: <code>qtable_battery#0.npz</code></p>
+              <div class="grid">
+                <div class="card">
+                  <h3>Métricas</h3>
+                  <ul class="bullet">
+                    <li>Estados únicos: 9</li>
+                    <li>Acciones: 3</li>
+                    <li>Cobertura (según config): 100.0%</li>
+                    <li>Completitud (estados con todas las acciones): 100.0%</li>
+                    <li>Q min/max/mean/std: -6.854 / 1.848 / -1.418 / 2.189</li>
+                    <li>Entropía media (softmax(Q)): 1.038</li>
+                    <li>Gap greedy (p10/p50/p90): 0.000 / 1.023 / 2.438</li>
+                    <li>Coherencia con reward: 71.4%<br/><span class="muted">Las recompensas usan real_balance (no delta_ph). Esta validación es aproximada.</span></li>
+                  </ul>
+                </div>
+
+                <div class="card">
+                  <h3>Gráficas</h3>
+                  <p><img src="q_heatmap_battery_0.png" alt="Heatmap battery#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                  <p><img src="q_hist_battery_0.png" alt="Hist battery#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                  <p><img src="greedy_actions_battery_0.png" alt="Actions battery#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                  <p><img src="expected_match_battery_0.png" alt="Expected battery#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                </div>
+
+                <div class="card">
+                  <h3>Recomendaciones prescriptivas (MARL)</h3>
+                  <ul class="bullet"><li>Coherencia parcial con la recompensa. Recomendación: aumentar episodios o suavizar actualización (alpha).</li><li>Nota: la recompensa usa real_balance, pero el estado de la Q-table usa delta_ph. Si observas incoherencias, una mejora fuerte es alinear el estado con real_balance (y/o incluirlo como variable adicional).</li></ul>
+                </div>
+              </div>
+            </details>
+            
+            <details class="card">
+              <summary>grid#0</summary>
+              <p class="muted">Archivo: <code>qtable_grid#0.npz</code></p>
+              <div class="grid">
+                <div class="card">
+                  <h3>Métricas</h3>
+                  <ul class="bullet">
+                    <li>Estados únicos: 9</li>
+                    <li>Acciones: 2</li>
+                    <li>Cobertura (según config): 100.0%</li>
+                    <li>Completitud (estados con todas las acciones): 100.0%</li>
+                    <li>Q min/max/mean/std: 0.000 / 5.852 / 2.054 / 1.973</li>
+                    <li>Entropía media (softmax(Q)): 0.544</li>
+                    <li>Gap greedy (p10/p50/p90): 0.000 / 2.298 / 3.774</li>
+                    <li>Coherencia con reward: 66.7%<br/><span class="muted">Las recompensas usan real_balance (no delta_ph). Esta validación es aproximada.</span></li>
+                  </ul>
+                </div>
+
+                <div class="card">
+                  <h3>Gráficas</h3>
+                  <p><img src="q_heatmap_grid_0.png" alt="Heatmap grid#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                  <p><img src="q_hist_grid_0.png" alt="Hist grid#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                  <p><img src="greedy_actions_grid_0.png" alt="Actions grid#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                  <p><img src="expected_match_grid_0.png" alt="Expected grid#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                </div>
+
+                <div class="card">
+                  <h3>Recomendaciones prescriptivas (MARL)</h3>
+                  <ul class="bullet"><li>Coherencia parcial con la recompensa. Recomendación: aumentar episodios o suavizar actualización (alpha).</li><li>Nota: la recompensa usa real_balance, pero el estado de la Q-table usa delta_ph. Si observas incoherencias, una mejora fuerte es alinear el estado con real_balance (y/o incluirlo como variable adicional).</li></ul>
+                </div>
+              </div>
+            </details>
+            
+            <details class="card">
+              <summary>wind#0</summary>
+              <p class="muted">Archivo: <code>qtable_wind#0.npz</code></p>
+              <div class="grid">
+                <div class="card">
+                  <h3>Métricas</h3>
+                  <ul class="bullet">
+                    <li>Estados únicos: 6</li>
+                    <li>Acciones: 2</li>
+                    <li>Cobertura (según config): 100.0%</li>
+                    <li>Completitud (estados con todas las acciones): 100.0%</li>
+                    <li>Q min/max/mean/std: 0.000 / 10.000 / 4.667 / 4.714</li>
+                    <li>Entropía media (softmax(Q)): 0.686</li>
+                    <li>Gap greedy (p10/p50/p90): 0.000 / 0.000 / 2.000</li>
+                    <li>Coherencia con reward: 100.0%<br/><span class="muted">Validación directa basada en core/rewards.py</span></li>
+                  </ul>
+                </div>
+
+                <div class="card">
+                  <h3>Gráficas</h3>
+                  <p><img src="q_heatmap_wind_0.png" alt="Heatmap wind#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                  <p><img src="q_hist_wind_0.png" alt="Hist wind#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                  <p><img src="greedy_actions_wind_0.png" alt="Actions wind#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                  <p><img src="expected_match_wind_0.png" alt="Expected wind#0" style="max-width: 100%; height: auto; border: 1px solid #ddd;" /></p>
+                </div>
+
+                <div class="card">
+                  <h3>Recomendaciones prescriptivas (MARL)</h3>
+                  <ul class="bullet"><li>En MARL estigmérgico, revisa que 'delta_ph' se actualice correctamente entre agentes y que el orden de ejecución no genere sesgo sistemático (p.ej., un renovable siempre 'come' primero).</li></ul>
+                </div>
+              </div>
+            </details>
+            
+      </div>
+
+      <div class="card">
+        <h2>Notas de interpretación</h2>
+        <ul class="bullet">
+          <li>Este análisis es estático (Q-tables finales). Para convergencia temporal se requiere historial por episodio.</li>
+          <li>Para battery/grid, la recompensa usa <code>real_balance</code>, pero el estado actual usa <code>delta_ph</code>; por eso algunas validaciones son aproximadas.</li>
+          <li>En MARL estigmérgico (delta_ph), el orden de ejecución y el consumo de potencial renovable pueden inducir sesgos en políticas aprendidas.</li>
+        </ul>
+      </div>
+
+    </body>
+    </html>

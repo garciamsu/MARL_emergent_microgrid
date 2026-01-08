@@ -1,0 +1,4 @@
+Agente,Estados únicos,Acciones,Cobertura estados,Completitud (estados con todas las acciones),Entropía media (softmax(Q)),Gap greedy p50,Coherencia con reward,Salud
+battery#0,9,3,100.0%,100.0%,1.038,1.023,71.4%,good
+grid#0,9,2,100.0%,100.0%,0.544,2.298,66.7%,good
+wind#0,6,2,100.0%,100.0%,0.686,0.000,100.0%,good

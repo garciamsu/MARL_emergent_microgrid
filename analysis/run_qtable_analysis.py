@@ -54,7 +54,7 @@ DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "default.yaml"
 # ------------------------------------------------------------------
 # Define aquí el checkpoint a analizar (carpeta results/checkpoints/<RUN_ID>/)
 # Ejemplo: RUN_ID = "44"
-RUN_ID = "44"
+RUN_ID = "45"
 
 
 @dataclass(frozen=True)

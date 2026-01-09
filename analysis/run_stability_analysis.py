@@ -19,6 +19,26 @@ import sys
 from pathlib import Path
 import argparse
 
+# Add project root to path (this file lives under analysis/)
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+
+def _get_stability_window(default: int = 100) -> int:
+    """Read stability.window from configs/default.yaml.
+
+    Falls back to `default` if missing/invalid.
+    """
+
+    try:
+        from configs.loader import load_config
+
+        cfg = load_config("configs/default.yaml")
+        stability_cfg = cfg.get("stability", {}) if isinstance(cfg, dict) else {}
+        window_value = int(stability_cfg.get("window", default))
+        return window_value if window_value >= 1 else default
+    except (OSError, ValueError, TypeError, ImportError):
+        return default
+
 
 def _summarize_numeric(series, prefix: str) -> dict:
     """Return robust summary stats for a numeric series."""
@@ -145,9 +165,6 @@ def _print_methods_comparison(results_dir: Path) -> None:
     print("-" * 80)
     print(table.to_string(index=False))
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 def run_learning_stability(results_dir: str = "results/stability") -> None:
     """Run methods 1–2 (learning stability) from Q-table history."""
 
@@ -175,7 +192,12 @@ def run_learning_stability(results_dir: str = "results/stability") -> None:
         agent_names = list(qtables_per_episode[0].keys())
         print(f"[OK] Agents: {', '.join(agent_names)}")
 
-    run_both_stability_analyses(qtables_per_episode, results_dir=results_dir)
+    ma_window = _get_stability_window(default=100)
+    run_both_stability_analyses(
+        qtables_per_episode,
+        results_dir=results_dir,
+        moving_avg_window=ma_window,
+    )
 
 
 def run_full_suite() -> None:
@@ -214,7 +236,8 @@ def run_operational_stability_suite() -> None:
     event_threshold_w = 2.0 * epsilon_band_w
     persistence_window_steps = 6
     dt_h = 1.0
-    rolling_window_steps = 12
+    stability_window = _get_stability_window(default=100)
+    rolling_window_steps = stability_window
 
     evolution_dir = EVOLUTION_DIR_DEFAULT
     results_dir = RESULTS_DIR_DEFAULT
@@ -234,12 +257,12 @@ def run_operational_stability_suite() -> None:
     qtables_path = results_dir / "qtables_per_episode.npz"
     if qtables_path.exists():
         bellman = BellmanStabilityAnalyzer(results_dir=results_dir)
-        bellman_csv, bellman_plot = bellman.run_from_npz(qtables_path)
+        bellman_csv, bellman_plot = bellman.run_from_npz(qtables_path, moving_avg_window=stability_window)
         print(f"[OK] Saved Bellman stability: {bellman_csv}")
         print(f"[OK] Saved plot: {bellman_plot}")
 
         consensus = ConsensusStabilityAnalyzer(results_dir=results_dir)
-        consensus_csv, consensus_plot = consensus.run_from_npz(qtables_path)
+        consensus_csv, consensus_plot = consensus.run_from_npz(qtables_path, moving_avg_window=stability_window)
         print(f"[OK] Saved consensus stability: {consensus_csv}")
         print(f"[OK] Saved plot: {consensus_plot}")
     else:
@@ -258,7 +281,7 @@ def run_operational_stability_suite() -> None:
     )
     df_var = variability.analyze(episodes)
     p_var = variability.save_results(df_var)
-    plot_paths = variability.plot(df_var)
+    plot_paths = variability.plot(df_var, moving_avg_window=stability_window)
     print(f"[OK] Saved variability metrics: {p_var}")
     for p in plot_paths:
         print(f"[OK] Saved plot: {p}")
@@ -285,9 +308,18 @@ def run_operational_stability_suite() -> None:
     if p_sr_plot is not None:
         print(f"[OK] Saved plot: {p_sr_plot}")
 
+    p_sr_plot_ma = policy.plot(
+        df_sr,
+        filename=f"policy_switch_rate_vs_episode_ma{stability_window}.png",
+        moving_avg_window=stability_window,
+    )
+    if p_sr_plot_ma is not None:
+        print(f"[OK] Saved plot (moving avg): {p_sr_plot_ma}")
+
     # One-row summary
     summary: dict = {
         "num_episodes": float(len(episodes)),
+        "stability_window": float(stability_window),
         "epsilon_band_w": float(epsilon_band_w),
         "event_threshold_w": float(event_threshold_w),
         "persistence_window_steps": float(persistence_window_steps),

@@ -2,7 +2,7 @@
 # General mode
 # ==============================================================
 
-mode: offline          # train | offline
+mode: train          # train | offline
 offline_run: 45      # set run_id if mode=offline
 
 # ==============================================================
@@ -26,7 +26,7 @@ offline:
 # ==============================================================
 
 simulation:
-  episodes: 1500            # number of training episodes (increased for better convergence)
+  episodes: 2500            # number of training episodes (increased for better convergence)
   dt_h: 1.0                 # step size in hours (must divide 1.0 exactly)
   seed: 10                  # random seed for reproducibility
   dataset: training_v1.csv  # Dataset file located in assets/datasets/

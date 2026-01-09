@@ -236,6 +236,50 @@ class BellmanContractionStabilityAnalyzer:
         print(f"✅ Bellman contraction stability plot saved to {output_path}")
         
         return output_path
+
+    def plot_stability_moving_average(self, window: int, filename: str | None = None) -> Path:
+        """Generate and save a moving-average variant of the stability plot.
+
+        The plot overlays the raw ΔV(k) series (faint) and a rolling mean
+        over episodes with the provided window size.
+        """
+
+        w = int(window)
+        if w < 1:
+            raise ValueError("window must be >= 1")
+
+        out_name = filename or f"bellman_contraction_stability_ma{w}.png"
+        output_path = self.results_dir / out_name
+
+        series = pd.Series(self.delta_v_per_episode, dtype="float64")
+        ma = series.rolling(window=w, min_periods=w).mean()
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        episodes = range(len(series))
+        ax.plot(episodes, series, linewidth=1, alpha=0.15, color="#2E86AB", label="ΔV(k) raw")
+        ax.plot(episodes, ma, linewidth=2.5, color="#2E86AB", label=f"ΔV(k) MA({w})")
+
+        ax.set_xlabel("Episode k", fontsize=12, fontweight="bold")
+        ax.set_ylabel("ΔV(k) = max_i ||V_i(k+1) - V_i(k)||_∞", fontsize=12, fontweight="bold")
+        ax.set_title(
+            f"Bellman Contraction Stability (Moving Average, window={w})\n"
+            "Smoothed convergence: MA(ΔV) → 0 indicates stable learning",
+            fontsize=14,
+            fontweight="bold",
+            pad=20,
+        )
+
+        ax.set_yscale("log")
+        ax.grid(True, alpha=0.3, linestyle="--")
+        ax.legend(fontsize=11)
+
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300, bbox_inches="tight")
+        plt.close()
+
+        print(f"✅ Bellman contraction moving-average plot saved to {output_path}")
+        return output_path
     
     def run_analysis(self) -> Tuple[Path, Path]:
         """Execute complete stability analysis pipeline.
@@ -476,6 +520,50 @@ class ConsensusStabilityAnalyzer:
         print(f"✅ Consensus stability plot saved to {output_path}")
         
         return output_path
+
+    def plot_stability_moving_average(self, window: int, filename: str | None = None) -> Path:
+        """Generate and save a moving-average variant of the consensus plot.
+
+        The plot overlays the raw D(k) series (faint) and a rolling mean
+        over episodes with the provided window size.
+        """
+
+        w = int(window)
+        if w < 1:
+            raise ValueError("window must be >= 1")
+
+        out_name = filename or f"consensus_stability_ma{w}.png"
+        output_path = self.results_dir / out_name
+
+        series = pd.Series(self.consensus_deviation_per_episode, dtype="float64")
+        ma = series.rolling(window=w, min_periods=w).mean()
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        episodes = range(len(series))
+        ax.plot(episodes, series, linewidth=1, alpha=0.15, color="#A23B72", label="D(k) raw")
+        ax.plot(episodes, ma, linewidth=2.5, color="#A23B72", label=f"D(k) MA({w})")
+
+        ax.set_xlabel("Episode k", fontsize=12, fontweight="bold")
+        ax.set_ylabel("D(k) = (1/N) Σ_i ||V_i(k) - V_avg(k)||_2", fontsize=12, fontweight="bold")
+        ax.set_title(
+            f"Consensus Stability (Moving Average, window={w})\n"
+            "Smoothed coordination: MA(D) → 0 indicates distributed consensus",
+            fontsize=14,
+            fontweight="bold",
+            pad=20,
+        )
+
+        ax.set_yscale("log")
+        ax.grid(True, alpha=0.3, linestyle="--")
+        ax.legend(fontsize=11)
+
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300, bbox_inches="tight")
+        plt.close()
+
+        print(f"✅ Consensus moving-average plot saved to {output_path}")
+        return output_path
     
     def run_analysis(self) -> Tuple[Path, Path]:
         """Execute complete consensus analysis pipeline.
@@ -513,8 +601,11 @@ class ConsensusStabilityAnalyzer:
         return csv_path, plot_path
 
 
-def run_both_stability_analyses(q_tables_per_episode: List[Dict[str, Dict]],
-                                results_dir: str = "results/stability") -> None:
+def run_both_stability_analyses(
+    q_tables_per_episode: List[Dict[str, Dict]],
+    results_dir: str = "results/stability",
+    moving_avg_window: int | None = None,
+) -> None:
     """Run both stability analyses with shared Q-table data.
     
     Convenience function to execute both Bellman contraction and consensus
@@ -541,6 +632,11 @@ def run_both_stability_analyses(q_tables_per_episode: List[Dict[str, Dict]],
     # Run analyses
     bellman_analyzer.run_analysis()
     consensus_analyzer.run_analysis()
+
+    if moving_avg_window is not None:
+        w = int(moving_avg_window)
+        bellman_analyzer.plot_stability_moving_average(window=w)
+        consensus_analyzer.plot_stability_moving_average(window=w)
     
     print("\n" + "="*80)
     print("✅ STABILITY ANALYSIS COMPLETE")

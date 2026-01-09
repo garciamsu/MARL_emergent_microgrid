@@ -126,7 +126,7 @@ class DefaultGridReward(RewardFn):
         else:
             reward = -0.25
         
-        print(f"\n delta_ph {delta_ph} soc {soc} agent.action {agent.action} reward {reward}")
+        #print(f"\n delta_ph {delta_ph} soc {soc} agent.action {agent.action} reward {reward}")
         return reward
 
 

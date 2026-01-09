@@ -294,8 +294,24 @@ class VariabilityStabilityAnalyzer:
         write_result_csv(df, out)
         return out
 
-    def plot(self, df: pd.DataFrame, filename_prefix: str = "variability") -> List[Path]:
-        """Create required plots: σ_e vs episodes and RMS_e vs episodes."""
+    @staticmethod
+    def _rolling_mean(series: pd.Series, window: int) -> pd.Series:
+        w = int(window)
+        if w < 1:
+            raise ValueError("moving average window must be >= 1")
+        return pd.to_numeric(series, errors="coerce").rolling(window=w, min_periods=w).mean()
+
+    def plot(
+        self,
+        df: pd.DataFrame,
+        filename_prefix: str = "variability",
+        moving_avg_window: Optional[int] = None,
+    ) -> List[Path]:
+        """Create required plots: σ_e vs episodes and RMS_e vs episodes.
+
+        If moving_avg_window is provided, produces additional plots based on
+        a rolling mean (moving average) over episodes.
+        """
 
         out_paths: List[Path] = []
         if df.empty:
@@ -314,6 +330,22 @@ class VariabilityStabilityAnalyzer:
         plt.close(fig)
         out_paths.append(p1)
 
+        if moving_avg_window is not None:
+            w = int(moving_avg_window)
+            p1_ma = self.results_dir / f"{filename_prefix}_std_vs_episode_ma{w}.png"
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.plot(df["episode"], df["std_e"], linewidth=1, alpha=0.15, label="raw")
+            ax.plot(df["episode"], self._rolling_mean(df["std_e"], w), linewidth=2.5, label=f"MA({w})")
+            ax.set_xlabel("Episode")
+            ax.set_ylabel(r"$\sigma_e$ (Std of energy balance error)")
+            ax.set_title(f"Variability-Based Stability: Std vs Episode (Moving Average, window={w})")
+            ax.grid(True, alpha=0.3, linestyle="--")
+            ax.legend(fontsize=9)
+            plt.tight_layout()
+            plt.savefig(p1_ma, dpi=300, bbox_inches="tight")
+            plt.close(fig)
+            out_paths.append(p1_ma)
+
         # RMS_e vs episode
         p2 = self.results_dir / f"{filename_prefix}_rms_vs_episode.png"
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -326,6 +358,22 @@ class VariabilityStabilityAnalyzer:
         plt.savefig(p2, dpi=300, bbox_inches="tight")
         plt.close(fig)
         out_paths.append(p2)
+
+        if moving_avg_window is not None:
+            w = int(moving_avg_window)
+            p2_ma = self.results_dir / f"{filename_prefix}_rms_vs_episode_ma{w}.png"
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.plot(df["episode"], df["rms_e"], linewidth=1, alpha=0.15, label="raw")
+            ax.plot(df["episode"], self._rolling_mean(df["rms_e"], w), linewidth=2.5, label=f"MA({w})")
+            ax.set_xlabel("Episode")
+            ax.set_ylabel(r"$RMS_e$ (Root-mean-square error)")
+            ax.set_title(f"Variability-Based Stability: RMS vs Episode (Moving Average, window={w})")
+            ax.grid(True, alpha=0.3, linestyle="--")
+            ax.legend(fontsize=9)
+            plt.tight_layout()
+            plt.savefig(p2_ma, dpi=300, bbox_inches="tight")
+            plt.close(fig)
+            out_paths.append(p2_ma)
 
         return out_paths
 
@@ -544,8 +592,23 @@ class PolicyStabilityAnalyzer:
         write_result_csv(df, out)
         return out
 
-    def plot(self, df: pd.DataFrame, filename: str = "policy_switch_rate_vs_episode.png") -> Optional[Path]:
-        """Create required plot: switch rate vs episode (one line per action column)."""
+    @staticmethod
+    def _rolling_mean(series: pd.Series, window: int) -> pd.Series:
+        w = int(window)
+        if w < 1:
+            raise ValueError("moving average window must be >= 1")
+        return pd.to_numeric(series, errors="coerce").rolling(window=w, min_periods=w).mean()
+
+    def plot(
+        self,
+        df: pd.DataFrame,
+        filename: str = "policy_switch_rate_vs_episode.png",
+        moving_avg_window: Optional[int] = None,
+    ) -> Optional[Path]:
+        """Create required plot: switch rate vs episode (one line per action column).
+
+        If moving_avg_window is provided, plots the moving average per action column.
+        """
 
         if df.empty:
             return None
@@ -554,7 +617,17 @@ class PolicyStabilityAnalyzer:
         fig, ax = plt.subplots(figsize=(12, 6))
 
         for action_col, g in df.groupby("action_column"):
-            ax.plot(g["episode"], g["switch_rate"], linewidth=2, label=action_col)
+            if moving_avg_window is None:
+                ax.plot(g["episode"], g["switch_rate"], linewidth=2, label=action_col)
+            else:
+                w = int(moving_avg_window)
+                ax.plot(g["episode"], g["switch_rate"], linewidth=1, alpha=0.15)
+                ax.plot(
+                    g["episode"],
+                    self._rolling_mean(g["switch_rate"], w),
+                    linewidth=2.5,
+                    label=f"{action_col} (MA{w})",
+                )
 
         ax.set_xlabel("Episode")
         ax.set_ylabel("Switch Rate SR")
@@ -594,11 +667,16 @@ class BellmanStabilityAnalyzer:
     def run_from_npz(
         self,
         qtables_npz_path: Path = Path("results/stability/qtables_per_episode.npz"),
+        moving_avg_window: Optional[int] = None,
     ) -> Tuple[Path, Path]:
         qtables = load_qtables_history(qtables_npz_path)
         analyzer = _BellmanContractionStabilityAnalyzer(results_dir=str(self.results_dir))
         analyzer.q_tables_per_episode = qtables
-        return analyzer.run_analysis()
+        csv_path, plot_path = analyzer.run_analysis()
+        if moving_avg_window is not None:
+            w = int(moving_avg_window)
+            analyzer.plot_stability_moving_average(window=w, filename=f"bellman_contraction_stability_ma{w}.png")
+        return csv_path, plot_path
 
 
 class ConsensusStabilityAnalyzer:
@@ -628,8 +706,13 @@ class ConsensusStabilityAnalyzer:
     def run_from_npz(
         self,
         qtables_npz_path: Path = Path("results/stability/qtables_per_episode.npz"),
+        moving_avg_window: Optional[int] = None,
     ) -> Tuple[Path, Path]:
         qtables = load_qtables_history(qtables_npz_path)
         analyzer = _ConsensusStabilityAnalyzer(results_dir=str(self.results_dir))
         analyzer.q_tables_per_episode = qtables
-        return analyzer.run_analysis()
+        csv_path, plot_path = analyzer.run_analysis()
+        if moving_avg_window is not None:
+            w = int(moving_avg_window)
+            analyzer.plot_stability_moving_average(window=w, filename=f"consensus_stability_ma{w}.png")
+        return csv_path, plot_path
